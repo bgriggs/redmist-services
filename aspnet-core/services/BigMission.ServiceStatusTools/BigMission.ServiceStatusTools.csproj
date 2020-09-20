@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\BigMission.Core\BigMission.Core.csproj" />
-    <ProjectReference Include="..\src\BigMission.EntityFrameworkCore\BigMission.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\BigMission.Core\BigMission.Core.csproj" />
+    <ProjectReference Include="..\..\src\BigMission.EntityFrameworkCore\BigMission.EntityFrameworkCore.csproj" />
   </ItemGroup>
   
   <PropertyGroup>

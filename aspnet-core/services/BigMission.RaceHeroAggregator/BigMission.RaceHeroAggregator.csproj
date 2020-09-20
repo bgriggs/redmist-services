@@ -20,10 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BigMission.CommandTools\BigMission.CommandTools.csproj" />
-    <ProjectReference Include="..\BigMission.RaceHeroSdk\BigMission.RaceHeroSdk.csproj" />
+    <ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
+    <ProjectReference Include="..\..\common\BigMission.RaceHeroSdk\BigMission.RaceHeroSdk.csproj" />
     <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
-    <ProjectReference Include="..\src\BigMission.Core\BigMission.Core.csproj" />
+    <ProjectReference Include="..\..\src\BigMission.Core\BigMission.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -21,7 +21,7 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\BigMission.CommandTools\BigMission.CommandTools.csproj" />
+    <ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
     <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
   </ItemGroup>
   
