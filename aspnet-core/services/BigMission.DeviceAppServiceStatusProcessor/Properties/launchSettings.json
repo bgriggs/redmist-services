@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.DeviceAppServiceStatusProcessor": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}

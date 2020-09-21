@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.VirtualChannelAggregator": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}

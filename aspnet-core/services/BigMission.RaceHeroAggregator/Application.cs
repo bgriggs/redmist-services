@@ -65,6 +65,7 @@ namespace BigMission.RaceHeroAggregator
 
             // Start updating service status
             ServiceTracking.Start();
+            Logger.Info("Started");
         }
 
         #region Event Subscription Management

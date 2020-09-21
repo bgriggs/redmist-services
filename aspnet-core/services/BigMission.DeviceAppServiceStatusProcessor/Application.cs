@@ -54,6 +54,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
             // Start updating service status
             ServiceTracking.Start();
+            Logger.Info("Started");
         }
 
         private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)

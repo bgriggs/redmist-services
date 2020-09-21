@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.RaceHeroAggregator": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.CarRealTimeStatusProcessor": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
