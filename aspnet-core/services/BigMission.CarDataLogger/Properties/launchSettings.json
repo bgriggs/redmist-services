@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.CarDataLogger": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
