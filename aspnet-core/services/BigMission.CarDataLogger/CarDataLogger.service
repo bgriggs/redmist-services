@@ -1,0 +1,15 @@
+﻿[Unit]
+Description=Car Data logger
+After=multi-user.target
+
+StartLimitIntervalSec=30
+StartLimitBurst=30
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+ExecStart=/path/to/daemon
+
+[Install]
+WantedBy=multi-user.target
