@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.RaceHeroAggregator
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.RaceHeroAggregator/BigMission.RaceHeroAggregator.dll
+WorkingDirectory=/home/bgriggs/redmist/BigMission.RaceHeroAggregator
+ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.RaceHeroAggregator/BigMission.RaceHeroAggregator.dll
 
 [Install]
 WantedBy=multi-user.target

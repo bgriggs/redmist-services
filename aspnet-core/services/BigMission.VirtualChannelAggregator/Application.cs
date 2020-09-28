@@ -41,6 +41,8 @@ namespace BigMission.VirtualChannelAggregator
         private EventProcessorClient processor;
         private Dictionary<int, Tuple<AppCommands, DeviceAppConfig>> deviceCommandClients = new Dictionary<int, Tuple<AppCommands, DeviceAppConfig>>();
         private Timer fullUpdateTimer;
+        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
+
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
         {
@@ -58,6 +60,7 @@ namespace BigMission.VirtualChannelAggregator
 
             // Start updating service status
             ServiceTracking.Start();
+            serviceBlock.WaitOne();
         }
 
         private void InternalRun()

@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.DeviceAppServiceStatusProcessor
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.DeviceAppServiceStatusProcessor/BigMission.DeviceAppServiceStatusProcessor.dll
+WorkingDirectory=/home/bgriggs/redmist/BigMission.DeviceAppServiceStatusProcessor
+ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.DeviceAppServiceStatusProcessor/BigMission.DeviceAppServiceStatusProcessor.dll
 
 [Install]
 WantedBy=multi-user.target

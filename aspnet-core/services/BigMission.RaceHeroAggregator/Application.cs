@@ -33,6 +33,7 @@ namespace BigMission.RaceHeroAggregator
 
         private Timer eventSubscriptionTimer;
         private readonly object eventSubscriptionCheckLock = new object();
+        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking)
@@ -66,6 +67,7 @@ namespace BigMission.RaceHeroAggregator
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            serviceBlock.WaitOne();
         }
 
         #region Event Subscription Management

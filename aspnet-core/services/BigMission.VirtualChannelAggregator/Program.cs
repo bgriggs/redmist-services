@@ -35,8 +35,6 @@ namespace BigMission.VirtualChannelAggregator
 
                 var application = provider.GetService<Application>();
                 application.Run();
-                Console.ReadLine();
-                application.TearDown();
             }
             catch (Exception ex)
             {

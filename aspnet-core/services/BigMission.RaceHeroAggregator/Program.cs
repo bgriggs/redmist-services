@@ -32,7 +32,6 @@ namespace BigMission.RaceHeroAggregator
 
                 var application = provider.GetService<Application>();
                 application.Run();
-                Console.ReadLine();
             }
             catch (Exception ex)
             {

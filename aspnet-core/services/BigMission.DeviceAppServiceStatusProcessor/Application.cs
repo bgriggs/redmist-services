@@ -15,6 +15,7 @@ using NLog;
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BigMission.DeviceAppServiceStatusProcessor
@@ -29,6 +30,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private ServiceTracking ServiceTracking { get; }
         private AppCommands Commands { get; }
         private EventProcessorClient processor;
+        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -55,6 +57,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            serviceBlock.WaitOne();
         }
 
         private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)

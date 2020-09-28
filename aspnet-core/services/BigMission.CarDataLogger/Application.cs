@@ -12,6 +12,7 @@ using System;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Threading;
 
 namespace BigMission.CarDataLogger
 {
@@ -24,7 +25,7 @@ namespace BigMission.CarDataLogger
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
         private EventProcessorClient processor;
-
+        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
         {
@@ -47,6 +48,7 @@ namespace BigMission.CarDataLogger
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            serviceBlock.WaitOne();
         }
 
         private async Task LogProcessEventHandler(ProcessEventArgs eventArgs)

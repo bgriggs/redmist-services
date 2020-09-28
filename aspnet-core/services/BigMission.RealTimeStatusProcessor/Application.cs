@@ -31,6 +31,7 @@ namespace BigMission.CarRealTimeStatusProcessor
         private readonly Dictionary<int, ChannelStatus> last = new Dictionary<int, ChannelStatus>();
         private Timer saveTimer;
         private BigMissionDbContext context;
+        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -62,6 +63,7 @@ namespace BigMission.CarRealTimeStatusProcessor
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            serviceBlock.WaitOne();
         }
 
         private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)

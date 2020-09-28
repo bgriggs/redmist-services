@@ -39,7 +39,6 @@ namespace BigMission.CarRealTimeStatusProcessor
 
                 var application = provider.GetService<Application>();
                 application.Run();
-                Console.ReadLine();
             }
             catch (Exception ex)
             {
