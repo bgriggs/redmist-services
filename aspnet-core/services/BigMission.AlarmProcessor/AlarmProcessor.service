@@ -1,0 +1,16 @@
+﻿[Unit]
+Description=Car Real-Time Status Processor
+After=multi-user.target
+
+StartLimitIntervalSec=30
+StartLimitBurst=10
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+WorkingDirectory=/home/bgriggs/redmist/BigMission.CarRealTimeStatusProcessor
+ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.CarRealTimeStatusProcessor/BigMission.CarRealTimeStatusProcessor.dll
+
+[Install]
+WantedBy=multi-user.target

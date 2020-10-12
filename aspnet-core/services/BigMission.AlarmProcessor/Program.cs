@@ -1,13 +1,14 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using BigMission.ServiceStatusTools;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using System;
-using BigMission.ServiceStatusTools;
 
-namespace BigMission.CarRealTimeStatusProcessor
+namespace BigMission.AlarmProcessor
 {
     /// <summary>
-    /// Consumes latest car status channel data and saves changes to a DB.
+    /// This service monitors channel data for values that will trigger an alarm.  When the 
+    /// user conditions are met, the trigger actions will be executed.
     /// </summary>
     class Program
     {
@@ -23,7 +24,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarRealTimeStatusProcessor", config["ConnectionString"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "AlarmProcessor", config["ConnectionString"], logger);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);
