@@ -68,43 +68,50 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
         private async Task HbProcessEventHandler(ProcessEventArgs eventArgs)
         {
-            if (eventArgs.Data.Properties.TryGetValue("DeviceKey", out object keyObject))
+            try
             {
-                string deviceKey = keyObject.ToString();
-
-                var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
-                var heartbeatData = JsonConvert.DeserializeObject<DeviceAppHeartbeat>(json);
-                Logger.Info($"Received HB from: '{heartbeatData.DeviceAppId}'");
-
-                var cf = new BigMissionDbContextFactory();
-                using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-
-                if (heartbeatData.DeviceAppId == 0 && !string.IsNullOrWhiteSpace(deviceKey))
+                if (eventArgs.Data.Properties.TryGetValue("DeviceKey", out object keyObject))
                 {
-                    var key = Guid.Parse(deviceKey);
-                    var deviceApp = db.DeviceAppConfig.FirstOrDefault(d => d.DeviceAppKey == key);
-                    if (deviceApp != null)
+                    string deviceKey = keyObject.ToString();
+
+                    var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
+                    var heartbeatData = JsonConvert.DeserializeObject<DeviceAppHeartbeat>(json);
+                    Logger.Info($"Received HB from: '{heartbeatData.DeviceAppId}'");
+
+                    var cf = new BigMissionDbContextFactory();
+                    using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+
+                    if (heartbeatData.DeviceAppId == 0 && !string.IsNullOrWhiteSpace(deviceKey))
                     {
-                        heartbeatData.DeviceAppId = deviceApp.Id;
+                        var key = Guid.Parse(deviceKey);
+                        var deviceApp = db.DeviceAppConfig.FirstOrDefault(d => d.DeviceAppKey == key);
+                        if (deviceApp != null)
+                        {
+                            heartbeatData.DeviceAppId = deviceApp.Id;
+                        }
+                        else
+                        {
+                            Logger.Debug($"Not app configured with key {deviceKey}");
+                        }
                     }
-                    else
+
+                    if (heartbeatData.DeviceAppId > 0)
                     {
-                        Logger.Debug($"Not app configured with key {deviceKey}");
+                        // Update heartbeat
+                        await CommitHeartbeat(heartbeatData, db);
+
+                        // Check configuration
+                        await ValidateConfiguration(heartbeatData, db);
                     }
                 }
 
-                if (heartbeatData.DeviceAppId > 0)
-                {
-                    // Update heartbeat
-                    await CommitHeartbeat(heartbeatData, db);
-
-                    // Check configuration
-                    await ValidateConfiguration(heartbeatData, db);
-                }
+                // Update checkpoint in the blob storage so that the app receives only new events the next time it's run
+                await eventArgs.UpdateCheckpointAsync(eventArgs.CancellationToken);
             }
-
-            // Update checkpoint in the blob storage so that the app receives only new events the next time it's run
-            await eventArgs.UpdateCheckpointAsync(eventArgs.CancellationToken);
+            catch(Exception ex)
+            {
+                Logger.Error(ex, "Error saving heartbeat update.");
+            }
         }
 
         private Task HbProcessErrorHandler(ProcessErrorEventArgs eventArgs)
