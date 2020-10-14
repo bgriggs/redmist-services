@@ -75,11 +75,11 @@ namespace BigMission.AlarmProcessor
             bool alarmOn = false;
             if (Alarm.ConditionOption == ALL)
             {
-                alarmOn = results.All(r => true);
+                alarmOn = results.All(r => r);
             }
             else if (Alarm.ConditionOption == ANY)
             {
-                alarmOn = results.Any(r => true);
+                alarmOn = results.Any(r => r);
             }
 
             Logger.Trace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
@@ -133,9 +133,9 @@ namespace BigMission.AlarmProcessor
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
                         // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First();
+                        var ch = Alarm.Conditions.First().ChannelId;
 
-                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.Id);
+                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch);
                         if (chStatusRow != null)
                         {
                             chStatusRow.AlarmMetadata = trigger.Color;
@@ -170,9 +170,9 @@ namespace BigMission.AlarmProcessor
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
                         // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First();
+                        var ch = Alarm.Conditions.First().ChannelId;
 
-                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.Id);
+                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch);
                         if (chStatusRow != null)
                         {
                             chStatusRow.AlarmMetadata = string.Empty;
