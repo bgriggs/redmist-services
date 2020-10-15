@@ -90,12 +90,12 @@ namespace BigMission.AlarmProcessor
                 alarmOn = results.Any(r => r);
             }
 
-            UpdateStatus(alarmOn);
+            UpdateStatus(alarmOn, true);
 
             return alarmOn;
         }
 
-        private void UpdateStatus(bool alarmOn)
+        private void UpdateStatus(bool alarmOn, bool applyTriggers)
         {
             Logger.Trace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
             var alarmStatus = context.CarAlarmStatus.FirstOrDefault(a => a.AlarmId == Alarm.Id);
@@ -111,7 +111,10 @@ namespace BigMission.AlarmProcessor
                 context.CarAlarmLog.Add(log);
 
                 // Turn off applicable triggers
-                RemoveTriggers();
+                if (applyTriggers)
+                {
+                    RemoveTriggers();
+                }
             }
             // Turn alarm on if it's off
             else if (alarmStatus == null && alarmOn)
@@ -126,7 +129,10 @@ namespace BigMission.AlarmProcessor
                 context.CarAlarmLog.Add(log);
 
                 // Activate triggers when alarms turn on
-                ProcessTriggers();
+                if (applyTriggers)
+                {
+                    ProcessTriggers();
+                }
             }
 
             Logger.Trace($"Alarm {Alarm.Name} saving...");
@@ -204,7 +210,7 @@ namespace BigMission.AlarmProcessor
 
         public void Supersede()
         {
-            UpdateStatus(alarmOn: false);
+            UpdateStatus(alarmOn: false, applyTriggers: false);
         }
     }
 }
