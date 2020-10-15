@@ -86,6 +86,14 @@ namespace BigMission.AlarmProcessor
 
             Logger.Trace($"Received status: {chDataSet.DeviceAppId}");
 
+            // If the status is too old, toss it
+            var diff = DateTime.UtcNow - chDataSet.Timestamp;
+            if (diff > TimeSpan.FromSeconds(5))
+            {
+                Logger.Trace($"Skipping status, too old: {diff.TotalSeconds} secs, {chDataSet.DeviceAppId}");
+                return;
+            }
+
             lock (alarmStatus)
             {
                 Parallel.ForEach(alarmStatus.Values, (alarmGrp) =>
