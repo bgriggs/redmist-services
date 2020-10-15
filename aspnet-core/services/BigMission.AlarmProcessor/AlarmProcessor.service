@@ -1,5 +1,5 @@
 ﻿[Unit]
-Description=Car Real-Time Status Processor
+Description=Alarm Processor
 After=multi-user.target
 
 StartLimitIntervalSec=30
@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/bgriggs/redmist/BigMission.CarRealTimeStatusProcessor
-ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.CarRealTimeStatusProcessor/BigMission.CarRealTimeStatusProcessor.dll
+WorkingDirectory=/home/bgriggs/redmist/BigMission.AlarmProcessor
+ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.AlarmProcessor/BigMission.AlarmProcessor.dll
 
 [Install]
 WantedBy=multi-user.target
