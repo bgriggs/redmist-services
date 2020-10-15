@@ -27,7 +27,11 @@ namespace BigMission.AlarmProcessor
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
-        private readonly List<AlarmStatus> alarmStatus = new List<AlarmStatus>();
+
+        /// <summary>
+        /// Alarms by their group
+        /// </summary>
+        private readonly Dictionary<string, List<AlarmStatus>> alarmStatus = new Dictionary<string, List<AlarmStatus>>();
 
         private EventProcessorClient processor;
         private BigMissionDbContext context;
@@ -84,12 +88,28 @@ namespace BigMission.AlarmProcessor
 
             lock (alarmStatus)
             {
-                Parallel.ForEach(alarmStatus, (alarm) =>
+                Parallel.ForEach(alarmStatus.Values, (alarmGrp) =>
                 {
                     try
                     {
-                        Logger.Trace($"Processing alarm: {alarm.Alarm.Name}");
-                        alarm.CheckConditions(chDataSet.Data);
+                        // Order the alarms by priority and check the highest priority first
+                        var orderedAlarms = alarmGrp.OrderBy(a => a.Priority);
+                        bool channelAlarmActive = false;
+                        foreach (var alarm in orderedAlarms)
+                        {
+                            Logger.Trace($"Processing alarm: {alarm.Alarm.Name}");
+                            // If the an alarm is already active on the channel, skip it
+                            if (!channelAlarmActive)
+                            {
+                                // Run the check on the alarm and preform triggers
+                                channelAlarmActive = alarm.CheckConditions(chDataSet.Data);
+                            }
+                            else // Alarm for channel is active, turn off lower priority alarms
+                            {
+                                alarm.Supersede();
+                                Logger.Trace($"Superseded alarm {alarm.Alarm.Name} due to higher priority being active");
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -123,13 +143,30 @@ namespace BigMission.AlarmProcessor
                     .Include(a => a.Triggers);
 
                 Logger.Info($"Loaded {alarmConfig.Count()} Alarms");
+
+                var als = new List<AlarmStatus>();
+                foreach (var ac in alarmConfig)
+                {
+                    var a = new AlarmStatus(ac, Config["ConnectionString"], Logger);
+                    als.Add(a);
+                }
+
+                // Group the alarms by the targeted channel for alarm progression support, e.g. info, warning, error
+                var grps = als.GroupBy(a => a.AlarmGroup);
+
                 lock (alarmStatus)
                 {
                     alarmStatus.Clear();
-                    foreach (var ac in alarmConfig)
+                    foreach(var chGrp in grps)
                     {
-                        var a = new AlarmStatus(ac, Config["ConnectionString"], Logger);
-                        alarmStatus.Add(a);
+                        List<AlarmStatus> channelAlarms;
+                        if (!alarmStatus.TryGetValue(chGrp.Key, out channelAlarms))
+                        {
+                            channelAlarms = new List<AlarmStatus>();
+                            alarmStatus[chGrp.Key] = channelAlarms;
+                        }
+
+                        channelAlarms.AddRange(chGrp);
                     }
                 }
             }

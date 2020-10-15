@@ -16,6 +16,16 @@ namespace BigMission.AlarmProcessor
         private List<ConditionStatus> conditionStatus = new List<ConditionStatus>();
         private ILogger Logger { get; }
 
+        public string AlarmGroup
+        {
+            get { return Alarm.AlarmGroup; }
+        }
+
+        public int Priority
+        {
+            get { return Alarm.Order; }
+        }
+
         private const string ALL = "All";
         private const string ANY = "Any";
 
@@ -35,7 +45,7 @@ namespace BigMission.AlarmProcessor
 
         public void InitializeConditions(AlarmCondition[] conditions)
         {
-            foreach(var cond in conditionStatus)
+            foreach (var cond in conditionStatus)
             {
                 try
                 {
@@ -46,19 +56,17 @@ namespace BigMission.AlarmProcessor
 
             conditionStatus.Clear();
 
-            foreach(var cond in conditions)
+            foreach (var cond in conditions)
             {
                 var cs = new ConditionStatus(cond, ConnectionString);
                 conditionStatus.Add(cs);
             }
         }
 
-        public void CheckConditions(ChannelStatus[] channelStatus)
+        public bool CheckConditions(ChannelStatus[] channelStatus)
         {
-            var alarmStatus = context.CarAlarmStatus.FirstOrDefault(a => a.AlarmId == Alarm.Id);
-
             var results = new List<bool>();
-            Parallel.ForEach(conditionStatus, (condStatus) => 
+            Parallel.ForEach(conditionStatus, (condStatus) =>
             {
                 try
                 {
@@ -82,7 +90,15 @@ namespace BigMission.AlarmProcessor
                 alarmOn = results.Any(r => r);
             }
 
+            UpdateStatus(alarmOn);
+
+            return alarmOn;
+        }
+
+        private void UpdateStatus(bool alarmOn)
+        {
             Logger.Trace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
+            var alarmStatus = context.CarAlarmStatus.FirstOrDefault(a => a.AlarmId == Alarm.Id);
 
             // Turn alarm off if it's active
             if (alarmStatus != null && !alarmOn)
@@ -100,7 +116,7 @@ namespace BigMission.AlarmProcessor
             // Turn alarm on if it's off
             else if (alarmStatus == null && alarmOn)
             {
-                Logger.Trace($"Alarm {Alarm.Name} turning on"); 
+                Logger.Trace($"Alarm {Alarm.Name} turning on");
 
                 var row = new CarAlarmStatus { AlarmId = Alarm.Id, ActiveTimestamp = DateTime.UtcNow };
                 context.CarAlarmStatus.Add(row);
@@ -133,9 +149,8 @@ namespace BigMission.AlarmProcessor
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
                         // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First().ChannelId;
-
-                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch);
+                        var ch = Alarm.Conditions.First();
+                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
                         if (chStatusRow != null)
                         {
                             chStatusRow.AlarmMetadata = trigger.Color;
@@ -170,9 +185,8 @@ namespace BigMission.AlarmProcessor
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
                         // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First().ChannelId;
-
-                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch);
+                        var ch = Alarm.Conditions.First();
+                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
                         if (chStatusRow != null)
                         {
                             chStatusRow.AlarmMetadata = string.Empty;
@@ -186,6 +200,11 @@ namespace BigMission.AlarmProcessor
                     Logger.Error(ex, "Error creating triggers");
                 }
             });
+        }
+
+        public void Supersede()
+        {
+            UpdateStatus(alarmOn: false);
         }
     }
 }
