@@ -1,12 +1,10 @@
 ﻿using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Consumer;
-using Azure.Messaging.EventHubs.Processor;
-using Azure.Storage.Blobs;
+using BigMission.CommandTools;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
@@ -28,13 +26,13 @@ namespace BigMission.AlarmProcessor
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
+        private readonly EventHubHelpers ehReader;
 
         /// <summary>
         /// Alarms by their group
         /// </summary>
         private readonly Dictionary<string, List<AlarmStatus>> alarmStatus = new Dictionary<string, List<AlarmStatus>>();
 
-        private EventProcessorClient processor;
         private BigMissionDbContext context;
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
@@ -44,6 +42,7 @@ namespace BigMission.AlarmProcessor
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
+            ehReader = new EventHubHelpers(logger);
         }
 
 
@@ -56,86 +55,65 @@ namespace BigMission.AlarmProcessor
             LoadAlarmConfiguration(null);
 
             // Process changes from stream and cache them here is the service
-            var storageClient = new BlobContainerClient(Config["BlobStorageConnStr"], Config["BlobContainer"]);
-            processor = new EventProcessorClient(storageClient, Config["KafkaConsumerGroup"], Config["KafkaConnectionString"], Config["KafkaDataTopic"]);
-            processor.ProcessEventAsync += StatusProcessEventHandler;
-            processor.ProcessErrorAsync += StatusProcessErrorHandler;
-            processor.PartitionInitializingAsync += Processor_PartitionInitializingAsync;
-            processor.StartProcessing();
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            receiveStatus.Wait();
             serviceBlock.WaitOne();
         }
 
-        private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)
+        private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
-            arg.DefaultStartingPosition = EventPosition.Latest;
-            return Task.CompletedTask;
-        }
-
-        private async Task StatusProcessEventHandler(ProcessEventArgs eventArgs)
-        {
-            var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
-            var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
-
-            if (chDataSet.Data == null)
+            try
             {
-                chDataSet.Data = new ChannelStatus[] { };
-            }
+                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
+                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
 
-            Logger.Trace($"Received status: {chDataSet.DeviceAppId}");
-
-            // If the status is too old, toss it
-            var diff = DateTime.UtcNow - chDataSet.Timestamp;
-            if (diff > TimeSpan.FromSeconds(5))
-            {
-                Logger.Trace($"Skipping status, too old: {diff.TotalSeconds} secs, {chDataSet.DeviceAppId}");
-                return;
-            }
-
-            lock (alarmStatus)
-            {
-                Parallel.ForEach(alarmStatus.Values, (alarmGrp) =>
+                if (chDataSet.Data == null)
                 {
-                    try
+                    chDataSet.Data = new ChannelStatus[] { };
+                }
+
+                Logger.Trace($"Received status: {chDataSet.DeviceAppId}");
+
+                lock (alarmStatus)
+                {
+                    Parallel.ForEach(alarmStatus.Values, (alarmGrp) =>
                     {
-                        // Order the alarms by priority and check the highest priority first
-                        var orderedAlarms = alarmGrp.OrderBy(a => a.Priority);
-                        bool channelAlarmActive = false;
-                        foreach (var alarm in orderedAlarms)
+                        try
                         {
-                            Logger.Trace($"Processing alarm: {alarm.Alarm.Name}");
-                            // If the an alarm is already active on the channel, skip it
-                            if (!channelAlarmActive)
+                            // Order the alarms by priority and check the highest priority first
+                            var orderedAlarms = alarmGrp.OrderBy(a => a.Priority);
+                            bool channelAlarmActive = false;
+                            foreach (var alarm in orderedAlarms)
                             {
-                                // Run the check on the alarm and preform triggers
-                                channelAlarmActive = alarm.CheckConditions(chDataSet.Data);
-                            }
-                            else // Alarm for channel is active, turn off lower priority alarms
-                            {
-                                alarm.Supersede();
-                                Logger.Trace($"Superseded alarm {alarm.Alarm.Name} due to higher priority being active");
+                                Logger.Trace($"Processing alarm: {alarm.Alarm.Name}");
+                                // If the an alarm is already active on the channel, skip it
+                                if (!channelAlarmActive)
+                                {
+                                    // Run the check on the alarm and preform triggers
+                                    channelAlarmActive = alarm.CheckConditions(chDataSet.Data);
+                                }
+                                else // Alarm for channel is active, turn off lower priority alarms
+                                {
+                                    alarm.Supersede();
+                                    Logger.Trace($"Superseded alarm {alarm.Alarm.Name} due to higher priority being active");
+                                }
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "Unable to process alarm status update");
-                    }
-                });
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "Unable to process alarm status update");
+                        }
+                    });
+                }
             }
-
-            // Update checkpoint in the blob storage so that the app receives only new events the next time it's run
-            await eventArgs.UpdateCheckpointAsync(eventArgs.CancellationToken);
-        }
-
-        private Task StatusProcessErrorHandler(ProcessErrorEventArgs eventArgs)
-        {
-            // Write details about the error to the console window
-            Logger.Error(eventArgs.Exception, $"\tPartition '{ eventArgs.PartitionId}': an unhandled exception was encountered.");
-            return Task.CompletedTask;
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Unable to process event from event hub partition");
+            }
         }
 
         #region Alarm Configuration
@@ -186,6 +164,5 @@ namespace BigMission.AlarmProcessor
         }
 
         #endregion
-
     }
 }

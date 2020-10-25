@@ -11,8 +11,8 @@ using NLog;
 using System;
 using System.Text;
 using System.Threading.Tasks;
-using System.Linq;
 using System.Threading;
+using System.Diagnostics;
 
 namespace BigMission.CarDataLogger
 {
@@ -88,14 +88,15 @@ namespace BigMission.CarDataLogger
                     var cf = new BigMissionDbContextFactory();
                     using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
                     db.ChannelLog.AddRange(ds.GetLogs());
+                    var sw = Stopwatch.StartNew();
                     await db.SaveChangesAsync();
+                    Logger.Trace($"Device source {ds.DeviceAppId} DB Commit in {sw.ElapsedMilliseconds}ms");
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Unable to save logs");
             }
-            Logger.Trace($"Saved log from app: {ds.DeviceAppId}");
         }
     }
 }

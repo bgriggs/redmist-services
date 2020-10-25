@@ -1,9 +1,7 @@
 ﻿using BigMission.EntityFrameworkCore;
-using BigMission.RaceHeroSdk;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
-using BigMission.Teams;
 using Microsoft.Extensions.Configuration;
 using NLog;
 using NUglify.Helpers;
@@ -11,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace BigMission.RaceHeroAggregator
 {
@@ -24,16 +21,11 @@ namespace BigMission.RaceHeroAggregator
         private IConfiguration Config { get; }
         private ServiceTracking ServiceTracking { get; }
 
-        private RaceHeroClient RhClient { get; set; }
-
         private readonly Dictionary<string, EventSubscription> eventSubscriptions = new Dictionary<string, EventSubscription>();
-        private readonly HashSet<string> liveEvents = new HashSet<string>();
-        private readonly object eventCheckLock = new object();
-        private readonly object pollLeaderboardLock = new object();
 
         private Timer eventSubscriptionTimer;
         private readonly object eventSubscriptionCheckLock = new object();
-        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking)
@@ -41,7 +33,6 @@ namespace BigMission.RaceHeroAggregator
             Logger = logger;
             Config = config;
             ServiceTracking = serviceTracking;
-            RhClient = new RaceHeroClient(Config["RaceHeroUrl"], Config["RaceHeroApiKey"]);
         }
 
 

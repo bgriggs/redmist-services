@@ -1,7 +1,4 @@
-﻿using Azure.Messaging.EventHubs;
-using Azure.Messaging.EventHubs.Consumer;
-using Azure.Messaging.EventHubs.Processor;
-using Azure.Storage.Blobs;
+﻿using Azure.Messaging.EventHubs.Consumer;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
@@ -37,11 +34,11 @@ namespace BigMission.VirtualChannelAggregator
         private ConfigurationCommands configurationChanges;
         private static readonly string[] configChanges = new[] { ConfigurationCommandTypes.DEVICE_MODIFIED, ConfigurationCommandTypes.CHANNEL_MODIFIED };
         private readonly BigMissionDbContextFactory contextFactory = new BigMissionDbContextFactory();
-
-        private EventProcessorClient processor;
+        private EventHubHelpers ehReader;
+        private Task receiveStatus;
         private Dictionary<int, Tuple<AppCommands, DeviceAppConfig>> deviceCommandClients = new Dictionary<int, Tuple<AppCommands, DeviceAppConfig>>();
         private Timer fullUpdateTimer;
-        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -68,20 +65,17 @@ namespace BigMission.VirtualChannelAggregator
             InitDeviceClients();
 
             // Process changes from stream and cache them here is the service
-            var storageClient = new BlobContainerClient(Config["BlobStorageConnStr"], Config["BlobContainer"]);
-            processor = new EventProcessorClient(storageClient, Config["KafkaConsumerGroup"], Config["KafkaConnectionString"], Config["KafkaDataTopic"]);
-            processor.ProcessEventAsync += ChannelProcessEventHandler;
-            processor.ProcessErrorAsync += ChannelProcessErrorHandler;
-            processor.PartitionInitializingAsync += Processor_PartitionInitializingAsync;
-            processor.StartProcessing();
+            ehReader = new EventHubHelpers(Logger);
+            receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
 
             if (configurationChanges == null)
             {
-                var group = "Config-" + Config["ServiceId"];
+                var group = "config-" + Config["ServiceId"];
                 configurationChanges = new ConfigurationCommands(Config["KafkaConnectionString"], group,
                     Config["KafkaConfigurationTopic"], Config["BlobStorageConnStr"], Config["BlobContainer"], Logger);
                 configurationChanges.Subscribe(configChanges, ProcessConfigurationChange);
             }
+
             if (fullUpdateTimer == null)
             {
                 var fullUpdateInterval = int.Parse(Config["FullUpdateFrequenceMs"]);
@@ -89,6 +83,29 @@ namespace BigMission.VirtualChannelAggregator
                 {
                     fullUpdateTimer = new Timer(FullUpdateCallback, null, 50, fullUpdateInterval);
                 }
+            }
+        }
+
+        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        {
+            try
+            {
+                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
+                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
+                if (chDataSet != null)
+                {
+                    Logger.Info($"Received status from: '{chDataSet.DeviceAppId}'");
+
+                    // Only process virtual channels
+                    if (chDataSet.IsVirtual)
+                    {
+                        SendChannelStaus(chDataSet.Data).Wait();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Unable to process event from event hub partition");
             }
         }
 
@@ -117,44 +134,11 @@ namespace BigMission.VirtualChannelAggregator
                 {
                     var topic = Config["KafkaCommandTopic"]; // + "-" + d.DeviceAppKey;
                     var t = new Tuple<AppCommands, DeviceAppConfig>(
-                         new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], null, topic,
-                         Config["BlobStorageConnStr"], Config["BlobContainer"], Logger),
+                         new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], null, topic, Logger),
                           d);
                     deviceCommandClients[d.Id] = t;
                 }
             }
-        }
-
-        private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)
-        {
-            arg.DefaultStartingPosition = EventPosition.Latest;
-            return Task.CompletedTask;
-        }
-
-        private async Task ChannelProcessEventHandler(ProcessEventArgs eventArgs)
-        {
-            var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
-            var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
-            if (chDataSet != null)
-            {
-                Logger.Info($"Received status from: '{chDataSet.DeviceAppId}'");
-
-                // Only process virtual channels
-                if (chDataSet.IsVirtual)
-                {
-                    await SendChannelStaus(chDataSet.Data);
-                }
-            }
-
-            // Update checkpoint in the blob storage so that the app receives only new events the next time it's run
-            await eventArgs.UpdateCheckpointAsync(eventArgs.CancellationToken);
-        }
-
-        private Task ChannelProcessErrorHandler(ProcessErrorEventArgs eventArgs)
-        {
-            // Write details about the error to the console window
-            Logger.Error(eventArgs.Exception, $"\tPartition '{ eventArgs.PartitionId}': an unhandled exception was encountered.");
-            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -254,7 +238,7 @@ namespace BigMission.VirtualChannelAggregator
         /// </summary>
         public void TearDown()
         {
-            processor.StopProcessing();
+            ehReader.CancelProcessing();
 
             var clientDispose = deviceCommandClients.Select(async c =>
             {

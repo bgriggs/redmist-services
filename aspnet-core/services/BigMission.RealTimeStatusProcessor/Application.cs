@@ -1,20 +1,19 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.CommandTools;
+using BigMission.EntityFrameworkCore;
+using BigMission.RaceManagement;
+using BigMission.ServiceData;
+using BigMission.ServiceStatusTools;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Diagnostics;
 using System.Linq;
-using BigMission.ServiceStatusTools;
-using BigMission.RaceManagement;
-using BigMission.ServiceData;
-using BigMission.EntityFrameworkCore;
-using Azure.Messaging.EventHubs;
-using Azure.Storage.Blobs;
-using System.Threading.Tasks;
-using Azure.Messaging.EventHubs.Processor;
 using System.Text;
-using Azure.Messaging.EventHubs.Consumer;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BigMission.CarRealTimeStatusProcessor
 {
@@ -26,12 +25,12 @@ namespace BigMission.CarRealTimeStatusProcessor
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
+        private readonly EventHubHelpers ehReader;
 
-        private EventProcessorClient processor;
         private readonly Dictionary<int, ChannelStatus> last = new Dictionary<int, ChannelStatus>();
         private Timer saveTimer;
         private BigMissionDbContext context;
-        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -39,6 +38,7 @@ namespace BigMission.CarRealTimeStatusProcessor
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
+            ehReader = new EventHubHelpers(logger);
         }
 
 
@@ -50,75 +50,62 @@ namespace BigMission.CarRealTimeStatusProcessor
             context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
 
             // Process changes from stream and cache them here is the service
-            var storageClient = new BlobContainerClient(Config["BlobStorageConnStr"], Config["BlobContainer"]);
-            processor = new EventProcessorClient(storageClient, Config["KafkaConsumerGroup"], Config["KafkaConnectionString"], Config["KafkaDataTopic"]);
-            processor.ProcessEventAsync += StatusProcessEventHandler;
-            processor.ProcessErrorAsync += StatusProcessErrorHandler;
-            processor.PartitionInitializingAsync += Processor_PartitionInitializingAsync;
-            processor.StartProcessing();
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
 
             // Process the cached status and update the database
-            saveTimer = new Timer(SaveCallback, null, 2000, 700);
+            saveTimer = new Timer(SaveCallback, null, 2000, 300);
 
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            receiveStatus.Wait();
             serviceBlock.WaitOne();
         }
 
-        private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)
+        private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
-            arg.DefaultStartingPosition = EventPosition.Latest;
-            return Task.CompletedTask;
-        }
-
-        private async Task StatusProcessEventHandler(ProcessEventArgs eventArgs)
-        {
-            var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
-            var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
-
-            if (chDataSet.Data == null)
+            try
             {
-                chDataSet.Data = new ChannelStatus[] { };
-            }
+                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
+                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
 
-            Logger.Trace($"Received log: {chDataSet.DeviceAppId}");
-
-            // Update cached status
-            lock (last)
-            {
-                foreach (var ch in chDataSet.Data)
+                if (chDataSet.Data == null)
                 {
-                    if (ch.DeviceAppId == 0)
-                    {
-                        ch.DeviceAppId = chDataSet.DeviceAppId;
-                    }
+                    chDataSet.Data = new ChannelStatus[] { };
+                }
 
-                    if (last.TryGetValue(ch.ChannelId, out ChannelStatus row))
+                Logger.Trace($"Received log: {chDataSet.DeviceAppId}");
+
+                // Update cached status
+                lock (last)
+                {
+                    foreach (var ch in chDataSet.Data)
                     {
-                        if (row.Value != ch.Value)
+                        if (ch.DeviceAppId == 0)
                         {
-                            row.Value = ch.Value;
-                            row.Timestamp = ch.Timestamp;
+                            ch.DeviceAppId = chDataSet.DeviceAppId;
                         }
-                    }
-                    else // Create new row
-                    {
-                        var cr = new ChannelStatus { DeviceAppId = ch.DeviceAppId, ChannelId = ch.ChannelId, Value = ch.Value, Timestamp = ch.Timestamp };
-                        last[ch.ChannelId] = cr;
+
+                        if (last.TryGetValue(ch.ChannelId, out ChannelStatus row))
+                        {
+                            if (row.Value != ch.Value)
+                            {
+                                row.Value = ch.Value;
+                                row.Timestamp = ch.Timestamp;
+                            }
+                        }
+                        else // Create new row
+                        {
+                            var cr = new ChannelStatus { DeviceAppId = ch.DeviceAppId, ChannelId = ch.ChannelId, Value = ch.Value, Timestamp = ch.Timestamp };
+                            last[ch.ChannelId] = cr;
+                        }
                     }
                 }
             }
-
-            // Update checkpoint in the blob storage so that the app receives only new events the next time it's run
-            await eventArgs.UpdateCheckpointAsync(eventArgs.CancellationToken);
-        }
-
-        private Task StatusProcessErrorHandler(ProcessErrorEventArgs eventArgs)
-        {
-            // Write details about the error to the console window
-            Logger.Error(eventArgs.Exception, $"\tPartition '{ eventArgs.PartitionId}': an unhandled exception was encountered.");
-            return Task.CompletedTask;
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Unable to process event from event hub partition");
+            }
         }
 
         public void UpdateChanges(ChannelStatus[] rows)
@@ -137,7 +124,9 @@ namespace BigMission.CarRealTimeStatusProcessor
                 }
             }
 
+            var sw = Stopwatch.StartNew();
             context.SaveChanges();
+            Logger.Trace($"DB Commit in {sw.ElapsedMilliseconds}ms");
         }
 
         private void SaveCallback(object obj)

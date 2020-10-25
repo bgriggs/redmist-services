@@ -1,8 +1,4 @@
-﻿using Abp.Extensions;
-using Azure.Messaging.EventHubs;
-using Azure.Messaging.EventHubs.Consumer;
-using Azure.Messaging.EventHubs.Processor;
-using Azure.Storage.Blobs;
+﻿using Azure.Messaging.EventHubs.Consumer;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
@@ -29,8 +25,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
         private AppCommands Commands { get; }
-        private EventProcessorClient processor;
-        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly EventHubHelpers ehReader;
+        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -39,7 +35,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             Logger = logger;
             ServiceTracking = serviceTracking;
             Commands = new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], null,
-                Config["KafkaCommandTopic"], Config["BlobStorageConnStr"], Config["BlobContainer"], logger);
+                Config["KafkaCommandTopic"], logger);
+            ehReader = new EventHubHelpers(logger);
         }
 
 
@@ -47,34 +44,25 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
-            var storageClient = new BlobContainerClient(Config["BlobStorageConnStr"], Config["BlobContainer"]);
-            processor = new EventProcessorClient(storageClient, Config["KafkaConsumerGroup"], Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"]);
-            processor.ProcessEventAsync += HbProcessEventHandler;
-            processor.ProcessErrorAsync += HbProcessErrorHandler;
-            processor.PartitionInitializingAsync += Processor_PartitionInitializingAsync;
-            processor.StartProcessing();
+            // Process changes from stream and cache them here is the service
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
+            receiveStatus.Wait();
             serviceBlock.WaitOne();
         }
 
-        private Task Processor_PartitionInitializingAsync(PartitionInitializingEventArgs arg)
-        {
-            arg.DefaultStartingPosition = EventPosition.Latest;
-            return Task.CompletedTask;
-        }
-
-        private async Task HbProcessEventHandler(ProcessEventArgs eventArgs)
+        private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
             {
-                if (eventArgs.Data.Properties.TryGetValue("DeviceKey", out object keyObject))
+                if (receivedEvent.Data.Properties.TryGetValue("DeviceKey", out object keyObject))
                 {
                     string deviceKey = keyObject.ToString();
 
-                    var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
+                    var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
                     var heartbeatData = JsonConvert.DeserializeObject<DeviceAppHeartbeat>(json);
                     Logger.Info($"Received HB from: '{heartbeatData.DeviceAppId}'");
 
@@ -98,27 +86,17 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     if (heartbeatData.DeviceAppId > 0)
                     {
                         // Update heartbeat
-                        await CommitHeartbeat(heartbeatData, db);
+                        CommitHeartbeat(heartbeatData, db).Wait();
 
                         // Check configuration
-                        await ValidateConfiguration(heartbeatData, db);
+                        ValidateConfiguration(heartbeatData, db).Wait();
                     }
                 }
-
-                // Update checkpoint in the blob storage so that the app receives only new events the next time it's run
-                await eventArgs.UpdateCheckpointAsync(eventArgs.CancellationToken);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Logger.Error(ex, "Error saving heartbeat update.");
+                Logger.Error(ex, "Unable to process event from event hub partition");
             }
-        }
-
-        private Task HbProcessErrorHandler(ProcessErrorEventArgs eventArgs)
-        {
-            // Write details about the error to the console window
-            Logger.Error(eventArgs.Exception, $"\tPartition '{ eventArgs.PartitionId}': an unhandled exception was encountered.");
-            return Task.CompletedTask;
         }
 
         /// <summary>
