@@ -133,10 +133,7 @@ namespace BigMission.VirtualChannelAggregator
 
                 foreach (var d in devices)
                 {
-                    var topic = Config["KafkaCommandTopic"]; // + "-" + d.DeviceAppKey;
-                    var t = new Tuple<AppCommands, DeviceAppConfig>(
-                         new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], null, topic, Logger),
-                          d);
+                    var t = new Tuple<AppCommands, DeviceAppConfig>(new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], Logger), d);
                     deviceCommandClients[d.Id] = t;
                 }
             }
@@ -211,7 +208,7 @@ namespace BigMission.VirtualChannelAggregator
                         };
                         AppCommands.EncodeCommandData(dataSet, cmd);
 
-                        await client.Item1.SendCommand(cmd);
+                        await client.Item1.SendCommand(cmd, Config["KafkaCommandTopic"], cmd.DestinationId);
                     }
                 }
                 catch (Exception ex)

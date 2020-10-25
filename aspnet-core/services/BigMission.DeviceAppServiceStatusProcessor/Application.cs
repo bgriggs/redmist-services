@@ -34,8 +34,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
-            Commands = new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], null,
-                Config["KafkaCommandTopic"], logger);
+            Commands = new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], logger);
             ehReader = new EventHubHelpers(logger);
         }
 
@@ -46,8 +45,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], 
-                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
             ServiceTracking.Start();
@@ -161,7 +159,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
                     AppCommands.EncodeCommandData(latestConfig, cmd);
 
-                    await Commands.SendCommand(cmd);
+                    await Commands.SendCommand(cmd, Config["KafkaCommandTopic"], cmd.DestinationId);
 
                     Logger.Info($"Sending updated configuraiton to application: {latestConfig.DeviceAppId}");
                 }
