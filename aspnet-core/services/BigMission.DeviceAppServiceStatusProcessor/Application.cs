@@ -45,7 +45,9 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
             // Process changes from stream and cache them here is the service
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
+            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], 
+                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
             ServiceTracking.Start();

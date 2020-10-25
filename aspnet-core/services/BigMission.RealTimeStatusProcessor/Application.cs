@@ -50,7 +50,9 @@ namespace BigMission.CarRealTimeStatusProcessor
             context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
 
             // Process changes from stream and cache them here is the service
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
+            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], 
+                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Process the cached status and update the database
             saveTimer = new Timer(SaveCallback, null, 2000, 300);

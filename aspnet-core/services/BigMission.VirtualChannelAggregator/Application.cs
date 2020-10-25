@@ -66,7 +66,9 @@ namespace BigMission.VirtualChannelAggregator
 
             // Process changes from stream and cache them here is the service
             ehReader = new EventHubHelpers(Logger);
-            receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
+            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
+            receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], 
+                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             if (configurationChanges == null)
             {

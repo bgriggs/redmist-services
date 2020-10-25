@@ -1,5 +1,4 @@
-﻿using Azure.Messaging.EventHubs;
-using Azure.Messaging.EventHubs.Consumer;
+﻿using Azure.Messaging.EventHubs.Consumer;
 using BigMission.CommandTools;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
@@ -55,7 +54,9 @@ namespace BigMission.AlarmProcessor
             LoadAlarmConfiguration(null);
 
             // Process changes from stream and cache them here is the service
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], null, EventPosition.Latest, ReceivedEventCallback);
+            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], 
+                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
             ServiceTracking.Start();
