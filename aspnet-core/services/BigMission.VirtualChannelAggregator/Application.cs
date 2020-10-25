@@ -71,8 +71,7 @@ namespace BigMission.VirtualChannelAggregator
             if (configurationChanges == null)
             {
                 var group = "config-" + Config["ServiceId"];
-                configurationChanges = new ConfigurationCommands(Config["KafkaConnectionString"], group,
-                    Config["KafkaConfigurationTopic"], Config["BlobStorageConnStr"], Config["BlobContainer"], Logger);
+                configurationChanges = new ConfigurationCommands(Config["KafkaConnectionString"], group, Config["KafkaConfigurationTopic"], Logger);
                 configurationChanges.Subscribe(configChanges, ProcessConfigurationChange);
             }
 
