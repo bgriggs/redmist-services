@@ -14,10 +14,12 @@ namespace BigMission.RaceHeroAggregator
         {
             try
             {
-                logger.Info("Starting...");
+                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                logger.Info($"Starting {env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(System.IO.Directory.GetCurrentDirectory())
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "RaceHeroConnector", config["ConnectionString"], logger);
