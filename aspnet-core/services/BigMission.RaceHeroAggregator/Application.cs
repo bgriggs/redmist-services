@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Twilio.Rest.Api.V2010.Account;
 
 namespace BigMission.RaceHeroAggregator
 {
@@ -134,10 +135,43 @@ namespace BigMission.RaceHeroAggregator
             {
                 var cf = new BigMissionDbContextFactory();
                 using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-                var now = DateTime.UtcNow;
-                return db.RaceEventSettings
-                    .Where(s => !s.IsDeleted && (s.EventStart <= now && s.EventEnd >= now))
+                
+                var events = db.RaceEventSettings
+                    .Where(s => !s.IsDeleted && s.IsEnabled)
                     .ToArray();
+
+                // Filter by subscription time
+                var activeSubscriptions = new List<RaceEventSettings>();
+
+                foreach (var evt in events)
+                {
+                    // Get the local time zone info if available
+                    TimeZoneInfo tz = null;
+                    if (!string.IsNullOrWhiteSpace(evt.EventTimeZoneId))
+                    {
+                        try
+                        {
+                            tz = TimeZoneInfo.FindSystemTimeZoneById(evt.EventTimeZoneId);
+                        }
+                        catch { }
+                    }
+
+                    // Attempt to use local time, otherwise use UTC
+                    var now = DateTime.UtcNow;
+                    if (tz != null)
+                    {
+                        now = TimeZoneInfo.ConvertTimeFromUtc(now, tz);
+                    }
+
+                    // The end date should go to the end of the day the that the user specified
+                    var end = new DateTime(evt.EventEnd.Year, evt.EventEnd.Month, evt.EventEnd.Day, 23, 59, 59);
+                    if (evt.EventStart <= now && end >= now)
+                    {
+                        activeSubscriptions.Add(evt);
+                    }
+                }
+
+                return activeSubscriptions.ToArray();
             }
             catch (Exception ex)
             {
