@@ -51,7 +51,7 @@ namespace BigMission.CarRealTimeStatusProcessor
 
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], 
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
                 partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Process the cached status and update the database
