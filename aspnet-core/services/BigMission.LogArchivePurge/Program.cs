@@ -4,8 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using System;
 
-
-namespace BigMission.VirtualChannelAggregator
+namespace BigMission.LogArchivePurge
 {
     class Program
     {
@@ -23,7 +22,7 @@ namespace BigMission.VirtualChannelAggregator
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "VirtualChannelAggregator", config["ConnectionString"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "LogArchivePurge", config["ConnectionString"], logger);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);
