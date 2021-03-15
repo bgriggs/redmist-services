@@ -68,7 +68,9 @@ namespace BigMission.LogArchivePurge
                         var settings = db.ArchivePurgeSettings.FirstOrDefault();
                         if (settings != null)
                         {
-                            using var conn = new SqlConnection(Config["ConnectionString"]);
+                            var csb = new SqlConnectionStringBuilder(Config["ConnectionString"]);
+                            csb.ConnectTimeout = 60 * 60 * 60;
+                            using var conn = new SqlConnection(csb.ConnectionString);
                             conn.Open();
 
                             // Run Audit log purge
