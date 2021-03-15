@@ -17,6 +17,11 @@ using System.Threading;
 
 namespace BigMission.LogArchivePurge
 {
+    /// <summary>
+    /// Archives and purges data from the system.  Data in the database for tables like channel log
+    /// are moved offline to blob storage for DB performance.  Other tables like the audit table
+    /// are simply purged. The blob storage is purged after a time as well.
+    /// </summary>
     class Application
     {
         private IConfiguration Config { get; }
@@ -79,7 +84,7 @@ namespace BigMission.LogArchivePurge
                             inTimeWindow = IsInTimeWindow(DateTime.UtcNow, settings.RunStart, settings.RunEnd);
                             if (settings.RunChannelMaintenance || inTimeWindow)
                             {
-                                ArchiveChannelLogs(db, conn);
+                                ArchiveChannelLogs(db, conn, settings);
                                 ResetChannelMaintenanceFlag(conn);
                             }
                         }
@@ -122,7 +127,7 @@ namespace BigMission.LogArchivePurge
         /// </summary>
         /// <param name="db"></param>
         /// <param name="conn"></param>
-        private void ArchiveChannelLogs(BigMissionDbContext db, SqlConnection conn)
+        private void ArchiveChannelLogs(BigMissionDbContext db, SqlConnection conn, ArchivePurgeSettings settings)
         {
             Logger.Info($"Running ArchiveChannelLog...");
 
@@ -146,6 +151,14 @@ namespace BigMission.LogArchivePurge
                         var chunkTs = new DateTime(ots.Year, ots.Month, ots.Day, ots.Hour, 0, 0);
                         while (chunkTs < DateTime.UtcNow)
                         {
+                            // Check the time to stop operations during business hours
+                            var inTimeWindow = IsInTimeWindow(DateTime.UtcNow, settings.RunStart, settings.RunEnd);
+                            if (!settings.RunChannelMaintenance && !inTimeWindow)
+                            {
+                                return;
+                            }
+
+                            // Load the next hour of logs
                             var logs = LoadChannelLogs(db, dev, chunkTs, chunkTs + inc);
                             if (logs.Any())
                             {
@@ -251,6 +264,9 @@ namespace BigMission.LogArchivePurge
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Clear out blob data when archive period has expired.
+        /// </summary>
         private void PurgeChannelArchive(int device, DateTime newest)
         {
             Logger.Info($"Purging archive for device {device} older than {newest}...");
