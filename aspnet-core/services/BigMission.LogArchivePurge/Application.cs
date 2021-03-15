@@ -68,9 +68,7 @@ namespace BigMission.LogArchivePurge
                         var settings = db.ArchivePurgeSettings.FirstOrDefault();
                         if (settings != null)
                         {
-                            var csb = new SqlConnectionStringBuilder(Config["ConnectionString"]);
-                            csb.ConnectTimeout = 60 * 60 * 60;
-                            using var conn = new SqlConnection(csb.ConnectionString);
+                            using var conn = new SqlConnection(Config["ConnectionString"]);
                             conn.Open();
 
                             // Run Audit log purge
@@ -120,6 +118,7 @@ namespace BigMission.LogArchivePurge
             var ret = DateTime.UtcNow - TimeSpan.FromDays(retentionDays);
             var c = $"DELETE FROM AbpAuditLogs WHERE ExecutionTime < '{ret}'";
             using var cmd = new SqlCommand(c, conn);
+            cmd.CommandTimeout = 60 * 60 * 60;
             int rows = cmd.ExecuteNonQuery();
             Logger.Info($"Deleted {rows} from AbpAuditLogs");
         }
@@ -209,6 +208,7 @@ namespace BigMission.LogArchivePurge
         {
             var c = $"SELECT TOP 1 [Timestamp] FROM [ChannelLog] WHERE [DeviceAppId]={deviceId}";
             using var cmd = new SqlCommand(c, conn);
+            cmd.CommandTimeout = 60 * 60 * 10;
             object robj = cmd.ExecuteScalar();
             if (robj != null)
             {
@@ -229,6 +229,7 @@ namespace BigMission.LogArchivePurge
             Logger.Info($"Deleting channel rows for device {device}");
             var c = $"DELETE FROM ChannelLog WHERE DeviceAppId={device} AND [Timestamp]>='{start}' AND [Timestamp]<'{end}'";
             using var cmd = new SqlCommand(c, conn);
+            cmd.CommandTimeout = 60 * 60 * 10;
             var rows = cmd.ExecuteNonQuery();
             Logger.Info($"Deleted {rows} from ChannelLog for Device {device} [Timestamp]>='{start}' AND [Timestamp]<'{end}'");
         }
