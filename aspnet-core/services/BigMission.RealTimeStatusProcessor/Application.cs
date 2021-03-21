@@ -1,4 +1,5 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.Cache;
 using BigMission.CommandTools;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
@@ -54,14 +55,7 @@ namespace BigMission.CarRealTimeStatusProcessor
             // Attempt to connect to redis cache
             useCache = !string.IsNullOrEmpty(Config["RedisConn"]);
             Logger.Info($"Cache available={useCache}");
-            if (useCache)
-            {
-                GetCache();
-
-                // Pre-load device channels for web host API and other status consumers
-                InitializeDeviceChannelCache();
-            }
-
+            
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
             Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
@@ -80,20 +74,7 @@ namespace BigMission.CarRealTimeStatusProcessor
             serviceBlock.WaitOne();
         }
 
-        private BigMissionDbContext GetDbContext()
-        {
-            if (context != null)// && context.Database.)
-            {
-                return context;
-            }
-            else
-            {
-                var cf = new BigMissionDbContextFactory();
-                context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-                return context;
-            }
-        }
-
+        
         private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
@@ -115,10 +96,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                     var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
                     foreach (var ch in chDataSet.Data)
                     {
-                        var cs = new Cache.Models.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
-                        var v = JsonConvert.SerializeObject(cs);
-                        var kvp = new KeyValuePair<RedisKey, RedisValue>(string.Format(Cache.Models.Consts.CHANNEL_KEY, ch.ChannelId), v);
-                        kvps.Add(kvp);
+                        kvps.Add(ChannelContext.CreateChannelStatusCacheEntry(ch));
                     }
                     var db = GetCache();
                     if (db != null)
@@ -149,7 +127,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                             if (row.Value != ch.Value)
                             {
                                 row.Value = ch.Value;
-                                var p = CreateCacheEntry(ch);
+                                var p = ChannelContext.CreateChannelHistoryCacheEntry(ch);
                                 history.Add(p);
                             }
 
@@ -160,7 +138,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                         {
                             var cr = new ChannelStatus { DeviceAppId = ch.DeviceAppId, ChannelId = ch.ChannelId, Value = ch.Value, Timestamp = ch.Timestamp };
                             last[ch.ChannelId] = cr;
-                            var p = CreateCacheEntry(ch);
+                            var p = ChannelContext.CreateChannelHistoryCacheEntry(ch);
                             history.Add(p);
                         }
                     }
@@ -226,7 +204,7 @@ namespace BigMission.CarRealTimeStatusProcessor
         /// Save changes to SQL server.
         /// </summary>
         /// <param name="rows"></param>
-        public void UpdateChanges(ChannelStatus[] rows)
+        private void UpdateChanges(ChannelStatus[] rows)
         {
             var db = GetDbContext();
             foreach (var updated in rows)
@@ -248,6 +226,20 @@ namespace BigMission.CarRealTimeStatusProcessor
             Logger.Trace($"DB Commit in {sw.ElapsedMilliseconds}ms");
         }
 
+        private BigMissionDbContext GetDbContext()
+        {
+            if (context != null)// && context.Database.)
+            {
+                return context;
+            }
+            else
+            {
+                var cf = new BigMissionDbContextFactory();
+                context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+                return context;
+            }
+        }
+
         private IDatabase GetCache()
         {
             if (cacheMuxer == null || !cacheMuxer.IsConnected)
@@ -255,34 +247,6 @@ namespace BigMission.CarRealTimeStatusProcessor
                 cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
             }
             return cacheMuxer.GetDatabase();
-        }
-
-        private static KeyValuePair<RedisKey, RedisValue> CreateCacheEntry(ChannelStatus ch)
-        {
-            var st = new Cache.Models.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
-            var v = JsonConvert.SerializeObject(st);
-            var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(Cache.Models.Consts.CHANNEL_HIST_KEY, ch.ChannelId), v);
-            return p;
-        }
-
-        /// <summary>
-        /// Loads channels by assigned device and caches them.
-        /// </summary>
-        private void InitializeDeviceChannelCache()
-        {
-            var db = GetDbContext();
-            var channelMappings = db.ChannelMappings.ToArray().GroupBy(g => g.DeviceAppId);
-            Logger.Info($"Initialize device channel cache with {channelMappings.Count()} devices...");
-            var map = new List<KeyValuePair<RedisKey, RedisValue>>();
-            foreach (var dg in channelMappings)
-            {
-                var channels = dg.Select(c => c.Id).ToArray();
-                var chstr = JsonConvert.SerializeObject(channels);
-                map.Add(new KeyValuePair<RedisKey, RedisValue>(string.Format(Cache.Models.Consts.DEVICE_CHANNELS, dg.Key), chstr));
-            }
-            var cache = GetCache();
-            cache.StringSet(map.ToArray(), flags: CommandFlags.FireAndForget);
-            Logger.Info($"Device cache loaded.");
         }
     }
 }
