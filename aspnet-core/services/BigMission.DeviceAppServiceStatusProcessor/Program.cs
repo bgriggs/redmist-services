@@ -24,7 +24,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "DeviceAppStatusProcessor", config["ConnectionString"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "DeviceAppStatusProcessor", config["RedisConn"], logger);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);

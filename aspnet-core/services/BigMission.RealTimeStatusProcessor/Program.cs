@@ -25,7 +25,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarRealTimeStatusProcessor", config["ConnectionString"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarRealTimeStatusProcessor", config["RedisConn"], logger);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);

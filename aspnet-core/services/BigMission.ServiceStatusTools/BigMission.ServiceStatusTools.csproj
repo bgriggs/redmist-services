@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\common\BigMission.Cache\BigMission.Cache.csproj" />
     <ProjectReference Include="..\..\src\BigMission.Core\BigMission.Core.csproj" />
     <ProjectReference Include="..\..\src\BigMission.EntityFrameworkCore\BigMission.EntityFrameworkCore.csproj" />
   </ItemGroup>

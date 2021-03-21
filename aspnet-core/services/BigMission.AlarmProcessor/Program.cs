@@ -26,7 +26,7 @@ namespace BigMission.AlarmProcessor
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "AlarmProcessor", config["ConnectionString"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "AlarmProcessor", config["RedisConn"], logger);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);

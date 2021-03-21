@@ -23,7 +23,7 @@ namespace BigMission.VirtualChannelAggregator
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "VirtualChannelAggregator", config["ConnectionString"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "VirtualChannelAggregator", config["RedisConn"], logger);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);
