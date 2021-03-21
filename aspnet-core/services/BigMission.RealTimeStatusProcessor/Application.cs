@@ -35,8 +35,6 @@ namespace BigMission.CarRealTimeStatusProcessor
 
         private volatile bool useCache;
         private ConnectionMultiplexer cacheMuxer;
-        private const string CHANNEL_KEY = "ch{0}";
-        private const string CHANNEL_HIST_KEY = "chist{0}";
         private const int HIST_MAX_LEN = 60;
 
 
@@ -59,10 +57,10 @@ namespace BigMission.CarRealTimeStatusProcessor
             if (useCache)
             {
                 GetCache();
-            }
 
-            var cf = new BigMissionDbContextFactory();
-            context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+                // Pre-load device channels for web host API and other status consumers
+                InitializeDeviceChannelCache();
+            }
 
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
@@ -80,6 +78,20 @@ namespace BigMission.CarRealTimeStatusProcessor
             Logger.Info("Started");
             receiveStatus.Wait();
             serviceBlock.WaitOne();
+        }
+
+        private BigMissionDbContext GetDbContext()
+        {
+            if (context != null)// && context.Database.)
+            {
+                return context;
+            }
+            else
+            {
+                var cf = new BigMissionDbContextFactory();
+                context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+                return context;
+            }
         }
 
         private void ReceivedEventCallback(PartitionEvent receivedEvent)
@@ -103,9 +115,9 @@ namespace BigMission.CarRealTimeStatusProcessor
                     var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
                     foreach (var ch in chDataSet.Data)
                     {
-                        var cs = new CacheModels.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp };
+                        var cs = new CacheModels.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
                         var v = JsonConvert.SerializeObject(cs);
-                        var kvp = new KeyValuePair<RedisKey, RedisValue>(string.Format(CHANNEL_KEY, ch.ChannelId), v);
+                        var kvp = new KeyValuePair<RedisKey, RedisValue>(string.Format(CacheModels.Consts.CHANNEL_KEY, ch.ChannelId), v);
                         kvps.Add(kvp);
                     }
                     var db = GetCache();
@@ -180,14 +192,6 @@ namespace BigMission.CarRealTimeStatusProcessor
             }
         }
 
-        private static KeyValuePair<RedisKey, RedisValue> CreateCacheEntry(ChannelStatus ch)
-        {
-            var st = new CacheModels.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp };
-            var v = JsonConvert.SerializeObject(st);
-            var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(CHANNEL_HIST_KEY, ch.ChannelId), v);
-            return p;
-        }
-
         /// <summary>
         /// Take care of processing status updates to SQL on another thread.
         /// </summary>
@@ -224,9 +228,10 @@ namespace BigMission.CarRealTimeStatusProcessor
         /// <param name="rows"></param>
         public void UpdateChanges(ChannelStatus[] rows)
         {
+            var db = GetDbContext();
             foreach (var updated in rows)
             {
-                var r = context.ChannelStatus.SingleOrDefault(c => c.DeviceAppId == updated.DeviceAppId && c.ChannelId == updated.ChannelId);
+                var r = db.ChannelStatus.SingleOrDefault(c => c.DeviceAppId == updated.DeviceAppId && c.ChannelId == updated.ChannelId);
                 if (r != null)
                 {
                     r.Value = updated.Value;
@@ -234,12 +239,12 @@ namespace BigMission.CarRealTimeStatusProcessor
                 }
                 else
                 {
-                    context.ChannelStatus.Add(updated);
+                    db.ChannelStatus.Add(updated);
                 }
             }
 
             var sw = Stopwatch.StartNew();
-            context.SaveChanges();
+            db.SaveChanges();
             Logger.Trace($"DB Commit in {sw.ElapsedMilliseconds}ms");
         }
 
@@ -250,6 +255,34 @@ namespace BigMission.CarRealTimeStatusProcessor
                 cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
             }
             return cacheMuxer.GetDatabase();
+        }
+
+        private static KeyValuePair<RedisKey, RedisValue> CreateCacheEntry(ChannelStatus ch)
+        {
+            var st = new CacheModels.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
+            var v = JsonConvert.SerializeObject(st);
+            var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(CacheModels.Consts.CHANNEL_HIST_KEY, ch.ChannelId), v);
+            return p;
+        }
+
+        /// <summary>
+        /// Loads channels by assigned device and caches them.
+        /// </summary>
+        private void InitializeDeviceChannelCache()
+        {
+            var db = GetDbContext();
+            var channelMappings = db.ChannelMappings.ToArray().GroupBy(g => g.DeviceAppId);
+            Logger.Info($"Initialize device channel cache with {channelMappings.Count()} devices...");
+            var map = new List<KeyValuePair<RedisKey, RedisValue>>();
+            foreach (var dg in channelMappings)
+            {
+                var channels = dg.Select(c => c.Id).ToArray();
+                var chstr = JsonConvert.SerializeObject(channels);
+                map.Add(new KeyValuePair<RedisKey, RedisValue>(string.Format(CacheModels.Consts.DEVICE_CHANNELS, dg.Key), chstr));
+            }
+            var cache = GetCache();
+            cache.StringSet(map.ToArray(), flags: CommandFlags.FireAndForget);
+            Logger.Info($"Device cache loaded.");
         }
     }
 }
