@@ -115,9 +115,9 @@ namespace BigMission.CarRealTimeStatusProcessor
                     var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
                     foreach (var ch in chDataSet.Data)
                     {
-                        var cs = new CacheModels.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
+                        var cs = new Cache.Models.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
                         var v = JsonConvert.SerializeObject(cs);
-                        var kvp = new KeyValuePair<RedisKey, RedisValue>(string.Format(CacheModels.Consts.CHANNEL_KEY, ch.ChannelId), v);
+                        var kvp = new KeyValuePair<RedisKey, RedisValue>(string.Format(Cache.Models.Consts.CHANNEL_KEY, ch.ChannelId), v);
                         kvps.Add(kvp);
                     }
                     var db = GetCache();
@@ -259,9 +259,9 @@ namespace BigMission.CarRealTimeStatusProcessor
 
         private static KeyValuePair<RedisKey, RedisValue> CreateCacheEntry(ChannelStatus ch)
         {
-            var st = new CacheModels.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
+            var st = new Cache.Models.ChannelStatus { Value = ch.Value, Timestamp = ch.Timestamp, DeviceId = ch.DeviceAppId };
             var v = JsonConvert.SerializeObject(st);
-            var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(CacheModels.Consts.CHANNEL_HIST_KEY, ch.ChannelId), v);
+            var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(Cache.Models.Consts.CHANNEL_HIST_KEY, ch.ChannelId), v);
             return p;
         }
 
@@ -278,7 +278,7 @@ namespace BigMission.CarRealTimeStatusProcessor
             {
                 var channels = dg.Select(c => c.Id).ToArray();
                 var chstr = JsonConvert.SerializeObject(channels);
-                map.Add(new KeyValuePair<RedisKey, RedisValue>(string.Format(CacheModels.Consts.DEVICE_CHANNELS, dg.Key), chstr));
+                map.Add(new KeyValuePair<RedisKey, RedisValue>(string.Format(Cache.Models.Consts.DEVICE_CHANNELS, dg.Key), chstr));
             }
             var cache = GetCache();
             cache.StringSet(map.ToArray(), flags: CommandFlags.FireAndForget);
