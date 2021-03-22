@@ -30,11 +30,8 @@ namespace BigMission.CarRealTimeStatusProcessor
         private readonly EventHubHelpers ehReader;
 
         private readonly Dictionary<int, ChannelStatus> last = new Dictionary<int, ChannelStatus>();
-        private Timer saveTimer;
-        private BigMissionDbContext context;
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
-        private volatile bool useCache;
         private ConnectionMultiplexer cacheMuxer;
         private const int HIST_MAX_LEN = 60;
 
@@ -52,20 +49,10 @@ namespace BigMission.CarRealTimeStatusProcessor
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
-            // Attempt to connect to redis cache
-            useCache = !string.IsNullOrEmpty(Config["RedisConn"]);
-            Logger.Info($"Cache available={useCache}");
-            
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
             Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
                 partitionFilter, EventPosition.Latest, ReceivedEventCallback);
-
-            if (!useCache)
-            {
-                // Process the cached status and update the SQL database
-                saveTimer = new Timer(SaveCallback, null, 2000, 300);
-            }
 
             // Start updating service status
             ServiceTracking.Start();
@@ -74,7 +61,7 @@ namespace BigMission.CarRealTimeStatusProcessor
             serviceBlock.WaitOne();
         }
 
-        
+
         private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
@@ -91,23 +78,24 @@ namespace BigMission.CarRealTimeStatusProcessor
                 Logger.Trace($"Received log: {chDataSet.DeviceAppId} Count={chDataSet.Data.Length}");
                 if (!chDataSet.Data.Any()) { return; }
 
-                if (useCache)
+                var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
+                foreach (var ch in chDataSet.Data)
                 {
-                    var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
-                    foreach (var ch in chDataSet.Data)
+                    kvps.Add(ChannelContext.CreateChannelStatusCacheEntry(ch));
+                }
+                var db = GetCache();
+                if (db != null)
+                {
+                    //db.StringSet(kvps.ToArray(), flags: CommandFlags.FireAndForget);
+                    foreach(var kvp in kvps)
                     {
-                        kvps.Add(ChannelContext.CreateChannelStatusCacheEntry(ch));
+                        db.StringSet(kvp.Key, kvp.Value, expiry: TimeSpan.FromMinutes(1), flags: CommandFlags.FireAndForget);
                     }
-                    var db = GetCache();
-                    if (db != null)
-                    {
-                        db.StringSet(kvps.ToArray(), flags: CommandFlags.FireAndForget);
-                        Logger.Trace($"Cached new status for device: {chDataSet.DeviceAppId}");
-                    }
-                    else
-                    {
-                        Logger.Warn("Cache was not available, failed to update status.");
-                    }
+                    Logger.Trace($"Cached new status for device: {chDataSet.DeviceAppId}");
+                }
+                else
+                {
+                    Logger.Warn("Cache was not available, failed to update status.");
                 }
 
                 // Update in-memory status locally
@@ -144,22 +132,18 @@ namespace BigMission.CarRealTimeStatusProcessor
                     }
                 }
 
-                if (useCache && history.Any())
+                if (history.Any())
                 {
-                    var db = GetCache();
-                    if (db != null)
+                    foreach (var h in history)
                     {
-                        foreach (var h in history)
+                        // Use the head of the list as the newest value
+                        var len = db.ListLeftPush(h.Key, h.Value);
+                        if (len > HIST_MAX_LEN)
                         {
-                            // Use the head of the list as the newest value
-                            var len = db.ListLeftPush(h.Key, h.Value);
-                            if (len > HIST_MAX_LEN)
-                            {
-                                db.ListTrim(h.Key, 0, HIST_MAX_LEN - 1, flags: CommandFlags.FireAndForget);
-                            }
+                            db.ListTrim(h.Key, 0, HIST_MAX_LEN - 1, flags: CommandFlags.FireAndForget);
                         }
-                        Logger.Trace($"Cached new history for device: {chDataSet.DeviceAppId}");
                     }
+                    Logger.Trace($"Cached new history for device: {chDataSet.DeviceAppId}");
                 }
 
                 Logger.Trace($"Processed status in {sw.ElapsedMilliseconds}ms");
@@ -167,76 +151,6 @@ namespace BigMission.CarRealTimeStatusProcessor
             catch (Exception ex)
             {
                 Logger.Error(ex, "Unable to process event from event hub partition");
-            }
-        }
-
-        /// <summary>
-        /// Take care of processing status updates to SQL on another thread.
-        /// </summary>
-        private void SaveCallback(object obj)
-        {
-            if (Monitor.TryEnter(saveTimer))
-            {
-                try
-                {
-                    // Get a copy of the current status as not to block
-                    ChannelStatus[] status;
-                    lock (last)
-                    {
-                        status = last.Select(l => l.Value.Clone()).ToArray();
-                    }
-
-                    // Commit changes to DB
-                    UpdateChanges(status);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Unable to commit status");
-                }
-                finally
-                {
-                    Monitor.Exit(saveTimer);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Save changes to SQL server.
-        /// </summary>
-        /// <param name="rows"></param>
-        private void UpdateChanges(ChannelStatus[] rows)
-        {
-            var db = GetDbContext();
-            foreach (var updated in rows)
-            {
-                var r = db.ChannelStatus.SingleOrDefault(c => c.DeviceAppId == updated.DeviceAppId && c.ChannelId == updated.ChannelId);
-                if (r != null)
-                {
-                    r.Value = updated.Value;
-                    r.Timestamp = updated.Timestamp;
-                }
-                else
-                {
-                    db.ChannelStatus.Add(updated);
-                }
-            }
-
-            var sw = Stopwatch.StartNew();
-            db.SaveChanges();
-            Logger.Trace($"DB Commit in {sw.ElapsedMilliseconds}ms");
-        }
-
-        private BigMissionDbContext GetDbContext()
-        {
-            if (context != null)// && context.Database.)
-            {
-                return context;
-            }
-            else
-            {
-                var cf = new BigMissionDbContextFactory();
-                context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-                return context;
             }
         }
 

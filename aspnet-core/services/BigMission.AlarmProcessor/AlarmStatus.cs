@@ -13,7 +13,7 @@ namespace BigMission.AlarmProcessor
         public CarAlarms Alarm { get; }
         public string ConnectionString { get; }
         private readonly BigMissionDbContext context;
-        private List<ConditionStatus> conditionStatus = new List<ConditionStatus>();
+        private readonly List<ConditionStatus> conditionStatus = new List<ConditionStatus>();
         private ILogger Logger { get; }
 
         public string AlarmGroup
@@ -154,15 +154,15 @@ namespace BigMission.AlarmProcessor
                     // Dashboard highlight
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
-                        // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First();
-                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
-                        if (chStatusRow != null)
-                        {
-                            chStatusRow.AlarmMetadata = trigger.Color;
-                            db.SaveChanges();
-                            Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
-                        }
+                        //// At the moment, use the first condition's channel
+                        //var ch = Alarm.Conditions.First();
+                        //var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
+                        //if (chStatusRow != null)
+                        //{
+                        //    chStatusRow.AlarmMetadata = trigger.Color;
+                        //    db.SaveChanges();
+                        //    Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
+                        //}
                     }
                     else
                     {
@@ -190,15 +190,15 @@ namespace BigMission.AlarmProcessor
                     // Dashboard highlight
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
-                        // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First();
-                        var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
-                        if (chStatusRow != null)
-                        {
-                            chStatusRow.AlarmMetadata = string.Empty;
-                            db.SaveChanges();
-                            Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
-                        }
+                        //// At the moment, use the first condition's channel
+                        //var ch = Alarm.Conditions.First();
+                        //var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
+                        //if (chStatusRow != null)
+                        //{
+                        //    chStatusRow.AlarmMetadata = string.Empty;
+                        //    db.SaveChanges();
+                        //    Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
+                        //}
                     }
                 }
                 catch (Exception ex)

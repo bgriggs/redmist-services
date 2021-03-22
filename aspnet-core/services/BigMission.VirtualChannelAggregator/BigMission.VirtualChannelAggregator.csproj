@@ -26,6 +26,7 @@
   </ItemGroup>
   
   <ItemGroup>
+    <ProjectReference Include="..\..\common\BigMission.Cache\BigMission.Cache.csproj" />
     <ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
     <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
   </ItemGroup>

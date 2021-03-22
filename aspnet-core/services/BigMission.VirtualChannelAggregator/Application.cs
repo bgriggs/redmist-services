@@ -1,4 +1,5 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.Cache;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
 using NUglify.Helpers;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,16 +38,17 @@ namespace BigMission.VirtualChannelAggregator
         private readonly BigMissionDbContextFactory contextFactory = new BigMissionDbContextFactory();
         private EventHubHelpers ehReader;
         private Task receiveStatus;
-        private Dictionary<int, Tuple<AppCommands, DeviceAppConfig>> deviceCommandClients = new Dictionary<int, Tuple<AppCommands, DeviceAppConfig>>();
+        private readonly Dictionary<int, Tuple<AppCommands, DeviceAppConfig, int[]>> deviceCommandClients = new Dictionary<int, Tuple<AppCommands, DeviceAppConfig, int[]>>();
         private Timer fullUpdateTimer;
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
-
+        private readonly ConnectionMultiplexer cacheMuxer;
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
         {
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
+            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
         }
 
 
@@ -67,7 +70,7 @@ namespace BigMission.VirtualChannelAggregator
             // Process changes from stream and cache them here in the service
             ehReader = new EventHubHelpers(Logger);
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], 
+            receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
                 partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             if (configurationChanges == null)
@@ -95,7 +98,7 @@ namespace BigMission.VirtualChannelAggregator
                 var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
                 if (chDataSet != null)
                 {
-                    Logger.Info($"Received status from: '{chDataSet.DeviceAppId}'");
+                    Logger.Debug($"Received status from: '{chDataSet.DeviceAppId}'");
 
                     // Only process virtual channels
                     if (chDataSet.IsVirtual)
@@ -130,10 +133,13 @@ namespace BigMission.VirtualChannelAggregator
                 using var context = contextFactory.CreateDbContext(new[] { Config["ConnectionString"] });
                 var devices = context.DeviceAppConfig.Where(d => !d.IsDeleted);
                 var deviceIds = devices.Select(d => d.Id);
+                var channels = context.ChannelMappings.Where(c => c.IsVirtual).ToArray();
 
                 foreach (var d in devices)
                 {
-                    var t = new Tuple<AppCommands, DeviceAppConfig>(new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], Logger), d);
+                    var devVirtChs = channels.Where(c => c.DeviceAppId == d.Id).Select(c => c.Id).ToArray();
+                    var t = new Tuple<AppCommands, DeviceAppConfig, int[]>(
+                        new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], Logger), d, devVirtChs);
                     deviceCommandClients[d.Id] = t;
                 }
             }
@@ -154,17 +160,18 @@ namespace BigMission.VirtualChannelAggregator
                         Logger.Info("Sending full status udpate");
 
                         int[] deviceIds;
+                        int[] channelIds;
                         lock (deviceCommandClients)
                         {
                             deviceIds = deviceCommandClients.Keys.ToArray();
+                            channelIds = deviceCommandClients.Values.SelectMany(v => v.Item3).ToArray();
                         }
 
-                        using var context = contextFactory.CreateDbContext(new[] { Config["ConnectionString"] });
-                        var virtualChannels = context.ChannelMappings.Where(c => deviceIds.Contains(c.DeviceAppId) && c.IsVirtual);
-                        var channelIds = virtualChannels.Select(c => c.Id).ToArray();
-
                         // Load current status
-                        var channelStatus = context.ChannelStatus.Where(s => channelIds.Contains(s.ChannelId));
+                        var cache = cacheMuxer.GetDatabase();
+                        var rks = channelIds.Select(i => new RedisKey(string.Format(Cache.Models.Consts.CHANNEL_KEY, i))).ToArray();
+                        var channelStatusStrs = cache.StringGet(rks);
+                        var channelStatus = ChannelContext.ConvertToEfChStatus(channelIds, channelStatusStrs);
                         SendChannelStaus(channelStatus.ToArray()).Wait();
                     }
                     finally
@@ -191,7 +198,7 @@ namespace BigMission.VirtualChannelAggregator
                 try
                 {
                     bool hasDevice;
-                    Tuple<AppCommands, DeviceAppConfig> client;
+                    Tuple<AppCommands, DeviceAppConfig, int[]> client;
                     lock (deviceCommandClients)
                     {
                         hasDevice = deviceCommandClients.TryGetValue(ds.Key, out client);

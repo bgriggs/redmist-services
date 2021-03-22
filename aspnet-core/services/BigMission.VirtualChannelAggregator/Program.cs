@@ -11,7 +11,7 @@ namespace BigMission.VirtualChannelAggregator
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
-        static void Main(string[] args)
+        static void Main()
         {
             try
             {
