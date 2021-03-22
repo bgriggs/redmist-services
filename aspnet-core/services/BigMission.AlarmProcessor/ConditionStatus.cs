@@ -1,5 +1,9 @@
-﻿using BigMission.EntityFrameworkCore;
+﻿using BigMission.Cache;
+using BigMission.Cache.Models;
+using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,21 +12,24 @@ namespace BigMission.AlarmProcessor
 {
     class ConditionStatus : IDisposable, IAsyncDisposable
     {
-        public AlarmCondition ConditionConfig { get; }
+        public RaceManagement.AlarmCondition ConditionConfig { get; }
         private readonly BigMissionDbContext context;
         private bool disposed;
+        private ConnectionMultiplexer cacheMuxer;
 
-        public ConditionStatus(AlarmCondition conditionConfig, string connectionString)
+
+        public ConditionStatus(RaceManagement.AlarmCondition conditionConfig, string connectionString, ConnectionMultiplexer cacheMuxer)
         {
             if (conditionConfig == null || connectionString == null) { throw new ArgumentNullException(); }
             ConditionConfig = conditionConfig;
 
             var cf = new BigMissionDbContextFactory();
             context = cf.CreateDbContext(new[] { connectionString });
+            this.cacheMuxer = cacheMuxer;
         }
 
 
-        public bool CheckConditions(ChannelStatus[] channelStatus)
+        public bool CheckConditions(RaceManagement.ChannelStatus[] channelStatus)
         {
             bool conditionActive = false;
             var chstatus = channelStatus.FirstOrDefault(s => s.ChannelId == ConditionConfig.ChannelId);
@@ -30,15 +37,23 @@ namespace BigMission.AlarmProcessor
             {
                 int.TryParse(ConditionConfig.OnFor, out int onfor);
 
-                var condStatus = context.AlarmConditionStatus.FirstOrDefault(c => c.ConditionId == ConditionConfig.Id);
+                var cache = cacheMuxer.GetDatabase();
+                var rv = cache.StringGet(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
+                Cache.Models.AlarmCondition condStatus = null;
+                if (rv.HasValue)
+                {
+                    condStatus = JsonConvert.DeserializeObject<Cache.Models.AlarmCondition>(rv);
+                }
+
                 var conditionState = EvalCondition(chstatus);
 
                 // See if this is newly turned on
-                if (conditionState && condStatus == null)
+                if (conditionState && !rv.HasValue)
                 {
-                    var row = new AlarmConditionStatus { ConditionId = ConditionConfig.Id, ActiveTimestamp = DateTime.UtcNow };
+                    var row = new Cache.Models.AlarmCondition { ActiveTimestamp = DateTime.UtcNow };
                     row.OnForMet = onfor == 0;
-                    context.AlarmConditionStatus.Add(row);
+                    var str = JsonConvert.SerializeObject(row);
+                    cache.StringSet(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id), str);
                     conditionActive = row.OnForMet;
                 }
                 // When active, see if it has been on for the requisite duration
@@ -57,16 +72,14 @@ namespace BigMission.AlarmProcessor
                 // No longer on, clear out
                 else if (!conditionState && condStatus != null)
                 {
-                    context.AlarmConditionStatus.Remove(condStatus);
+                    cache.KeyDelete(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
                 }
-
-                context.SaveChanges();
             }
 
             return conditionActive;
         }
 
-        private bool EvalCondition(ChannelStatus channelStatus)
+        private bool EvalCondition(RaceManagement.ChannelStatus channelStatus)
         {
             var configVal = float.Parse(ConditionConfig.ChannelValue);
             if (ConditionConfig.ConditionType == AlarmConditionType.EQUALS)

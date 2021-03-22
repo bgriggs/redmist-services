@@ -1,6 +1,9 @@
-﻿using BigMission.EntityFrameworkCore;
+﻿using BigMission.Cache;
+using BigMission.Cache.Models;
+using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using NLog;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +18,8 @@ namespace BigMission.AlarmProcessor
         private readonly BigMissionDbContext context;
         private readonly List<ConditionStatus> conditionStatus = new List<ConditionStatus>();
         private ILogger Logger { get; }
+        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly ChannelContext channelContext;
 
         public string AlarmGroup
         {
@@ -30,7 +35,7 @@ namespace BigMission.AlarmProcessor
         private const string ANY = "Any";
 
 
-        public AlarmStatus(CarAlarms alarm, string connectionString, ILogger logger)
+        public AlarmStatus(CarAlarms alarm, string connectionString, ILogger logger, ConnectionMultiplexer cacheMuxer, ChannelContext channelContext)
         {
             Alarm = alarm ?? throw new ArgumentNullException();
             ConnectionString = connectionString ?? throw new ArgumentNullException();
@@ -40,10 +45,12 @@ namespace BigMission.AlarmProcessor
 
             var cf = new BigMissionDbContextFactory();
             context = cf.CreateDbContext(new[] { connectionString });
+            this.cacheMuxer = cacheMuxer;
+            this.channelContext = channelContext;
         }
 
 
-        public void InitializeConditions(AlarmCondition[] conditions)
+        public void InitializeConditions(RaceManagement.AlarmCondition[] conditions)
         {
             foreach (var cond in conditionStatus)
             {
@@ -58,12 +65,12 @@ namespace BigMission.AlarmProcessor
 
             foreach (var cond in conditions)
             {
-                var cs = new ConditionStatus(cond, ConnectionString);
+                var cs = new ConditionStatus(cond, ConnectionString, cacheMuxer);
                 conditionStatus.Add(cs);
             }
         }
 
-        public bool CheckConditions(ChannelStatus[] channelStatus)
+        public bool CheckConditions(RaceManagement.ChannelStatus[] channelStatus)
         {
             var results = new List<bool>();
             Parallel.ForEach(conditionStatus, (condStatus) =>
@@ -98,13 +105,15 @@ namespace BigMission.AlarmProcessor
         private void UpdateStatus(bool alarmOn, bool applyTriggers)
         {
             Logger.Trace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
-            var alarmStatus = context.CarAlarmStatus.FirstOrDefault(a => a.AlarmId == Alarm.Id);
+            var cache = cacheMuxer.GetDatabase();
+            var alarmKey = string.Format(Consts.ALARM_STATUS, Alarm.Id);
+            var rv = cache.StringGet(alarmKey);
 
             // Turn alarm off if it's active
-            if (alarmStatus != null && !alarmOn)
+            if (rv.HasValue && !alarmOn)
             {
                 Logger.Trace($"Alarm {Alarm.Name} turning off");
-                context.CarAlarmStatus.Remove(alarmStatus);
+                cache.KeyDelete(alarmKey);
 
                 // Log change
                 var log = new CarAlarmLog { AlarmId = Alarm.Id, Timestamp = DateTime.UtcNow, IsActive = false };
@@ -117,12 +126,11 @@ namespace BigMission.AlarmProcessor
                 }
             }
             // Turn alarm on if it's off
-            else if (alarmStatus == null && alarmOn)
+            else if (!rv.HasValue && alarmOn)
             {
                 Logger.Trace($"Alarm {Alarm.Name} turning on");
 
-                var row = new CarAlarmStatus { AlarmId = Alarm.Id, ActiveTimestamp = DateTime.UtcNow };
-                context.CarAlarmStatus.Add(row);
+                cache.StringSet(alarmKey, DateTime.UtcNow.ToString());
 
                 // Log change
                 var log = new CarAlarmLog { AlarmId = Alarm.Id, Timestamp = DateTime.UtcNow, IsActive = true };
@@ -146,23 +154,17 @@ namespace BigMission.AlarmProcessor
             {
                 try
                 {
-                    var cf = new BigMissionDbContextFactory();
-                    using var db = cf.CreateDbContext(new[] { ConnectionString });
-
                     Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active");
 
                     // Dashboard highlight
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
-                        //// At the moment, use the first condition's channel
-                        //var ch = Alarm.Conditions.First();
-                        //var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
-                        //if (chStatusRow != null)
-                        //{
-                        //    chStatusRow.AlarmMetadata = trigger.Color;
-                        //    db.SaveChanges();
-                        //    Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
-                        //}
+                        // At the moment, use the first condition's channel
+                        var ch = Alarm.Conditions.First();
+                        var cache = cacheMuxer.GetDatabase();
+                        var deviceAppId = channelContext.GetDeviceAppId(ch.ChannelId);
+                        cache.HashSet(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString(), trigger.Color);
+                        Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
                     }
                     else
                     {
@@ -182,23 +184,17 @@ namespace BigMission.AlarmProcessor
             {
                 try
                 {
-                    var cf = new BigMissionDbContextFactory();
-                    using var db = cf.CreateDbContext(new[] { ConnectionString });
-
                     Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off");
 
                     // Dashboard highlight
                     if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
                     {
-                        //// At the moment, use the first condition's channel
-                        //var ch = Alarm.Conditions.First();
-                        //var chStatusRow = db.ChannelStatus.FirstOrDefault(c => c.ChannelId == ch.ChannelId);
-                        //if (chStatusRow != null)
-                        //{
-                        //    chStatusRow.AlarmMetadata = string.Empty;
-                        //    db.SaveChanges();
-                        //    Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
-                        //}
+                        // At the moment, use the first condition's channel
+                        var ch = Alarm.Conditions.First();
+                        var cache = cacheMuxer.GetDatabase();
+                        var deviceAppId = channelContext.GetDeviceAppId(ch.ChannelId);
+                        cache.HashDelete(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString());
+                        Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
                     }
                 }
                 catch (Exception ex)

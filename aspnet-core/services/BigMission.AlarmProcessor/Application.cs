@@ -1,4 +1,5 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.Cache;
 using BigMission.CommandTools;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,6 +28,8 @@ namespace BigMission.AlarmProcessor
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
         private readonly EventHubHelpers ehReader;
+        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly ChannelContext channelContext;
 
         /// <summary>
         /// Alarms by their group
@@ -42,6 +46,8 @@ namespace BigMission.AlarmProcessor
             Logger = logger;
             ServiceTracking = serviceTracking;
             ehReader = new EventHubHelpers(logger);
+            cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
+            channelContext = new ChannelContext(Config["ConnectionString"], cacheMuxer, true);
         }
 
 
@@ -52,6 +58,7 @@ namespace BigMission.AlarmProcessor
             var cf = new BigMissionDbContextFactory();
             context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
             LoadAlarmConfiguration(null);
+            channelContext.WarmUp();
 
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
@@ -135,7 +142,7 @@ namespace BigMission.AlarmProcessor
                 var als = new List<AlarmStatus>();
                 foreach (var ac in alarmConfig)
                 {
-                    var a = new AlarmStatus(ac, Config["ConnectionString"], Logger);
+                    var a = new AlarmStatus(ac, Config["ConnectionString"], Logger, cacheMuxer, channelContext);
                     als.Add(a);
                 }
 
@@ -147,8 +154,7 @@ namespace BigMission.AlarmProcessor
                     alarmStatus.Clear();
                     foreach(var chGrp in grps)
                     {
-                        List<AlarmStatus> channelAlarms;
-                        if (!alarmStatus.TryGetValue(chGrp.Key, out channelAlarms))
+                        if (!alarmStatus.TryGetValue(chGrp.Key, out List<AlarmStatus> channelAlarms))
                         {
                             channelAlarms = new List<AlarmStatus>();
                             alarmStatus[chGrp.Key] = channelAlarms;
