@@ -15,12 +15,12 @@ namespace BigMission.AlarmProcessor
         public RaceManagement.AlarmCondition ConditionConfig { get; }
         private readonly BigMissionDbContext context;
         private bool disposed;
-        private ConnectionMultiplexer cacheMuxer;
+        private readonly ConnectionMultiplexer cacheMuxer;
 
 
         public ConditionStatus(RaceManagement.AlarmCondition conditionConfig, string connectionString, ConnectionMultiplexer cacheMuxer)
         {
-            if (conditionConfig == null || connectionString == null) { throw new ArgumentNullException(); }
+            if (conditionConfig == null || connectionString == null || cacheMuxer == null) { throw new ArgumentNullException(); }
             ConditionConfig = conditionConfig;
 
             var cf = new BigMissionDbContextFactory();

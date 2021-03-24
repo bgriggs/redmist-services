@@ -40,13 +40,14 @@ namespace BigMission.AlarmProcessor
             Alarm = alarm ?? throw new ArgumentNullException();
             ConnectionString = connectionString ?? throw new ArgumentNullException();
             Logger = logger ?? throw new ArgumentNullException();
-
-            InitializeConditions(alarm.Conditions.ToArray());
+            if (cacheMuxer == null) { throw new ArgumentNullException(); }
+            this.cacheMuxer = cacheMuxer;
+            this.channelContext = channelContext;
 
             var cf = new BigMissionDbContextFactory();
             context = cf.CreateDbContext(new[] { connectionString });
-            this.cacheMuxer = cacheMuxer;
-            this.channelContext = channelContext;
+
+            InitializeConditions(alarm.Conditions.ToArray());
         }
 
 

@@ -1,6 +1,7 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
 using BigMission.Cache;
 using BigMission.CommandTools;
+using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
@@ -30,6 +31,13 @@ namespace BigMission.AlarmProcessor
         private readonly EventHubHelpers ehReader;
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly ChannelContext channelContext;
+        private ConfigurationCommands configurationChanges;
+        private static readonly string[] configChanges = new[]
+        {
+            ConfigurationCommandTypes.DEVICE_MODIFIED,
+            ConfigurationCommandTypes.CHANNEL_MODIFIED,
+            ConfigurationCommandTypes.ALARM_CHANGED
+        };
 
         /// <summary>
         /// Alarms by their group
@@ -62,8 +70,15 @@ namespace BigMission.AlarmProcessor
 
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"], 
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
                 partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+
+            if (configurationChanges == null)
+            {
+                var group = "config-" + Config["ServiceId"];
+                configurationChanges = new ConfigurationCommands(Config["KafkaConnectionString"], group, Config["KafkaConfigurationTopic"], Logger);
+                configurationChanges.Subscribe(configChanges, ProcessConfigurationChange);
+            }
 
             // Start updating service status
             ServiceTracking.Start();
@@ -152,7 +167,7 @@ namespace BigMission.AlarmProcessor
                 lock (alarmStatus)
                 {
                     alarmStatus.Clear();
-                    foreach(var chGrp in grps)
+                    foreach (var chGrp in grps)
                     {
                         if (!alarmStatus.TryGetValue(chGrp.Key, out List<AlarmStatus> channelAlarms))
                         {
@@ -171,5 +186,21 @@ namespace BigMission.AlarmProcessor
         }
 
         #endregion
+
+        /// <summary>
+        /// When a change to devices or channels is received invalidate and relaod.
+        /// </summary>
+        /// <param name="command"></param>
+        private void ProcessConfigurationChange(KeyValuePair<string, string> command)
+        {
+            if (command.Key == ConfigurationCommandTypes.CHANNEL_MODIFIED || command.Key == ConfigurationCommandTypes.DEVICE_MODIFIED)
+            {
+                channelContext.Invalidate();
+            }
+            else if (command.Key == ConfigurationCommandTypes.ALARM_CHANGED)
+            {
+                LoadAlarmConfiguration(null);
+            }
+        }
     }
 }
