@@ -1,23 +1,28 @@
 ﻿using BigMission.ServiceStatusTools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NLog;
-using NLog.Extensions.Logging;
+using NLog.Config;
 using System;
 
 namespace BigMission.DeviceAppServiceStatusProcessor
 {
     class Program
     {
-        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private static Logger logger;
 
         static void Main()
         {
             try
             {
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-                logger.Info($"Starting. Env={env}...");
+                if (env.ToUpper() == "PRODUCTION")
+                {
+                    LogManager.Configuration = new XmlLoggingConfiguration("nlog.Production.config");
+                }
+                logger = LogManager.GetCurrentClassLogger();
+
+                logger.Info($"Starting env={env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(System.IO.Directory.GetCurrentDirectory())
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)

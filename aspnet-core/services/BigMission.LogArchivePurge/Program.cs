@@ -2,24 +2,30 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
+using NLog.Config;
 using System;
 
 namespace BigMission.LogArchivePurge
 {
     class Program
     {
-        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private static Logger logger;
 
         static void Main()
         {
             try
             {
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-                logger.Info($"Starting {env}...");
+                if (env.ToUpper() == "PRODUCTION")
+                {
+                    LogManager.Configuration = new XmlLoggingConfiguration("nlog.Production.config");
+                }
+                logger = LogManager.GetCurrentClassLogger();
+
+                logger.Info($"Starting env={env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(System.IO.Directory.GetCurrentDirectory())
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                    .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "LogArchivePurge", config["RedisConn"], logger);

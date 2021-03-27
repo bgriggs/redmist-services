@@ -1,22 +1,27 @@
 ﻿using BigMission.ServiceStatusTools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NLog;
-using NLog.Extensions.Logging;
+using NLog.Config;
 using System;
 
 namespace BigMission.CarDataLogger
 {
     class Program
     {
-        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private static Logger logger;
 
         static void Main()
         {
             try
             {
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                if (env.ToUpper() == "PRODUCTION")
+                {
+                    LogManager.Configuration = new XmlLoggingConfiguration("nlog.Production.config");
+                }
+                logger = LogManager.GetCurrentClassLogger();
+
                 logger.Info($"Starting {env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(System.IO.Directory.GetCurrentDirectory())
