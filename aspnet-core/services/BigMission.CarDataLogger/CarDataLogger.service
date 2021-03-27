@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/bgriggs/redmist/BigMission.CarDataLogger
-ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.CarDataLogger/BigMission.CarDataLogger.dll
+WorkingDirectory=/home/redmist/BigMission.CarDataLogger
+ExecStart=/usr/bin/dotnet /home/redmist/BigMission.CarDataLogger/BigMission.CarDataLogger.dll
 
 [Install]
 WantedBy=multi-user.target

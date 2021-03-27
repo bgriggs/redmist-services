@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/bgriggs/redmist/BigMission.LogArchivePurge
-ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.LogArchivePurge/BigMission.LogArchivePurge.dll
+WorkingDirectory=/home/redmist/BigMission.LogArchivePurge
+ExecStart=/usr/bin/dotnet /home/redmist/BigMission.LogArchivePurge/BigMission.LogArchivePurge.dll
 
 [Install]
 WantedBy=multi-user.target

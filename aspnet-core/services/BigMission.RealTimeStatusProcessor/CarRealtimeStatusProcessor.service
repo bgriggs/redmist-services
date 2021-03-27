@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/bgriggs/redmist/BigMission.CarRealTimeStatusProcessor
-ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.CarRealTimeStatusProcessor/BigMission.CarRealTimeStatusProcessor.dll
+WorkingDirectory=/home/redmist/BigMission.CarRealTimeStatusProcessor
+ExecStart=/usr/bin/dotnet /home/redmist/BigMission.CarRealTimeStatusProcessor/BigMission.CarRealTimeStatusProcessor.dll
 
 [Install]
 WantedBy=multi-user.target

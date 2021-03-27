@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/bgriggs/redmist/BigMission.VirtualChannelAggregator
-ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.RaceHeroAggregator/BigMission.VirtualChannelAggregator.dll
+WorkingDirectory=/home/redmist/BigMission.VirtualChannelAggregator
+ExecStart=/usr/bin/dotnet /home/redmist/BigMission.RaceHeroAggregator/BigMission.VirtualChannelAggregator.dll
 
 [Install]
 WantedBy=multi-user.target

@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=on-failure
 RestartSec=10s
 
-WorkingDirectory=/home/bgriggs/redmist/BigMission.AlarmProcessor
-ExecStart=/usr/bin/dotnet /home/bgriggs/redmist/BigMission.AlarmProcessor/BigMission.AlarmProcessor.dll
+WorkingDirectory=/home/redmist/BigMission.AlarmProcessor
+ExecStart=/usr/bin/dotnet /home/redmist/BigMission.AlarmProcessor/BigMission.AlarmProcessor.dll
 
 [Install]
 WantedBy=multi-user.target
