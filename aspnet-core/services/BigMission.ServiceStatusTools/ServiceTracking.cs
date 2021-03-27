@@ -11,7 +11,7 @@ namespace BigMission.ServiceStatusTools
 {
     public class ServiceTracking : IDisposable
     {
-        //private readonly ServiceStatus status;
+        private readonly Guid serviceId;
         private readonly Cache.Models.ServiceStatus cacheStatus;
         private Timer statusTimer;
         private ILogger Logger { get; }
@@ -27,10 +27,11 @@ namespace BigMission.ServiceStatusTools
             {
                 throw new ArgumentNullException();
             }
+            serviceId = id;
             cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = name, State = ServiceState.OFFLINE, Note = "Initializing" };
             this.redisConn = redisConn;
             Logger = logger;
-            
+
             var cache = GetCache();
             Update(cacheStatus.State, cacheStatus.Note, cache);
         }
@@ -127,14 +128,19 @@ namespace BigMission.ServiceStatusTools
                     var stStr = JsonConvert.SerializeObject(st);
                     cache.HashSet(Consts.SERVICE_STATUS, ss.Name, stStr);
                 }
+            }
 
-                if (st.ServiceId == cacheStatus.ServiceId && !string.IsNullOrWhiteSpace(st.DesiredLogLevel))
+            // Check to see if user is overriding the log level
+            var desiredKey = string.Format(Consts.SERVICE_LOG_DESIRED_LEVEL, serviceId);
+            var desiredLogLevel = cache.StringGet(desiredKey);
+            if (desiredLogLevel.HasValue && !string.IsNullOrEmpty(desiredLogLevel))
+            {
+                Logger.Trace($"Found desired log level={desiredLogLevel}");
+                var desiredLevel = LogLevel.FromString(desiredLogLevel);
+                if (Logger.Factory.GlobalThreshold != desiredLevel)
                 {
-                    var desiredLevel = LogLevel.FromString(st.DesiredLogLevel);
-                    if (Logger.Factory.GlobalThreshold != desiredLevel)
-                    {
-                        Logger.Factory.GlobalThreshold = desiredLevel;
-                    }
+                    Logger.Factory.GlobalThreshold = desiredLevel;
+                    Logger.Info($"Applied new log level={desiredLevel}");
                 }
             }
         }
