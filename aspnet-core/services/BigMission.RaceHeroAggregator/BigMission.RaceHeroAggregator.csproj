@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
     <ProjectReference Include="..\..\common\BigMission.RaceHeroSdk\BigMission.RaceHeroSdk.csproj" />
+    <ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj" />
     <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
     <ProjectReference Include="..\..\src\BigMission.Core\BigMission.Core.csproj" />
   </ItemGroup>
