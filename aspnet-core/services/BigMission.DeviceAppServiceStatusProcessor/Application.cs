@@ -1,4 +1,5 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.Cache;
 using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
@@ -33,6 +34,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private readonly int _maxListLength = 1000;
         private readonly TimeSpan _lengthTrim = TimeSpan.FromSeconds(30);
         private readonly Dictionary<string, DateTime> _lastTrims = new Dictionary<string, DateTime>();
+        private readonly DeviceAppContext deviceAppContext;
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -43,6 +45,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             Commands = new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], logger);
             ehReader = new EventHubHelpers(logger);
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
+            deviceAppContext = new DeviceAppContext(cacheMuxer);
         }
 
 
@@ -50,10 +53,14 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
+            var cf = new BigMissionDbContextFactory();
+            using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+            deviceAppContext.WarmUpDeviceConfigIds(db);
+
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
             Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(
-                Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], 
+                Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"],
                 partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
@@ -99,7 +106,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                         CommitHeartbeat(heartbeatData, json).Wait();
 
                         // Check configuration
-                        ValidateConfiguration(heartbeatData, db).Wait();
+                        ValidateConfiguration(deviceKey, heartbeatData, db).Wait();
 
                         // Check log level
                         CheckDeviceAppLogLevel(heartbeatData, deviceKey).Wait();
@@ -160,24 +167,21 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         /// </summary>
         /// <param name="hb"></param>
         /// <param name="db"></param>
-        private async Task ValidateConfiguration(DeviceApp.Shared.DeviceAppHeartbeat hb, BigMissionDbContext db)
+        private async Task ValidateConfiguration(string deviceAppKey, DeviceApp.Shared.DeviceAppHeartbeat hb, BigMissionDbContext db)
         {
             Logger.Debug($"Validate configuration for: {hb.DeviceAppId}");
-
+            var serverConfigId = await deviceAppContext.GetDeviceConfigId(deviceAppKey);
             // Determine if the configuration guid is the same as whats in the database
-            var exists = db.CanAppConfig.Count(c => c.DeviceAppId == hb.DeviceAppId && c.ConfigurationId == hb.ConfigurationId);
-            if (exists == 0)
+            if (serverConfigId != null && new Guid(serverConfigId) != hb.ConfigurationId)
             {
                 // The configuration changed, send it to the app
-                Logger.Debug($"Configuration for {hb.DeviceAppId} is expired.");
+                Logger.Info($"Configuration for {hb.DeviceAppId} is expired.");
 
                 // Load the new configuration
                 var latestConfig = db.CanAppConfig.SingleOrDefault(c => c.DeviceAppId == hb.DeviceAppId);
                 if (latestConfig != null)
                 {
-                    // Load the apps key/Guid for the app to verify against
-                    var device = db.DeviceAppConfig.Single(d => d.Id == hb.DeviceAppId);
-                    latestConfig.DeviceAppKey = device.DeviceAppKey.ToString();
+                    latestConfig.DeviceAppKey = deviceAppKey;
 
                     // Load channel mappings
                     var channelMappings = db.ChannelMappings.Where(m => m.DeviceAppId == hb.DeviceAppId);
@@ -204,7 +208,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
             Logger.Debug($"Finished validating configuration for: {hb.DeviceAppId}");
         }
-        
+
         /// <summary>
         /// Determine if there is a user log level override set for the device.  If so, send it to the device.
         /// </summary>
