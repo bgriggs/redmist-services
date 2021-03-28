@@ -1,13 +1,14 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
+using StackExchange.Redis;
 using System;
 using System.Linq;
 using System.Text;
@@ -27,6 +28,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private AppCommands Commands { get; }
         private readonly EventHubHelpers ehReader;
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly ConnectionMultiplexer cacheMuxer;
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -36,6 +38,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             ServiceTracking = serviceTracking;
             Commands = new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], logger);
             ehReader = new EventHubHelpers(logger);
+            cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
         }
 
 
@@ -63,8 +66,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     string deviceKey = keyObject.ToString();
 
                     var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                    var heartbeatData = JsonConvert.DeserializeObject<DeviceAppHeartbeat>(json);
-                    Logger.Info($"Received HB from: '{heartbeatData.DeviceAppId}'");
+                    var heartbeatData = JsonConvert.DeserializeObject<DeviceApp.Shared.DeviceAppHeartbeat>(json);
+                    Logger.Debug($"Received HB from: '{heartbeatData.DeviceAppId}'");
 
                     var cf = new BigMissionDbContextFactory();
                     using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
@@ -79,14 +82,14 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                         }
                         else
                         {
-                            Logger.Debug($"Not app configured with key {deviceKey}");
+                            Logger.Debug($"No app configured with key {deviceKey}");
                         }
                     }
 
                     if (heartbeatData.DeviceAppId > 0)
                     {
                         // Update heartbeat
-                        CommitHeartbeat(heartbeatData, db).Wait();
+                        CommitHeartbeat(heartbeatData, json);
 
                         // Check configuration
                         ValidateConfiguration(heartbeatData, db).Wait();
@@ -104,22 +107,12 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         /// </summary>
         /// <param name="hb"></param>
         /// <param name="db"></param>
-        private async Task CommitHeartbeat(DeviceAppHeartbeat hb, BigMissionDbContext db)
+        private void CommitHeartbeat(DeviceApp.Shared.DeviceAppHeartbeat hb, string hbjson)
         {
-            Logger.Debug($"Saving heartbeat: {hb.DeviceAppId}");
+            Logger.Trace($"Saving heartbeat: {hb.DeviceAppId}");
 
-            var row = db.DeviceAppHeartbeats.SingleOrDefault(r => r.DeviceAppId == hb.DeviceAppId);
-            if (row != null)
-            {
-                row.Timestamp = hb.Timestamp;
-            }
-            else
-            {
-                db.DeviceAppHeartbeats.Add(hb);
-            }
-
-            Logger.Debug($"Saved heartbeat: {hb.DeviceAppId}");
-            await db.SaveChangesAsync();
+            var cache = cacheMuxer.GetDatabase();
+            cache.HashSet(Consts.DEVICEAPP_STATUS, new RedisValue(hb.DeviceAppId.ToString()), hbjson);
         }
 
         /// <summary>
@@ -127,7 +120,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         /// </summary>
         /// <param name="hb"></param>
         /// <param name="db"></param>
-        private async Task ValidateConfiguration(DeviceAppHeartbeat hb, BigMissionDbContext db)
+        private async Task ValidateConfiguration(DeviceApp.Shared.DeviceAppHeartbeat hb, BigMissionDbContext db)
         {
             Logger.Debug($"Validate configuration for: {hb.DeviceAppId}");
 
