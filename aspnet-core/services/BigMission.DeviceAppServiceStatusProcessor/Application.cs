@@ -32,7 +32,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly int _maxListLength = 1000;
         private readonly TimeSpan _lengthTrim = TimeSpan.FromSeconds(30);
-        private Dictionary<string, DateTime> _lastTrims = new Dictionary<string, DateTime>();
+        private readonly Dictionary<string, DateTime> _lastTrims = new Dictionary<string, DateTime>();
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -52,7 +52,9 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
             // Process changes from stream and cache them here is the service
             var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(
+                Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"], 
+                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             // Start updating service status
             ServiceTracking.Start();
@@ -94,10 +96,13 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     if (heartbeatData.DeviceAppId > 0)
                     {
                         // Update heartbeat
-                        CommitHeartbeat(heartbeatData, json);
+                        CommitHeartbeat(heartbeatData, json).Wait();
 
                         // Check configuration
                         ValidateConfiguration(heartbeatData, db).Wait();
+
+                        // Check log level
+                        CheckDeviceAppLogLevel(heartbeatData, deviceKey).Wait();
                     }
                 }
                 // Check for logs
@@ -109,7 +114,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     var cache = cacheMuxer.GetDatabase();
                     var log = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
                     cache.ListLeftPush(cacheKey, log, flags: CommandFlags.FireAndForget);
-                    
+
                     if (_maxListLength > 0)
                     {
                         lock (_lastTrims)
@@ -121,7 +126,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                                     cache.ListTrim(cacheKey, 0, _maxListLength, flags: CommandFlags.FireAndForget);
                                     _lastTrims[deviceKey] = DateTime.UtcNow;
                                     Logger.Trace($"Trimed logs for: {deviceKey}");
-                                } 
+                                }
                             }
                             else
                             {
@@ -142,12 +147,12 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         /// </summary>
         /// <param name="hb"></param>
         /// <param name="db"></param>
-        private void CommitHeartbeat(DeviceApp.Shared.DeviceAppHeartbeat hb, string hbjson)
+        private async Task CommitHeartbeat(DeviceApp.Shared.DeviceAppHeartbeat hb, string hbjson)
         {
             Logger.Trace($"Saving heartbeat: {hb.DeviceAppId}");
 
             var cache = cacheMuxer.GetDatabase();
-            cache.HashSet(Consts.DEVICEAPP_STATUS, new RedisValue(hb.DeviceAppId.ToString()), hbjson);
+            await cache.HashSetAsync(Consts.DEVICEAPP_STATUS, new RedisValue(hb.DeviceAppId.ToString()), hbjson);
         }
 
         /// <summary>
@@ -198,6 +203,41 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             }
 
             Logger.Debug($"Finished validating configuration for: {hb.DeviceAppId}");
+        }
+        
+        /// <summary>
+        /// Determine if there is a user log level override set for the device.  If so, send it to the device.
+        /// </summary>
+        /// <param name="hb"></param>
+        /// <param name="deviceAppKey"></param>
+        private async Task CheckDeviceAppLogLevel(DeviceApp.Shared.DeviceAppHeartbeat hb, string deviceAppKey)
+        {
+            var cache = cacheMuxer.GetDatabase();
+            var key = string.Format(Consts.DEVICEAPP_LOG_DESIRED_LEVEL, deviceAppKey);
+            var rv = await cache.StringGetAsync(key);
+            if (rv.HasValue)
+            {
+                LogLevel desiredLevel;
+                try
+                {
+                    // This will throw ArgumentException if value is not valid and bail out
+                    desiredLevel = LogLevel.FromString(rv.ToString());
+                    var currentLevel = LogLevel.FromString(hb.LogLevel);
+                    if (desiredLevel != currentLevel)
+                    {
+                        Logger.Debug($"Sending log level update for device {deviceAppKey}");
+                        var cmd = new Command
+                        {
+                            CommandType = CommandTypes.SET_LOG_LEVEL,
+                            Data = desiredLevel.Name,
+                            DestinationId = deviceAppKey,
+                            Timestamp = DateTime.UtcNow
+                        };
+                        await Commands.SendCommand(cmd, Config["KafkaCommandTopic"], cmd.DestinationId);
+                    }
+                }
+                catch (ArgumentException) { }
+            }
         }
     }
 }
