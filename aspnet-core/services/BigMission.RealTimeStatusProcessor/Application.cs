@@ -1,6 +1,7 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
 using BigMission.Cache;
 using BigMission.CommandTools;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
@@ -68,11 +69,11 @@ namespace BigMission.CarRealTimeStatusProcessor
             {
                 var sw = Stopwatch.StartNew();
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
+                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
 
                 if (chDataSet.Data == null)
                 {
-                    chDataSet.Data = new ChannelStatus[] { };
+                    chDataSet.Data = new ChannelStatusDto[] { };
                 }
 
                 Logger.Trace($"Received log: {chDataSet.DeviceAppId} Count={chDataSet.Data.Length}");

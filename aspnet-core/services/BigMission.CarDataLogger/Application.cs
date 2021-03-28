@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace BigMission.CarDataLogger
 {
@@ -25,7 +26,7 @@ namespace BigMission.CarDataLogger
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
         private EventProcessorClient processor;
-        private ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
         {
@@ -54,7 +55,7 @@ namespace BigMission.CarDataLogger
         private async Task LogProcessEventHandler(ProcessEventArgs eventArgs)
         {
             var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
-            var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
+            var chDataSet = JsonConvert.DeserializeObject<DeviceApp.Shared.ChannelDataSetDto>(json);
 
             Logger.Trace($"Received log: {chDataSet.DeviceAppId}");
 
@@ -71,23 +72,26 @@ namespace BigMission.CarDataLogger
             return Task.CompletedTask;
         }
 
-        private async Task SaveLog(ChannelDataSet ds)
+        private async Task SaveLog(DeviceApp.Shared.ChannelDataSetDto ds)
         {
             try
             {
                 if (ds.Data?.Length > 0)
                 {
+                    var logs = new List<ChannelLog>();
                     foreach(var l in ds.Data)
                     {
                         if (l.DeviceAppId == 0)
                         {
                             l.DeviceAppId = ds.DeviceAppId;
                         }
+                        var dblog = new ChannelLog { DeviceAppId = l.DeviceAppId, ChannelId = l.ChannelId, Timestamp = l.Timestamp, Value = l.Value };
+                        logs.Add(dblog);
                     }
 
                     var cf = new BigMissionDbContextFactory();
                     using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-                    db.ChannelLog.AddRange(ds.GetLogs());
+                    db.ChannelLog.AddRange(logs);
                     var sw = Stopwatch.StartNew();
                     await db.SaveChangesAsync();
                     Logger.Trace($"Device source {ds.DeviceAppId} DB Commit in {sw.ElapsedMilliseconds}ms");

@@ -2,6 +2,7 @@
 using BigMission.Cache;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
@@ -94,7 +95,7 @@ namespace BigMission.VirtualChannelAggregator
             try
             {
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
+                var chDataSet = JsonConvert.DeserializeObject<DeviceApp.Shared.ChannelDataSetDto>(json);
                 if (chDataSet != null)
                 {
                     Logger.Debug($"Received status from: '{chDataSet.DeviceAppId}'");
@@ -170,7 +171,7 @@ namespace BigMission.VirtualChannelAggregator
                         var cache = cacheMuxer.GetDatabase();
                         var rks = channelIds.Select(i => new RedisKey(string.Format(Cache.Models.Consts.CHANNEL_KEY, i))).ToArray();
                         var channelStatusStrs = cache.StringGet(rks);
-                        var channelStatus = ChannelContext.ConvertToEfChStatus(channelIds, channelStatusStrs);
+                        var channelStatus = ChannelContext.ConvertToDeviceChStatus(channelIds, channelStatusStrs);
                         SendChannelStaus(channelStatus.ToArray()).Wait();
                     }
                     finally
@@ -189,7 +190,7 @@ namespace BigMission.VirtualChannelAggregator
             }
         }
 
-        private async Task SendChannelStaus(ChannelStatus[] status)
+        private async Task SendChannelStaus(ChannelStatusDto[] status)
         {
             var deviceStatus = status.GroupBy(s => s.DeviceAppId);
             var tasks = deviceStatus.Select(async ds =>
@@ -205,7 +206,7 @@ namespace BigMission.VirtualChannelAggregator
                     if (hasDevice)
                     {
                         Logger.Trace($"Sending virtual status to device {ds.Key}");
-                        var dataSet = new ChannelDataSet { DeviceAppId = ds.Key, IsVirtual = true, Timestamp = DateTime.UtcNow, Data = ds.ToArray() };
+                        var dataSet = new ChannelDataSetDto { DeviceAppId = ds.Key, IsVirtual = true, Timestamp = DateTime.UtcNow, Data = ds.ToArray() };
                         var cmd = new Command
                         {
                             DestinationId = client.Item2.DeviceAppKey.ToString(),
