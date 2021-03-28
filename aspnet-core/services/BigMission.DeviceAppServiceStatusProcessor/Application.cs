@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -29,6 +30,9 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private readonly EventHubHelpers ehReader;
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
         private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly int _maxListLength = 1000;
+        private readonly TimeSpan _lengthTrim = TimeSpan.FromSeconds(30);
+        private Dictionary<string, DateTime> _lastTrims = new Dictionary<string, DateTime>();
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
@@ -61,6 +65,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         {
             try
             {
+                // Check for heartbeat
                 if (receivedEvent.Data.Properties.TryGetValue("DeviceKey", out object keyObject))
                 {
                     string deviceKey = keyObject.ToString();
@@ -93,6 +98,36 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
                         // Check configuration
                         ValidateConfiguration(heartbeatData, db).Wait();
+                    }
+                }
+                // Check for logs
+                else if (receivedEvent.Data.Properties.TryGetValue("LogSourceID", out object sourceId))
+                {
+                    var deviceKey = sourceId.ToString();
+                    Logger.Trace($"RX log from: {deviceKey}");
+                    var cacheKey = string.Format(Consts.DEVICEAPP_LOG, deviceKey);
+                    var cache = cacheMuxer.GetDatabase();
+                    var log = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
+                    cache.ListLeftPush(cacheKey, log, flags: CommandFlags.FireAndForget);
+                    
+                    if (_maxListLength > 0)
+                    {
+                        lock (_lastTrims)
+                        {
+                            if (_lastTrims.TryGetValue(deviceKey, out var lastTrim))
+                            {
+                                if ((DateTime.UtcNow - lastTrim) > _lengthTrim)
+                                {
+                                    cache.ListTrim(cacheKey, 0, _maxListLength, flags: CommandFlags.FireAndForget);
+                                    _lastTrims[deviceKey] = DateTime.UtcNow;
+                                    Logger.Trace($"Trimed logs for: {deviceKey}");
+                                } 
+                            }
+                            else
+                            {
+                                _lastTrims[deviceKey] = DateTime.UtcNow;
+                            }
+                        }
                     }
                 }
             }
