@@ -1,5 +1,6 @@
 ﻿using BigMission.Cache;
 using BigMission.Cache.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using NLog;
@@ -71,9 +72,9 @@ namespace BigMission.AlarmProcessor
             }
         }
 
-        public bool CheckConditions(RaceManagement.ChannelStatus[] channelStatus)
+        public bool CheckConditions(ChannelStatusDto[] channelStatus)
         {
-            var results = new List<bool>();
+            var results = new List<bool?>();
             Parallel.ForEach(conditionStatus, (condStatus) =>
             {
                 try
@@ -88,14 +89,20 @@ namespace BigMission.AlarmProcessor
                 }
             });
 
+            if (results.Contains(null))
+            {
+                Logger.Trace($"Cannot check {Alarm.AlarmGroup}. Not all conditions can be checked.");
+                return false;
+            }
+
             bool alarmOn = false;
             if (Alarm.ConditionOption == ALL)
             {
-                alarmOn = results.All(r => r);
+                alarmOn = results.All(r => r.Value);
             }
             else if (Alarm.ConditionOption == ANY)
             {
-                alarmOn = results.Any(r => r);
+                alarmOn = results.Any(r => r.Value);
             }
 
             UpdateStatus(alarmOn, true);

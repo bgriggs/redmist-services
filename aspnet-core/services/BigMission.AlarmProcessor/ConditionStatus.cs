@@ -1,5 +1,5 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.Models;
+﻿using BigMission.Cache.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using Newtonsoft.Json;
@@ -16,7 +16,7 @@ namespace BigMission.AlarmProcessor
         private readonly BigMissionDbContext context;
         private bool disposed;
         private readonly ConnectionMultiplexer cacheMuxer;
-
+        private bool? lastConditionActive;
 
         public ConditionStatus(RaceManagement.AlarmCondition conditionConfig, string connectionString, ConnectionMultiplexer cacheMuxer)
         {
@@ -29,7 +29,7 @@ namespace BigMission.AlarmProcessor
         }
 
 
-        public bool CheckConditions(RaceManagement.ChannelStatus[] channelStatus)
+        public bool? CheckConditions(ChannelStatusDto[] channelStatus)
         {
             bool conditionActive = false;
             var chstatus = channelStatus.FirstOrDefault(s => s.ChannelId == ConditionConfig.ChannelId);
@@ -57,7 +57,7 @@ namespace BigMission.AlarmProcessor
                     conditionActive = row.OnForMet;
                 }
                 // When active, see if it has been on for the requisite duration
-                else if (conditionState && condStatus != null && !condStatus.OnForMet)
+                else if (conditionState && condStatus != null && condStatus.OnForMet)
                 {
                     if (onfor > 0)
                     {
@@ -74,12 +74,20 @@ namespace BigMission.AlarmProcessor
                 {
                     cache.KeyDelete(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
                 }
+                lastConditionActive = conditionActive;
+                return conditionActive;
             }
 
-            return conditionActive;
+            // If there was no update for this channel use the last state when availabe.
+            if (lastConditionActive.HasValue)
+            {
+                return lastConditionActive;
+            }
+
+            return null;
         }
 
-        private bool EvalCondition(RaceManagement.ChannelStatus channelStatus)
+        private bool EvalCondition(ChannelStatusDto channelStatus)
         {
             var configVal = float.Parse(ConditionConfig.ChannelValue);
             if (ConditionConfig.ConditionType == AlarmConditionType.EQUALS)
@@ -126,7 +134,7 @@ namespace BigMission.AlarmProcessor
         {
             try
             {
-                return context.DisposeAsync(); 
+                return context.DisposeAsync();
             }
             catch (Exception exception)
             {

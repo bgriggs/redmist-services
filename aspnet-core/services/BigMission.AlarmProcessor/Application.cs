@@ -2,8 +2,9 @@
 using BigMission.Cache;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
+//using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ using NLog;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -89,14 +91,15 @@ namespace BigMission.AlarmProcessor
 
         private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
+            var sw = Stopwatch.StartNew();
             try
             {
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSet>(json);
+                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
 
                 if (chDataSet.Data == null)
                 {
-                    chDataSet.Data = new ChannelStatus[] { };
+                    chDataSet.Data = new ChannelStatusDto[] { };
                 }
 
                 Logger.Trace($"Received status: {chDataSet.DeviceAppId}");
@@ -136,6 +139,10 @@ namespace BigMission.AlarmProcessor
             catch (Exception ex)
             {
                 Logger.Error(ex, "Unable to process event from event hub partition");
+            }
+            finally
+            {
+                Logger.Trace($"Processed channels in {sw.ElapsedMilliseconds}ms");
             }
         }
 
