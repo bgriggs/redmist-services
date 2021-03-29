@@ -82,6 +82,8 @@ namespace BigMission.CarRealTimeStatusProcessor
                 var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
                 foreach (var ch in chDataSet.Data)
                 {
+                    // Reset time to server time to prevent timeouts when data is being updated.
+                    ch.Timestamp = DateTime.UtcNow;
                     kvps.Add(ChannelContext.CreateChannelStatusCacheEntry(ch));
                 }
                 var db = GetCache();
