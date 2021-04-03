@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using NLog.Config;
 using System;
+using System.IO;
 
 namespace BigMission.CarDataLogger
 {
@@ -15,16 +16,17 @@ namespace BigMission.CarDataLogger
         {
             try
             {
+                var basePath = Directory.GetCurrentDirectory();
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
                 if (env.ToUpper() == "PRODUCTION")
                 {
-                    LogManager.Configuration = new XmlLoggingConfiguration("nlog.Production.config");
+                    LogManager.Configuration = new XmlLoggingConfiguration($"{basePath}{Path.DirectorySeparatorChar}nlog.Production.config");
                 }
                 logger = LogManager.GetCurrentClassLogger();
 
                 logger.Info($"Starting {env}...");
                 var config = new ConfigurationBuilder()
-                    .SetBasePath(System.IO.Directory.GetCurrentDirectory())
+                    .SetBasePath(basePath)
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
