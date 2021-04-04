@@ -11,6 +11,7 @@ RestartSec=10s
 
 WorkingDirectory=/home/redmist/BigMission.CarRealTimeStatusProcessor
 ExecStart=/usr/bin/dotnet /home/redmist/BigMission.CarRealTimeStatusProcessor/BigMission.CarRealTimeStatusProcessor.dll
+Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]
 WantedBy=multi-user.target

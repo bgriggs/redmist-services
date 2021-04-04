@@ -11,6 +11,7 @@ RestartSec=10s
 
 WorkingDirectory=/home/redmist/BigMission.AlarmProcessor
 ExecStart=/usr/bin/dotnet /home/redmist/BigMission.AlarmProcessor/BigMission.AlarmProcessor.dll
+Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]
 WantedBy=multi-user.target

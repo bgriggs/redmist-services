@@ -11,6 +11,7 @@ RestartSec=10s
 
 WorkingDirectory=/home/redmist/BigMission.RaceHeroAggregator
 ExecStart=/usr/bin/dotnet /home/redmist/BigMission.RaceHeroAggregator/BigMission.RaceHeroAggregator.dll
+Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]
 WantedBy=multi-user.target
