@@ -145,8 +145,8 @@ namespace BigMission.RaceHeroAggregator
                     // Check for ended
                     else if (isEnded)
                     {
-                        Logger.Info($"Event {eventId} has ended, terminating subscription polling");
-                        StopEventPolling();
+                        Logger.Info($"Event {eventId} has ended, terminating subscription polling, waiting for event to restart.");
+                        Start();
                     }
                 }
                 catch (Exception ex)

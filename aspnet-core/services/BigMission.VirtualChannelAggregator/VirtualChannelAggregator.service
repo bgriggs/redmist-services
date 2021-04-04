@@ -10,7 +10,7 @@ Restart=on-failure
 RestartSec=10s
 
 WorkingDirectory=/home/redmist/BigMission.VirtualChannelAggregator
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.RaceHeroAggregator/BigMission.VirtualChannelAggregator.dll
+ExecStart=/usr/bin/dotnet /home/redmist/BigMission.VirtualChannelAggregator/BigMission.VirtualChannelAggregator.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]
