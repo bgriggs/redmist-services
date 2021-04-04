@@ -169,9 +169,17 @@ namespace BigMission.AlarmProcessor
                     delKeys.Add(alarmKey);
                 }
                 Logger.Info($"Clearing {delKeys.Count()} alarm status");
+
+                var deviceAppIds = context.DeviceAppConfig.Where(d => !d.IsDeleted).Select(d => d.Id).ToArray();
+                foreach (var dai in deviceAppIds)
+                {
+                    delKeys.Add(string.Format(Consts.ALARM_CH_CONDS, dai));
+                }
+                Logger.Info($"Clearing {deviceAppIds.Count()} alarm channel status");
+
                 var cache = cacheMuxer.GetDatabase();
                 cache.KeyDelete(delKeys.ToArray(), CommandFlags.FireAndForget);
-
+                
                 // Filter down to active alarms
                 alarmConfig = alarmConfig.Where(a => !a.IsDeleted && a.IsEnabled).ToArray();
                 Logger.Debug($"Found {alarmConfig.Count()} enabled alarms");
