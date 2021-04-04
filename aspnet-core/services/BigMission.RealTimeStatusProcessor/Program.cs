@@ -19,6 +19,9 @@ namespace BigMission.CarRealTimeStatusProcessor
         {
             try
             {
+                while (!System.Diagnostics.Debugger.IsAttached)
+                    System.Threading.Thread.Sleep(100);
+
                 var basePath = System.IO.Directory.GetCurrentDirectory();
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
                 if (env.ToUpper() == "PRODUCTION")
