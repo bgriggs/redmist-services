@@ -202,6 +202,11 @@ namespace BigMission.RaceHeroAggregator
                         {
                             Logger.Error(ex, "Error ending poll for race data timer");
                         }
+                        finally
+                        {
+                            Logger.Info("Restart event check for possible event restart.");
+                            Start();
+                        }
                     }
                     else
                     {
