@@ -1,10 +1,10 @@
 ﻿using Azure.Messaging.EventHubs.Consumer;
 using BigMission.Cache;
+using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
-//using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using Microsoft.EntityFrameworkCore;
@@ -155,12 +155,26 @@ namespace BigMission.AlarmProcessor
                 //var cf = new BigMissionDbContextFactory();
                 //using var context = cf.CreateDbContext(new[] { Config["ConnectionString"] });
                 var alarmConfig = context.CarAlarms
-                    .Where(a => !a.IsDeleted && a.IsEnabled)
+                    //.Where(a => !a.IsDeleted && a.IsEnabled)
                     .Include(a => a.Conditions)
-                    .Include(a => a.Triggers);
+                    .Include(a => a.Triggers)
+                    .ToArray();
 
                 Logger.Info($"Loaded {alarmConfig.Count()} Alarms");
+                
+                var delKeys = new List<RedisKey>();
+                foreach (var ac in alarmConfig)
+                {
+                    var alarmKey = string.Format(Consts.ALARM_STATUS, ac.Id);
+                    delKeys.Add(alarmKey);
+                }
+                Logger.Info($"Clearing {delKeys.Count()} alarm status");
+                var cache = cacheMuxer.GetDatabase();
+                cache.KeyDelete(delKeys.ToArray(), CommandFlags.FireAndForget);
 
+                // Filter down to active alarms
+                alarmConfig = alarmConfig.Where(a => !a.IsDeleted && a.IsEnabled).ToArray();
+                Logger.Debug($"Found {alarmConfig.Count()} enabled alarms");
                 var als = new List<AlarmStatus>();
                 foreach (var ac in alarmConfig)
                 {

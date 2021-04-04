@@ -41,8 +41,7 @@ namespace BigMission.AlarmProcessor
             Alarm = alarm ?? throw new ArgumentNullException();
             ConnectionString = connectionString ?? throw new ArgumentNullException();
             Logger = logger ?? throw new ArgumentNullException();
-            if (cacheMuxer == null) { throw new ArgumentNullException(); }
-            this.cacheMuxer = cacheMuxer;
+            this.cacheMuxer = cacheMuxer ?? throw new ArgumentNullException();
             this.channelContext = channelContext;
 
             var cf = new BigMissionDbContextFactory();
