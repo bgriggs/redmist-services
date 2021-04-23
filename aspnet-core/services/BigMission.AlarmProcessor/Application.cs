@@ -217,7 +217,7 @@ namespace BigMission.AlarmProcessor
         #endregion
 
         /// <summary>
-        /// When a change to devices or channels is received invalidate and relaod.
+        /// When a change to devices or channels is received invalidate and reload.
         /// </summary>
         /// <param name="command"></param>
         private void ProcessConfigurationChange(KeyValuePair<string, string> command)
