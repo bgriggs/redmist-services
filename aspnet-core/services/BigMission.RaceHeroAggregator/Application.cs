@@ -5,6 +5,7 @@ using BigMission.ServiceStatusTools;
 using Microsoft.Extensions.Configuration;
 using NLog;
 using NUglify.Helpers;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,6 +28,7 @@ namespace BigMission.RaceHeroAggregator
         private Timer eventSubscriptionTimer;
         private readonly object eventSubscriptionCheckLock = new object();
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        private readonly ConnectionMultiplexer cacheMuxer;
 
 
         public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking)
@@ -34,6 +36,7 @@ namespace BigMission.RaceHeroAggregator
             Logger = logger;
             Config = config;
             ServiceTracking = serviceTracking;
+            cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
         }
 
 
@@ -87,7 +90,7 @@ namespace BigMission.RaceHeroAggregator
                         {
                             if (!eventSubscriptions.TryGetValue(settingGrg.Key, out EventSubscription subscription))
                             {
-                                subscription = new EventSubscription(Logger, Config);
+                                subscription = new EventSubscription(Logger, Config, cacheMuxer);
                                 eventSubscriptions[settingGrg.Key] = subscription;
                                 subscription.Start();
                                 Logger.Info($"Adding event subscription for event ID '{settingGrg.Key}' and starting polling.");

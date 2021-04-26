@@ -1,11 +1,14 @@
-﻿using BigMission.EntityFrameworkCore;
+﻿using BigMission.Cache.Models;
+using BigMission.EntityFrameworkCore;
 using BigMission.RaceHeroSdk;
 using BigMission.RaceHeroSdk.Models;
 using BigMission.RaceManagement;
 using BigMission.Teams;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using NLog;
 using NUglify.Helpers;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,7 +27,7 @@ namespace BigMission.RaceHeroAggregator
             get { return settings.Values.FirstOrDefault()?.RaceHeroEventId; }
         }
 
-        private List<CarSubscription> subscriberCars = new List<CarSubscription>();
+        private readonly List<CarSubscription> subscriberCars = new List<CarSubscription>();
 
 
         private readonly Dictionary<int, RaceEventSettings> settings = new Dictionary<int, RaceEventSettings>();
@@ -41,14 +44,18 @@ namespace BigMission.RaceHeroAggregator
         /// <summary>
         /// Latest Car status
         /// </summary>
-        private Dictionary<string, Racer> racerStatus = new Dictionary<string, Racer>();
+        private readonly Dictionary<string, Racer> racerStatus = new Dictionary<string, Racer>();
+
+        private const int FUEL_STATS_MAX_LEN = 100;
+        private readonly ConnectionMultiplexer cacheMuxer;
 
 
-        public EventSubscription(ILogger logger, IConfiguration config)
+        public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer)
         {
             Logger = logger;
             Config = config;
             RhClient = new RaceHeroClient(Config["RaceHeroUrl"], Config["RaceHeroApiKey"]);
+            this.cacheMuxer = cacheMuxer;
         }
 
 
@@ -216,7 +223,7 @@ namespace BigMission.RaceHeroAggregator
                         {
                             foreach (var newRacer in leaderboard.Racers)
                             {
-                                if (racerStatus.TryGetValue(newRacer.RacerNumber, out Racer racer))
+                                if (racerStatus.TryGetValue(newRacer.RacerNumber, out var racer))
                                 {
                                     // Process changes
                                     if (racer.CurrentLap != newRacer.CurrentLap)
@@ -228,17 +235,13 @@ namespace BigMission.RaceHeroAggregator
                                 racerStatus[newRacer.RacerNumber] = newRacer;
                             }
 
-                            //// When there was a change, for which there will be logs, 
-                            //// copy off the new status for updating the cars
-                            //if (logs.Any())
-                            //{
                             latestStatusCopy = racerStatus.Values.ToArray();
-                            ////}e
                         }
 
                         if (latestStatusCopy != null)
                         {
                             Logger.Trace($"Processing subscriber car lap changes");
+
                             // Update car data with full current field
                             lock (subscriberCars)
                             {
@@ -248,7 +251,28 @@ namespace BigMission.RaceHeroAggregator
 
                         if (logs.Any())
                         {
-                            LogLapChanges(logs.ToArray());
+                            var eid = int.Parse(EventId);
+                            var now = DateTime.UtcNow;
+                            var carRaceLaps = new List<CarRaceLap>();
+                            foreach (var l in logs)
+                            {
+                                var log = new CarRaceLap
+                                {
+                                    EventId = eid,
+                                    CarNumber = l.RacerNumber,
+                                    Timestamp = now,
+                                    CurrentLap = l.CurrentLap,
+                                    ClassName = l.RacerClassName,
+                                    LastLapTimeSeconds = l.LastLapTimeSeconds,
+                                    PositionInRun = l.PositionInRun,
+                                    LastPitLap = l.LastPitLap,
+                                    PitStops = l.PitStops
+                                };
+                                carRaceLaps.Add(log);
+                            }
+
+                            CacheToFuelStatistics(carRaceLaps);
+                            LogLapChanges(carRaceLaps);
                         }
                     }
                 }
@@ -267,33 +291,35 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private void LogLapChanges(Racer[] laps)
+        private void LogLapChanges(List<CarRaceLap> laps)
         {
-            Logger.Trace($"Logging leaderboard laps count={laps.Length}");
-            var eventId = int.Parse(EventId);
-            var now = DateTime.UtcNow;
-
-            var logs = new List<CarRaceLap>();
-            foreach (var l in laps)
-            {
-                var log = new CarRaceLap
-                {
-                    EventId = eventId,
-                    CarNumber = l.RacerNumber,
-                    Timestamp = now,
-                    CurrentLap = l.CurrentLap,
-                    ClassName = l.RacerClassName,
-                    LastLapTimeSeconds = l.LastLapTimeSeconds,
-                    PositionInRun = l.PositionInRun,
-                    LastPitLap = l.LastPitLap,
-                    PitStops = l.PitStops
-                };
-                logs.Add(log);
-            }
+            Logger.Trace($"Logging leaderboard laps count={laps.Count}");
             var cf = new BigMissionDbContextFactory();
             using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-            db.CarRacerLaps.AddRange(logs);
+            db.CarRacerLaps.AddRange(laps);
             db.SaveChanges();
+        }
+
+        /// <summary>
+        /// Publish lap data for the fuel statistics service to consume.
+        /// </summary>
+        /// <param name="laps"></param>
+        private void CacheToFuelStatistics(List<CarRaceLap> laps)
+        {
+            Logger.Trace($"Caching leaderboard for fuel statistics laps count={laps.Count}");
+            var cache = cacheMuxer.GetDatabase();
+            var eventKey = string.Format(Consts.LAPS_FUEL_STAT, EventId);
+            foreach (var lap in laps)
+            {
+                var lapJson = JsonConvert.SerializeObject(lap);
+
+                // Use the head of the list as the newest value
+                var len = cache.ListLeftPush(eventKey, lapJson);
+                if (len > FUEL_STATS_MAX_LEN)
+                {
+                    cache.ListTrim(eventKey, 0, FUEL_STATS_MAX_LEN - 1, flags: CommandFlags.FireAndForget);
+                }
+            }
         }
 
 

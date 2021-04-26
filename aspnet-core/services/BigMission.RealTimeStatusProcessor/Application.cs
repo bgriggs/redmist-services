@@ -2,7 +2,6 @@
 using BigMission.Cache;
 using BigMission.CommandTools;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
