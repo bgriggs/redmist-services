@@ -67,6 +67,12 @@ namespace BigMission.CarRealTimeStatusProcessor
             try
             {
                 var sw = Stopwatch.StartNew();
+                if (receivedEvent.Data.Properties.Count > 0 && receivedEvent.Data.Properties.ContainsKey("ChannelDataSetDto"))
+                {
+                    if (receivedEvent.Data.Properties["Type"].ToString() != "ChannelDataSetDto")
+                        return;
+                }
+                
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
                 var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
 

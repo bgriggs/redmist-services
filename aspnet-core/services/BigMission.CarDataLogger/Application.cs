@@ -54,6 +54,12 @@ namespace BigMission.CarDataLogger
 
         private async Task LogProcessEventHandler(ProcessEventArgs eventArgs)
         {
+            if (eventArgs.Data.Properties.Count > 0 && eventArgs.Data.Properties.ContainsKey("ChannelDataSetDto"))
+            {
+                if (eventArgs.Data.Properties["Type"].ToString() != "ChannelDataSetDto")
+                    return;
+            }
+
             var json = Encoding.UTF8.GetString(eventArgs.Data.Body.ToArray());
             var chDataSet = JsonConvert.DeserializeObject<DeviceApp.Shared.ChannelDataSetDto>(json);
 
