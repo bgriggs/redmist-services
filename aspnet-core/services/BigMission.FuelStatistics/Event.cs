@@ -1,41 +1,47 @@
 ﻿using BigMission.Cache.Models;
+using BigMission.Cache.Models.FuelStatistics;
 using BigMission.EntityFrameworkCore;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
+using System.Threading;
 
 namespace BigMission.FuelStatistics
 {
     class Event : IDisposable
     {
-        public int EventId { get; private set; }
+        public int RhEventId { get; private set; }
         public Dictionary<string, Car> Cars { get; } = new Dictionary<string, Car>();
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly string dbConnStr;
         private bool disposed;
 
 
-        public Event(int eventId, ConnectionMultiplexer cacheMuxer, string dbConnStr)
+        public Event(string rhEventId, ConnectionMultiplexer cacheMuxer, string dbConnStr)
         {
-            if (eventId <= 0) { throw new ArgumentException("eventId"); }
-            EventId = eventId;
+            if (!int.TryParse(rhEventId, out var id)) { throw new ArgumentException("rhEventId"); }
+            RhEventId = id;
             this.cacheMuxer = cacheMuxer;
             this.dbConnStr = dbConnStr;
         }
 
 
+        /// <summary>
+        /// Pull in any existing data for the event to reset on service restart or event change.
+        /// </summary>
         public void Initialize()
         {
+            // Load any saved laps from log for the event
             var cf = new BigMissionDbContextFactory();
             using var db = cf.CreateDbContext(new[] { dbConnStr });
             var laps = db.CarRacerLaps
-                .Where(l => l.EventId == EventId)
+                .Where(l => l.EventId == RhEventId)
                 .Select(l => new Lap
                 {
-                    EventId = EventId,
+                    EventId = RhEventId,
                     CarNumber = l.CarNumber,
                     Timestamp = l.Timestamp,
                     ClassName = l.ClassName,
@@ -64,9 +70,13 @@ namespace BigMission.FuelStatistics
 
                 // Save car status
                 var cache = cacheMuxer.GetDatabase();
-                var eventKey = string.Format(Consts.FUEL_STAT, EventId);
+                var eventKey = string.Format(Consts.FUEL_STAT, RhEventId);
                 var carJson = JsonConvert.SerializeObject(car);
                 cache.HashSet(eventKey, car.Number, carJson);
+                //Newtonsoft.Json.Serialization.ITraceWriter traceWriter = new Newtonsoft.Json.Serialization.MemoryTraceWriter();
+                //var jss = new JsonSerializerSettings { TraceWriter = traceWriter, Converters = { new Newtonsoft.Json.Converters.JavaScriptDateTimeConverter() } };
+                //var c = JsonConvert.DeserializeObject<CarBase>(carJson, jss);
+                //Console.WriteLine(traceWriter);
             }
         }
 

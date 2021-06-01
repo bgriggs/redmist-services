@@ -62,7 +62,7 @@ namespace BigMission.FuelStatistics
 
             InitializeEvents();
 
-            //LoadFullTestLaps();
+            LoadFullTestLaps();
             //var c = events[28141].Cars["134"];
 
             //foreach (var p in c.Pits)
@@ -87,14 +87,23 @@ namespace BigMission.FuelStatistics
 
         private void InitializeEvents()
         {
+            var cache = cacheMuxer.GetDatabase();
             var eventSettings = LoadEventSettings();
             foreach (var settings in eventSettings)
             {
                 if (!events.TryGetValue(settings.Id, out Event e))
                 {
-                    e = new Event(settings.Id, cacheMuxer, Config["ConnectionString"]);
+                    e = new Event(settings.RaceHeroEventId, cacheMuxer, Config["ConnectionString"]);
                     e.Initialize();
                     events[settings.Id] = e;
+
+                    // Clear event in cache
+                    var hashKey = string.Format(Consts.FUEL_STAT, e.RhEventId);
+                    var ehash = cache.HashGetAll(hashKey);
+                    foreach (var ckey in ehash)
+                    {
+                        cache.HashDelete(hashKey, ckey.Name.ToString());
+                    }
                 }
             }
 
@@ -142,7 +151,7 @@ namespace BigMission.FuelStatistics
 
                     // The end date should go to the end of the day the that the user specified
                     var end = new DateTime(evt.EventEnd.Year, evt.EventEnd.Month, evt.EventEnd.Day, 23, 59, 59);
-                    if (evt.EventStart <= now && end >= now)
+                    //if (evt.EventStart <= now && end >= now)
                     {
                         activeSubscriptions.Add(evt);
                     }
@@ -250,7 +259,7 @@ namespace BigMission.FuelStatistics
                 st.Push(lap);
                 if (!events.TryGetValue(lap.EventId, out _))
                 {
-                    Event evt = new Event(lap.EventId, cacheMuxer, Config["ConnectionString"]);
+                    Event evt = new Event(lap.EventId.ToString(), cacheMuxer, Config["ConnectionString"]);
                     events[lap.EventId] = evt;
                 }
             }
@@ -258,7 +267,12 @@ namespace BigMission.FuelStatistics
             var eventLaps = st.GroupBy(l => l.EventId);
             foreach (var el in eventLaps)
             {
-                events[el.Key].UpdateLap(el.ToArray());
+                foreach (var lap in el)
+                {
+                    events[el.Key].UpdateLap(lap);
+                    Logger.Trace($"Updating lap for {lap.CarNumber}");
+                    Thread.Sleep(100);
+                }
             }
         }
 

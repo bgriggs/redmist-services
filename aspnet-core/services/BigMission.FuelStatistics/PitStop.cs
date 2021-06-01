@@ -9,7 +9,7 @@ namespace BigMission.FuelStatistics
     public class PitStop : PitStopBase
     {
         /// <summary>
-        /// Laps with pit stop flag.  This sometimes includes more than one when pit loop is before pit stall.
+        /// Laps with pit stop flag.  This sometimes includes more than one lap such as when pit loop is before pit stall.
         /// </summary>
         [JsonIgnore] 
         public SortedDictionary<int, Lap> Laps { get; } = new SortedDictionary<int, Lap>();

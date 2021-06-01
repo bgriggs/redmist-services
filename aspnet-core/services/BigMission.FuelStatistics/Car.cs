@@ -19,9 +19,10 @@ namespace BigMission.FuelStatistics
             if (string.IsNullOrWhiteSpace(className)) { throw new ArgumentException("className"); }
             ClassName = className;
         }
-        
+
         private void ClearMetrics()
         {
+            PositionOverall = null;
             LastStop = null;
             LastPitLap = null;
             NextPitTime = null;
@@ -46,6 +47,8 @@ namespace BigMission.FuelStatistics
                     Laps[lap.CurrentLap] = lap;
                 }
             }
+
+            PositionOverall = Laps.Last().Value.PositionInRun;
 
             // Update stats
             Stints.Clear();
@@ -111,29 +114,49 @@ namespace BigMission.FuelStatistics
                 }
             }
 
+            StintLaps = Stints.Last().TotalLaps;
+            StintTimeSecs = (int)Stints.Last().StintDurationSecs;
+            PitStops = Pits.Count;
+            LastLapSecs = Laps.Last().Value.LastLapTimeSeconds;
+
             if (Pits.Any() && Stints.Any())
             {
-                var lps =  (PitStop)Pits.Last();
+                var lps = (PitStop)Pits.Last();
                 LastStop = lps.EndPitTime;
                 LastPitLap = lps.Laps.Last().Key;
 
                 var estStopTimes = Pits.Select(p => p.EstPitStopSecs);
-                MeanPitStopSecs = Statistics.Mean(estStopTimes);
-                MedianPitStopSecs = Statistics.Median(estStopTimes);
-                BestPitStopSecs = Statistics.Minimum(estStopTimes);
+                MeanPitStopSecs = Statistics.Mean(estStopTimes.Where(st => st > 0));
+                MedianPitStopSecs = Statistics.Median(estStopTimes.Where(st => st > 0));
+                BestPitStopSecs = Statistics.Minimum(estStopTimes.Where(st => st > 0));
 
-
-                MeanRangeSecs = Statistics.Mean(Stints.Select(s => s.StintDurationSecs));
-                MaxRangeSecs = Statistics.Maximum(Stints.Select(s => s.StintDurationSecs));
+                MeanRangeSecs = Statistics.Mean(Stints.Where(st => st.StintDurationSecs > 0).Select(s => s.StintDurationSecs));
+                MaxRangeSecs = Statistics.Maximum(Stints.Where(st => st.StintDurationSecs > 0).Select(s => s.StintDurationSecs));
 
                 MeanRangeLaps = Statistics.Mean(Stints.Select(s => (double)s.TotalLaps));
                 MaxRangeLaps = Statistics.Maximum(Stints.Select(s => (double)s.TotalLaps));
                 MedianRangeLaps = Statistics.Median(Stints.Select(s => (double)s.TotalLaps));
 
-
-                NextPitTime = LastStop + TimeSpan.FromSeconds(MaxRangeSecs ?? 0);
-                MinutesRemaining = (NextPitTime.Value - Laps.Last().Value.Timestamp).TotalMinutes;
-                LapsRemaining = MinutesRemaining / (Stints.Last().MedianLapTimeSecs / 60);
+                if (MaxRangeSecs.HasValue && MaxRangeSecs > 0)
+                {
+                    NextPitTime = LastStop + TimeSpan.FromSeconds(MaxRangeSecs ?? 0);
+                    MinutesRemaining = (NextPitTime.Value - Laps.Last().Value.Timestamp).TotalMinutes;
+                    if (MinutesRemaining > 0)
+                    {
+                        LapsRemaining = MinutesRemaining / (Stints.Last().MedianLapTimeSecs / 60);
+                    }
+                    else
+                    {
+                        MinutesRemaining = null;
+                        LapsRemaining = null;
+                    }
+                }
+                else
+                {
+                    NextPitTime = null;
+                    MinutesRemaining = null;
+                    LapsRemaining = null;
+                }
             }
         }
     }
