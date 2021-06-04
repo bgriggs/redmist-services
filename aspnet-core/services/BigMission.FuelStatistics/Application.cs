@@ -62,7 +62,7 @@ namespace BigMission.FuelStatistics
 
             InitializeEvents();
 
-            LoadFullTestLaps();
+            //LoadFullTestLaps();
             //var c = events[28141].Cars["134"];
 
             //foreach (var p in c.Pits)
