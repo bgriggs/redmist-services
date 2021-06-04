@@ -15,5 +15,6 @@ namespace BigMission.FuelStatistics
         public double LastLapTimeSeconds { get; set; }
         public int LastPitLap { get; set; }
         public int PitStops { get; set; }
+        public byte Flag { get; set; }
     }
 }

@@ -195,6 +195,7 @@ namespace BigMission.RaceHeroAggregator
                     Logger.Trace($"Polling leaderboard for event {eventId}");
                     var lbTask = RhClient.GetLeaderboard(eventId);
                     lbTask.Wait();
+                    
                     var leaderboard = lbTask.Result;
 
                     // Stop polling when the event is over
@@ -215,8 +216,11 @@ namespace BigMission.RaceHeroAggregator
                             Start();
                         }
                     }
-                    else
+                    else // Process lap updates
                     {
+                        var cf = leaderboard.CurrentFlag;
+                        var flag = RaceHeroClient.ParseFlag(cf);
+
                         var logs = new List<Racer>();
                         Racer[] latestStatusCopy = null;
                         lock (racerStatus)
@@ -266,7 +270,8 @@ namespace BigMission.RaceHeroAggregator
                                     LastLapTimeSeconds = l.LastLapTimeSeconds,
                                     PositionInRun = l.PositionInRun,
                                     LastPitLap = l.LastPitLap,
-                                    PitStops = l.PitStops
+                                    PitStops = l.PitStops,
+                                    Flag = (byte)flag
                                 };
                                 carRaceLaps.Add(log);
                             }

@@ -151,7 +151,7 @@ namespace BigMission.FuelStatistics
 
                     // The end date should go to the end of the day the that the user specified
                     var end = new DateTime(evt.EventEnd.Year, evt.EventEnd.Month, evt.EventEnd.Day, 23, 59, 59);
-                    //if (evt.EventStart <= now && end >= now)
+                    if (evt.EventStart <= now && end >= now)
                     {
                         activeSubscriptions.Add(evt);
                     }
@@ -227,7 +227,8 @@ namespace BigMission.FuelStatistics
                         LastLapTimeSeconds = racer.LastLapTimeSeconds,
                         LastPitLap = racer.LastPitLap,
                         PitStops = racer.PitStops,
-                        PositionInRun = racer.PositionInRun
+                        PositionInRun = racer.PositionInRun,
+                        Flag = racer.Flag
                     };
                     laps.Add(lap);
                 }
