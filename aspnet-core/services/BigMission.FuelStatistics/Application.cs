@@ -1,14 +1,12 @@
 ﻿using BigMission.Cache.Models;
-using BigMission.CommandTools;
-using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
-using BigMission.RaceHeroSdk.Models;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
+using NUglify.Helpers;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -27,15 +25,11 @@ namespace BigMission.FuelStatistics
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
-        private readonly EventHubHelpers ehReader;
+        private Timer eventSubscriptionTimer;
+        private readonly object eventSubscriptionCheckLock = new object();
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly Dictionary<int, Event> events = new Dictionary<int, Event>();
-        private ConfigurationCommands configurationChanges;
-        private static readonly string[] configChanges = new[]
-        {
-            ConfigurationCommandTypes.EVENT_SUBSCRIPTION_MODIFIED,
-        };
+        private readonly Dictionary<int, Event> eventSubscriptions = new Dictionary<int, Event>();
         private Timer lapCheckTimer;
 
 
@@ -44,7 +38,6 @@ namespace BigMission.FuelStatistics
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
-            ehReader = new EventHubHelpers(logger);
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
         }
 
@@ -53,14 +46,10 @@ namespace BigMission.FuelStatistics
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
-            if (configurationChanges == null)
-            {
-                var group = "config-" + Config["ServiceId"];
-                configurationChanges = new ConfigurationCommands(Config["KafkaConnectionString"], group, Config["KafkaConfigurationTopic"], Logger);
-                configurationChanges.Subscribe(configChanges, ProcessConfigurationChange);
-            }
+            // Load event subscriptions
+            eventSubscriptionTimer = new Timer(RunSubscriptionCheck, null, 0, int.Parse(Config["EventSubscriptionCheckMs"]));
 
-            InitializeEvents();
+            //InitializeEvents();
 
             //LoadFullTestLaps();
             //var c = events[28141].Cars["134"];
@@ -85,33 +74,70 @@ namespace BigMission.FuelStatistics
             serviceBlock.WaitOne();
         }
 
-        private void InitializeEvents()
+        private void RunSubscriptionCheck(object obj)
         {
-            var cache = cacheMuxer.GetDatabase();
-            var eventSettings = LoadEventSettings();
-            foreach (var settings in eventSettings)
+            if (Monitor.TryEnter(eventSubscriptionCheckLock))
             {
-                if (!events.TryGetValue(settings.Id, out Event e))
+                try
                 {
-                    e = new Event(settings.RaceHeroEventId, cacheMuxer, Config["ConnectionString"]);
-                    e.Initialize();
-                    events[settings.Id] = e;
+                    var eventSettings = LoadEventSettings();
+                    Logger.Info($"Loaded {eventSettings.Length} event subscriptions.");
+                    var settingEventGrps = eventSettings.GroupBy(s => s.RaceHeroEventId);
+                    var eventIds = eventSettings.Select(s => int.Parse(s.RaceHeroEventId)).Distinct();
+                    var cache = cacheMuxer.GetDatabase();
 
-                    // Clear event in cache
-                    var hashKey = string.Format(Consts.FUEL_STAT, e.RhEventId);
-                    var ehash = cache.HashGetAll(hashKey);
-                    foreach (var ckey in ehash)
+                    lock (eventSubscriptions)
                     {
-                        cache.HashDelete(hashKey, ckey.Name.ToString());
+                        foreach (var settings in eventSettings)
+                        {
+                            var eventId = int.Parse(settings.RaceHeroEventId);
+                            if (!eventSubscriptions.TryGetValue(eventId, out Event e))
+                            {
+                                e = new Event(settings.RaceHeroEventId, cacheMuxer, Config["ConnectionString"]);
+                                e.Initialize();
+                                eventSubscriptions[eventId] = e;
+
+                                // Clear event in cache
+                                var hashKey = string.Format(Consts.FUEL_STAT, e.RhEventId);
+                                var ehash = cache.HashGetAll(hashKey);
+                                foreach (var ckey in ehash)
+                                {
+                                    cache.HashDelete(hashKey, ckey.Name.ToString());
+                                }
+                            }
+                        }
+
+                        // Remove deleted
+                        var expiredEvents = eventSubscriptions.Keys.Except(eventIds);
+                        expiredEvents.ForEach(e =>
+                        {
+                            Logger.Info($"Removing event subscription {e}");
+                            if (eventSubscriptions.Remove(e, out Event sub))
+                            {
+                                try
+                                {
+                                    sub.Dispose();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.Error(ex, $"Error stopping event subscription {sub.RhEventId}.");
+                                }
+                            }
+                        });
                     }
                 }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error polling subscriptions");
+                }
+                finally
+                {
+                    Monitor.Exit(eventSubscriptionCheckLock);
+                }
             }
-
-            var removedEventIds = events.Keys.Where(i => !eventSettings.Select(s => s.Id).Contains(i));
-            foreach (var id in removedEventIds)
+            else
             {
-                events[id].Dispose();
-                events.Remove(id);
+                Logger.Info("Skipping RunSubscriptionCheck");
             }
         }
 
@@ -175,7 +201,7 @@ namespace BigMission.FuelStatistics
                     var sw = Stopwatch.StartNew();
 
                     var cache = cacheMuxer.GetDatabase();
-                    foreach (var evt in events)
+                    foreach (var evt in eventSubscriptions)
                     {
                         try
                         {
@@ -238,18 +264,6 @@ namespace BigMission.FuelStatistics
             return laps.ToArray();
         }
 
-        /// <summary>
-        /// When a change to event subscriptions is received invalidate and reload.
-        /// </summary>
-        /// <param name="command"></param>
-        private void ProcessConfigurationChange(KeyValuePair<string, string> command)
-        {
-            if (command.Key == ConfigurationCommandTypes.EVENT_SUBSCRIPTION_MODIFIED)
-            {
-                InitializeEvents();
-            }
-        }
-
         private void LoadFullTestLaps()
         {
             var lines = File.ReadAllLines("TestLaps.csv");
@@ -258,10 +272,10 @@ namespace BigMission.FuelStatistics
             {
                 var lap = ParseTestLap(lines[i]);
                 st.Push(lap);
-                if (!events.TryGetValue(lap.EventId, out _))
+                if (!eventSubscriptions.TryGetValue(lap.EventId, out _))
                 {
                     Event evt = new Event(lap.EventId.ToString(), cacheMuxer, Config["ConnectionString"]);
-                    events[lap.EventId] = evt;
+                    eventSubscriptions[lap.EventId] = evt;
                 }
             }
 
@@ -270,7 +284,7 @@ namespace BigMission.FuelStatistics
             {
                 foreach (var lap in el)
                 {
-                    events[el.Key].UpdateLap(lap);
+                    eventSubscriptions[el.Key].UpdateLap(lap);
                     Logger.Trace($"Updating lap for {lap.CarNumber}");
                     Thread.Sleep(100);
                 }

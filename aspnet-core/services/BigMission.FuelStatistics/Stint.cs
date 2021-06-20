@@ -1,9 +1,7 @@
 ﻿using BigMission.Cache.Models.FuelStatistics;
 using MathNet.Numerics.Statistics;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace BigMission.FuelStatistics
@@ -25,7 +23,7 @@ namespace BigMission.FuelStatistics
                     var first = Laps.First();
                     var last = Laps.Last();
 
-                    return (last.Value.Timestamp - first.Value.Timestamp).TotalSeconds;
+                    return (last.Value.Timestamp - first.Value.Timestamp).TotalSeconds + first.Value.LastLapTimeSeconds;
                 }
 
                 return 0;
@@ -41,7 +39,7 @@ namespace BigMission.FuelStatistics
                     var first = Laps.First();
                     var last = Laps.Last();
 
-                    return last.Value.CurrentLap - first.Value.CurrentLap;
+                    return (last.Value.CurrentLap - first.Value.CurrentLap) + 1;
                 }
 
                 return 0;

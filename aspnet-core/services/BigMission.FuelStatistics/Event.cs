@@ -66,6 +66,19 @@ namespace BigMission.FuelStatistics
                     car = new Car(cl.Key, cl.First().ClassName);
                     Cars[cl.Key] = car;
                 }
+
+                // Check for an event/lap reset when new laps are less than what's tracked for the car.
+                // This is typcially when you have a multi-race event.
+                if (laps.Any() && car.Laps.Any())
+                {
+                    var latestLap = laps.Max(l => l.CurrentLap);
+                    var carsLatest = car.Laps.Keys.Max();
+                    if (carsLatest > latestLap)
+                    {
+                        car.Reset();
+                    }
+                }
+
                 car.AddLap(cl.ToArray());
 
                 // Save car status

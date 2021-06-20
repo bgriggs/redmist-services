@@ -36,6 +36,12 @@ namespace BigMission.FuelStatistics
             MedianPitStopSecs = null;
         }
 
+        public void Reset()
+        {
+            Laps.Clear();
+            ClearMetrics();
+        }
+
         public void AddLap(params Lap[] laps)
         {
             ClearMetrics();
