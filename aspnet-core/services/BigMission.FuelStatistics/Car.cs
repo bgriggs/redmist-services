@@ -60,7 +60,7 @@ namespace BigMission.FuelStatistics
             Stints.Clear();
             Pits.Clear();
 
-            var currentStint = new Stint();
+            var currentStint = new Stint { StintNumber = 1 };
             Stints.Add(currentStint);
 
             foreach (var lap in Laps)
@@ -71,14 +71,15 @@ namespace BigMission.FuelStatistics
                 {
                     includeLapInStint = false;
 
-                    var ps = new PitStop();
+                    var ps = new PitStop { PitStopNumber = Pits.Count + 1 };
                     Pits.Add(ps);
                     ps.Laps[lap.Key] = lap.Value;
                     ps.Comments = "Using flagged pit lap as pit stop lap. ";
+
                     // Create a new stint on pit lap
                     if (currentStint.Laps.Any())
                     {
-                        currentStint = new Stint();
+                        currentStint = new Stint { StintNumber = Stints.Count + 1};
                         Stints.Add(currentStint);
                     }
                 }

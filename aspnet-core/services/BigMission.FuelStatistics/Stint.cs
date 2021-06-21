@@ -1,5 +1,6 @@
 ﻿using BigMission.Cache.Models.FuelStatistics;
 using MathNet.Numerics.Statistics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
@@ -13,6 +14,23 @@ namespace BigMission.FuelStatistics
         /// </summary>
         [JsonIgnore]
         public SortedDictionary<int, Lap> Laps { get; } = new SortedDictionary<int, Lap>();
+
+        public override DateTime Start
+        {
+            get
+            {
+                var fl = Laps.First().Value;
+                return fl.Timestamp.AddSeconds(-fl.LastLapTimeSeconds);
+            }
+        }
+        public override DateTime End
+        {
+            get
+            {
+                var fl = Laps.Last().Value;
+                return fl.Timestamp;
+            }
+        }
 
         public override double StintDurationSecs
         {
