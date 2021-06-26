@@ -38,6 +38,7 @@ namespace BigMission.KeypadServices
             Logger = logger;
             ServiceTracking = serviceTracking;
             ehReader = new EventHubHelpers(logger);
+            cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
         }
 
 
