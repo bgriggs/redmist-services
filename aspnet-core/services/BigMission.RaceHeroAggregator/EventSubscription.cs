@@ -28,8 +28,6 @@ namespace BigMission.RaceHeroAggregator
         }
 
         private readonly List<CarSubscription> subscriberCars = new List<CarSubscription>();
-
-
         private readonly Dictionary<int, RaceEventSettings> settings = new Dictionary<int, RaceEventSettings>();
         private RaceHeroClient RhClient { get; set; }
 
@@ -48,6 +46,7 @@ namespace BigMission.RaceHeroAggregator
 
         private const int FUEL_STATS_MAX_LEN = 100;
         private readonly ConnectionMultiplexer cacheMuxer;
+        private FlagStatus flagStatus;
 
 
         public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer)
@@ -143,6 +142,11 @@ namespace BigMission.RaceHeroAggregator
                     {
                         Logger.Info($"Event {eventId} is live, starting to poll for race status");
 
+                        if (int.TryParse(EventId, out int eid))
+                        {
+                            flagStatus = new FlagStatus(eid, Logger, Config, cacheMuxer);
+                        }
+
                         // Start polling for race status
                         var interval = int.Parse(Config["EventPollTimer"]);
                         pollLeaderboardTimer = new Timer(PollLeaderboard, null, 0, interval);
@@ -202,6 +206,8 @@ namespace BigMission.RaceHeroAggregator
                     if (leaderboard == null || leaderboard.Racers == null)
                     {
                         Logger.Info($"Event {eventId} has ended");
+                        flagStatus?.EndEvent().Wait();
+
                         try
                         {
                             pollLeaderboardTimer.Dispose();
@@ -220,6 +226,7 @@ namespace BigMission.RaceHeroAggregator
                     {
                         var cf = leaderboard.CurrentFlag;
                         var flag = RaceHeroClient.ParseFlag(cf);
+                        flagStatus?.ProcessFlagStatus(flag).Wait();
 
                         var logs = new List<Racer>();
                         Racer[] latestStatusCopy = null;
