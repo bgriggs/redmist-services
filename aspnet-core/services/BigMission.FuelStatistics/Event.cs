@@ -1,31 +1,42 @@
-﻿using BigMission.Cache.Models;
-using BigMission.Cache.Models.FuelStatistics;
+﻿using BigMission.Cache;
+using BigMission.Cache.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
+using BigMission.FuelStatistics.FuelRange;
+using BigMission.RaceManagement;
 using Newtonsoft.Json;
+using NLog;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 
 namespace BigMission.FuelStatistics
 {
     class Event : IDisposable
     {
+        private readonly RaceEventSettings settings;
+        private ILogger Logger { get; }
         public int RhEventId { get; private set; }
         public Dictionary<string, Car> Cars { get; } = new Dictionary<string, Car>();
+        private readonly Dictionary<int, CarRange> carRanges = new Dictionary<int, CarRange>();
+        private readonly Dictionary<int, int> deviceAppCarMappings = new Dictionary<int, int>();
+        private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly string dbConnStr;
+        private FuelRangeContext fuelRangeContext;
+        private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(2);
+        private DateTime lastFrUpdate;
         private bool disposed;
 
-
-        public Event(string rhEventId, ConnectionMultiplexer cacheMuxer, string dbConnStr)
+        public Event(RaceEventSettings settings, ConnectionMultiplexer cacheMuxer, string dbConnStr, ILogger logger)
         {
-            if (!int.TryParse(rhEventId, out var id)) { throw new ArgumentException("rhEventId"); }
+            this.settings = settings;
+            if (!int.TryParse(settings.RaceHeroEventId, out var id)) { throw new ArgumentException("rhEventId"); }
             RhEventId = id;
             this.cacheMuxer = cacheMuxer;
             this.dbConnStr = dbConnStr;
+            Logger = logger;
         }
 
 
@@ -34,8 +45,15 @@ namespace BigMission.FuelStatistics
         /// </summary>
         public void Initialize()
         {
-            // Load any saved laps from log for the event
+            carRanges.Clear();
+            deviceAppCarMappings.Clear();
+            carNumberToIdMappings.Clear();
+
             var cf = new BigMissionDbContextFactory();
+
+            fuelRangeContext = new FuelRangeContext(cacheMuxer, cf.CreateDbContext(new[] { dbConnStr }));
+
+            // Load any saved laps from log for the event
             using var db = cf.CreateDbContext(new[] { dbConnStr });
             var laps = db.CarRacerLaps
                 .Where(l => l.EventId == RhEventId)
@@ -54,6 +72,58 @@ namespace BigMission.FuelStatistics
                 .ToArray();
 
             UpdateLap(laps);
+
+            // Load range settings for event cars
+            Logger.Info("Loading Fuel Range Settings...");
+            var carIds = settings.GetCarIds();
+            var carSettings = db.FuelRangeSettings.Where(c => carIds.Contains(c.CarId));
+            Logger.Info($"Loaded {carSettings.Count()} fuel range settings");
+            foreach (var cs in carSettings)
+            {
+                var carRange = new CarRange(cs, fuelRangeContext);
+                carRanges[cs.CarId] = carRange;
+            }
+
+            // Load mappings to associate telemetry from device ID to Car ID
+            Logger.Info("Loading device apps...");
+            var deviceApps = db.DeviceAppConfig.Where(d => d.CarId.HasValue && carIds.Contains(d.CarId.Value));
+            Logger.Info($"Loaded {deviceApps.Count()} device apps");
+            foreach (var da in deviceApps)
+            {
+                deviceAppCarMappings[da.Id] = da.CarId.Value;
+            }
+
+            // Load Cars to be able to go from RH car number to a car ID
+            Logger.Info("Loading cars...");
+            var cars = db.Cars.Where(c => !c.IsDeleted && carIds.Contains(c.Id));
+            Logger.Info($"Loaded {cars.Count()} cars");
+            foreach (var c in cars)
+            {
+                carNumberToIdMappings[c.Number.ToUpper()] = c.Id;
+            }
+
+            // Load car's telemetry channel definitions
+            var deviceAppIds = deviceAppCarMappings.Keys.ToArray();
+            var channelNames = new[] { ReservedChannel.SPEED, ReservedChannel.FUEL_LEVEL };
+            var channels = db.ChannelMappings.Where(ch => deviceAppIds.Contains(ch.DeviceAppId) && channelNames.Contains(ch.ReservedName));
+            foreach(var chMap in channels)
+            {
+                if (deviceAppCarMappings.TryGetValue(chMap.DeviceAppId, out int carId))
+                {
+                    if (carRanges.TryGetValue(carId, out CarRange cr))
+                    {
+                        if (chMap.ReservedName == ReservedChannel.SPEED)
+                        {
+                            cr.SpeedChannel = chMap;
+                        }
+                        else if(chMap.ReservedName == ReservedChannel.FUEL_LEVEL)
+                        {
+                            cr.FuelLevelChannel = chMap;
+                        }
+                    }
+                }
+                
+            }
         }
 
         public void UpdateLap(params Lap[] laps)
@@ -90,9 +160,64 @@ namespace BigMission.FuelStatistics
                 //var jss = new JsonSerializerSettings { TraceWriter = traceWriter, Converters = { new Newtonsoft.Json.Converters.JavaScriptDateTimeConverter() } };
                 //var c = JsonConvert.DeserializeObject<CarBase>(carJson, jss);
                 //Console.WriteLine(traceWriter);
+
+                // Udpate Fuel Range stats
+                if (carNumberToIdMappings.TryGetValue(cl.Key.ToUpper(), out int carId))
+                {
+                    if (carRanges.TryGetValue(carId, out CarRange cr))
+                    {
+                        cr.UpdateWithRaceHero(cl.ToArray());
+
+                        TryUpdateStints();
+                    }
+                }
             }
         }
 
+        /// <summary>
+        /// Processes telemetry used by fuel range calculations.
+        /// </summary>
+        /// <param name="telem"></param>
+        public void UpdateTelemetry(ChannelDataSetDto telem)
+        {
+            if (deviceAppCarMappings.TryGetValue(telem.DeviceAppId, out int carId))
+            {
+                if (carRanges.TryGetValue(carId, out CarRange cr))
+                {
+                    cr.UpdateWithTelemetry(telem);
+
+                    TryUpdateStints();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pull any updates from the cars and save them without exceeding an interval.
+        /// </summary>
+        private void TryUpdateStints()
+        {
+            var diff = DateTime.Now - lastFrUpdate;
+            if (diff >= frUpdateInterval)
+            {
+                var updates = new List<FuelRangeStint>();
+                foreach(var cr in carRanges)
+                {
+                    var frs = cr.Value.StintDataToSave;
+                    if (frs != null)
+                    {
+                        updates.Add(frs);
+                        cr.Value.StintDataToSave = null;
+                    }
+                }
+
+                if (updates.Any())
+                {
+                    fuelRangeContext.UpdateTeamStints(updates).Wait();
+                }
+
+                lastFrUpdate = DateTime.Now;
+            }
+        }
 
         #region Dispose
 

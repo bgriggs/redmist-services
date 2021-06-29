@@ -1,4 +1,7 @@
-﻿using BigMission.Cache.Models;
+﻿using Azure.Messaging.EventHubs.Consumer;
+using BigMission.Cache.Models;
+using BigMission.CommandTools;
+using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
@@ -13,7 +16,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics
 {
@@ -31,7 +36,7 @@ namespace BigMission.FuelStatistics
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly Dictionary<int, Event> eventSubscriptions = new Dictionary<int, Event>();
         private Timer lapCheckTimer;
-
+        private readonly EventHubHelpers ehReader;
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
         {
@@ -39,6 +44,7 @@ namespace BigMission.FuelStatistics
             Logger = logger;
             ServiceTracking = serviceTracking;
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
+            ehReader = new EventHubHelpers(logger);
         }
 
 
@@ -48,6 +54,11 @@ namespace BigMission.FuelStatistics
 
             // Load event subscriptions
             eventSubscriptionTimer = new Timer(RunSubscriptionCheck, null, 0, int.Parse(Config["EventSubscriptionCheckMs"]));
+
+            // Process changes from stream and cache them here is the service
+            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
+            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
+                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
 
             //InitializeEvents();
 
@@ -93,7 +104,7 @@ namespace BigMission.FuelStatistics
                             var eventId = int.Parse(settings.RaceHeroEventId);
                             if (!eventSubscriptions.TryGetValue(eventId, out Event e))
                             {
-                                e = new Event(settings.RaceHeroEventId, cacheMuxer, Config["ConnectionString"]);
+                                e = new Event(settings, cacheMuxer, Config["ConnectionString"], Logger);
                                 e.Initialize();
                                 eventSubscriptions[eventId] = e;
 
@@ -264,48 +275,94 @@ namespace BigMission.FuelStatistics
             return laps.ToArray();
         }
 
-        private void LoadFullTestLaps()
+        private void ReceivedEventCallback(PartitionEvent receivedEvent)
         {
-            var lines = File.ReadAllLines("TestLaps.csv");
-            var st = new Stack<Lap>();
-            for (int i = 1; i < lines.Length; i++)
+            try
             {
-                var lap = ParseTestLap(lines[i]);
-                st.Push(lap);
-                if (!eventSubscriptions.TryGetValue(lap.EventId, out _))
+                var sw = Stopwatch.StartNew();
+                if (!eventSubscriptions.Any())
                 {
-                    Event evt = new Event(lap.EventId.ToString(), cacheMuxer, Config["ConnectionString"]);
-                    eventSubscriptions[lap.EventId] = evt;
+                    return;
                 }
-            }
+                if (receivedEvent.Data.Properties.Count > 0 && receivedEvent.Data.Properties.ContainsKey("ChannelDataSetDto"))
+                {
+                    if (receivedEvent.Data.Properties["Type"].ToString() != "ChannelDataSetDto")
+                        return;
+                }
 
-            var eventLaps = st.GroupBy(l => l.EventId);
-            foreach (var el in eventLaps)
-            {
-                foreach (var lap in el)
+                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
+                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
+
+                if (chDataSet.Data == null)
                 {
-                    eventSubscriptions[el.Key].UpdateLap(lap);
-                    Logger.Trace($"Updating lap for {lap.CarNumber}");
-                    Thread.Sleep(100);
+                    chDataSet.Data = new ChannelStatusDto[] { };
                 }
+
+                Event[] events;
+                lock (eventSubscriptions)
+                {
+                    events = eventSubscriptions.Values.ToArray();
+                }
+
+                Parallel.ForEach(events, evt => 
+                {
+                    evt.UpdateTelemetry(chDataSet);
+                });
+
+                Logger.Trace($"Processed car status in {sw.ElapsedMilliseconds}ms");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Unable to process event from event hub partition");
             }
         }
 
-        private static Lap ParseTestLap(string line)
-        {
-            var values = line.Split('\t');
-            var l = new Lap();
-            l.EventId = int.Parse(values[0]);
-            l.CarNumber = values[1];
-            l.Timestamp = DateTime.Parse(values[2]);
-            l.ClassName = values[3];
-            l.PositionInRun = int.Parse(values[4]);
-            l.CurrentLap = int.Parse(values[5]);
-            l.LastLapTimeSeconds = double.Parse(values[6]);
-            l.LastPitLap = int.Parse(values[7]);
-            l.PitStops = int.Parse(values[8]);
+        #region Testing
 
-            return l;
-        }
+        //private void LoadFullTestLaps()
+        //{
+        //    var lines = File.ReadAllLines("TestLaps.csv");
+        //    var st = new Stack<Lap>();
+        //    for (int i = 1; i < lines.Length; i++)
+        //    {
+        //        var lap = ParseTestLap(lines[i]);
+        //        st.Push(lap);
+        //        if (!eventSubscriptions.TryGetValue(lap.EventId, out _))
+        //        {
+        //            Event evt = new Event(lap.EventId.ToString(), cacheMuxer, Config["ConnectionString"]);
+        //            eventSubscriptions[lap.EventId] = evt;
+        //        }
+        //    }
+
+        //    var eventLaps = st.GroupBy(l => l.EventId);
+        //    foreach (var el in eventLaps)
+        //    {
+        //        foreach (var lap in el)
+        //        {
+        //            eventSubscriptions[el.Key].UpdateLap(lap);
+        //            Logger.Trace($"Updating lap for {lap.CarNumber}");
+        //            Thread.Sleep(100);
+        //        }
+        //    }
+        //}
+
+        //private static Lap ParseTestLap(string line)
+        //{
+        //    var values = line.Split('\t');
+        //    var l = new Lap();
+        //    l.EventId = int.Parse(values[0]);
+        //    l.CarNumber = values[1];
+        //    l.Timestamp = DateTime.Parse(values[2]);
+        //    l.ClassName = values[3];
+        //    l.PositionInRun = int.Parse(values[4]);
+        //    l.CurrentLap = int.Parse(values[5]);
+        //    l.LastLapTimeSeconds = double.Parse(values[6]);
+        //    l.LastPitLap = int.Parse(values[7]);
+        //    l.PitStops = int.Parse(values[8]);
+
+        //    return l;
+        //}
+
+        #endregion
     }
 }
