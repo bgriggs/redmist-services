@@ -10,6 +10,7 @@ using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace BigMission.FuelStatistics
 {
@@ -27,6 +28,9 @@ namespace BigMission.FuelStatistics
         private FuelRangeContext fuelRangeContext;
         private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(2);
         private DateTime lastFrUpdate;
+        private readonly TimeSpan flagUpdateInterval = TimeSpan.FromMilliseconds(500);
+        private Timer flagUpdateTimer;
+        private List<EventFlag> lastEventFlags = new List<EventFlag>();
         private bool disposed;
 
         public Event(RaceEventSettings settings, ConnectionMultiplexer cacheMuxer, string dbConnStr, ILogger logger)
@@ -106,7 +110,7 @@ namespace BigMission.FuelStatistics
             var deviceAppIds = deviceAppCarMappings.Keys.ToArray();
             var channelNames = new[] { ReservedChannel.SPEED, ReservedChannel.FUEL_LEVEL };
             var channels = db.ChannelMappings.Where(ch => deviceAppIds.Contains(ch.DeviceAppId) && channelNames.Contains(ch.ReservedName));
-            foreach(var chMap in channels)
+            foreach (var chMap in channels)
             {
                 if (deviceAppCarMappings.TryGetValue(chMap.DeviceAppId, out int carId))
                 {
@@ -116,14 +120,15 @@ namespace BigMission.FuelStatistics
                         {
                             cr.SpeedChannel = chMap;
                         }
-                        else if(chMap.ReservedName == ReservedChannel.FUEL_LEVEL)
+                        else if (chMap.ReservedName == ReservedChannel.FUEL_LEVEL)
                         {
                             cr.FuelLevelChannel = chMap;
                         }
                     }
                 }
-                
             }
+
+            flagUpdateTimer = new Timer(DoUpdateFlags, null, TimeSpan.FromMilliseconds(100), flagUpdateInterval);
         }
 
         public void UpdateLap(params Lap[] laps)
@@ -200,7 +205,7 @@ namespace BigMission.FuelStatistics
             if (diff >= frUpdateInterval)
             {
                 var updates = new List<FuelRangeStint>();
-                foreach(var cr in carRanges)
+                foreach (var cr in carRanges)
                 {
                     var frs = cr.Value.StintDataToSave;
                     if (frs != null)
@@ -219,6 +224,39 @@ namespace BigMission.FuelStatistics
             }
         }
 
+        private void DoUpdateFlags(object obj)
+        {
+            if (Monitor.TryEnter(flagUpdateTimer))
+            {
+                try
+                {
+                    var cache = cacheMuxer.GetDatabase();
+                    var key = string.Format(Consts.EVENT_FLAGS, RhEventId);
+                    var json = cache.StringGet(key);
+                    if (!string.IsNullOrEmpty(json))
+                    {
+                        var flags = JsonConvert.DeserializeObject<List<EventFlag>>(json);
+                        if (lastEventFlags.Count != flags.Count)
+                        {
+                            foreach (var car in carRanges.Values)
+                            {
+                                car.UpdateFlagState(flags);
+                            }
+                            lastEventFlags = flags;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error update flags");
+                }
+                finally
+                {
+                    Monitor.Exit(flagUpdateInterval);
+                }
+            }
+        }
+
         #region Dispose
 
         public void Dispose()
@@ -234,7 +272,15 @@ namespace BigMission.FuelStatistics
 
             if (disposing)
             {
-
+                if (flagUpdateTimer != null)
+                {
+                    try
+                    {
+                        flagUpdateTimer.Dispose();
+                    }
+                    catch { }
+                    flagUpdateTimer = null;
+                }
             }
 
             disposed = true;

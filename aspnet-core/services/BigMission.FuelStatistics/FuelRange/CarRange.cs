@@ -4,7 +4,7 @@ using BigMission.RaceManagement;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using static BigMission.RaceHeroSdk.RaceHeroClient;
 
 namespace BigMission.FuelStatistics.FuelRange
 {
@@ -45,6 +45,7 @@ namespace BigMission.FuelStatistics.FuelRange
         private readonly TimeSpan speedTimeThreshold = TimeSpan.FromSeconds(6);
         private readonly int speedTriggerMinSamples = 3;
         private readonly float speedTriggerThreshold = 35f;
+        private List<EventFlag> lastEventFlags = new List<EventFlag>();
 
 
         public CarRange(FuelRangeSettings settings, FuelRangeContext fuelRangeContext)
@@ -54,6 +55,7 @@ namespace BigMission.FuelStatistics.FuelRange
             CarId = settings.CarId;
             refuelCheck = new RefuelCheck();
         }
+
 
         public void UpdateWithRaceHero(Lap[] laps)
         {
@@ -83,6 +85,9 @@ namespace BigMission.FuelStatistics.FuelRange
                     }
                 }
             }
+
+            // Update the duration when new laps push the stint time forward
+            UpdateFlagState(lastEventFlags);
         }
 
         public void UpdateWithTelemetry(ChannelDataSetDto telem)
@@ -153,9 +158,61 @@ namespace BigMission.FuelStatistics.FuelRange
             return false;
         }
 
-        public void UpdateFlagState()
+        public void UpdateFlagState(List<EventFlag> eventFlags)
         {
-            // todo add real-time flag changes and set yellow/red duration
+            var stint = CurrentStint;
+            if (stint != null)
+            {
+                double yellowDuration = 0;
+                double redDuration = 0;
+                foreach (var flag in eventFlags)
+                {
+                    var f = ParseFlag(flag.Flag);
+                    if (f == Flag.Yellow)
+                    {
+                        yellowDuration += CalcFlagDuration(flag, stint);
+                    }
+                    else if (f == Flag.Red)
+                    {
+                        redDuration += CalcFlagDuration(flag, stint);
+                    }
+                }
+
+                stint.YellowDurationMins = yellowDuration;
+                stint.RedDurationMins = redDuration;
+            }
+
+            lastEventFlags = eventFlags;
+        }
+
+        private static double CalcFlagDuration(EventFlag flag, FuelRangeStint stint)
+        {
+            double duration = 0;
+
+            // Flag starts during current stint
+            if (flag.Start >= stint.Start)
+            {
+                if (flag.End.HasValue)
+                {
+                    duration += (flag.End.Value - flag.Start).TotalMinutes;
+                }
+                else // Flag still active
+                {
+                    duration += (DateTime.UtcNow - flag.Start).TotalMinutes;
+                }
+            }
+            // Flag started before the stint and is still active
+            else if (flag.Start < stint.Start && flag.End == null)
+            {
+                duration += (DateTime.UtcNow - stint.Start).TotalMinutes;
+            }
+            // Flag started before the stint and ended during the stint
+            else if (flag.Start < stint.Start && flag.End.HasValue && flag.End.Value > flag.Start)
+            {
+                duration += (flag.End.Value - stint.Start).TotalMinutes;
+            }
+
+            return duration;
         }
     }
 }
