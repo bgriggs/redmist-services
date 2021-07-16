@@ -29,11 +29,11 @@ namespace BigMission.RaceHeroAggregator
             this.cacheMuxer = cacheMuxer;
         }
 
-        public async Task ProcessFlagStatus(Flag flag)
+        public async Task ProcessFlagStatus(Flag flag, int runId)
         {
             if (eventFlags.Count == 0)
             {
-                var ef = AddNewFlag(flag);
+                var ef = AddNewFlag(flag, runId);
 
                 var cacheTask = UpdateCache();
                 var cf = new BigMissionDbContextFactory();
@@ -50,7 +50,7 @@ namespace BigMission.RaceHeroAggregator
                 {
                     Logger.Trace($"Processing flag change from {currentFlag.Flag} to {flag}");
                     currentFlag.End = DateTime.UtcNow;
-                    var ef = AddNewFlag(flag);
+                    var ef = AddNewFlag(flag, runId);
 
                     // Save changes
                     var cacheTask = UpdateCache();
@@ -83,9 +83,9 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private EventFlag AddNewFlag(Flag flag)
+        private EventFlag AddNewFlag(Flag flag, int runId)
         {
-            var ef = new EventFlag { EventId = eventId, Flag = flag.ToString(), Start = DateTime.UtcNow };
+            var ef = new EventFlag { EventId = eventId, RunId = runId, Flag = flag.ToString(), Start = DateTime.UtcNow };
             eventFlags.Add(ef);
             return ef;
         }

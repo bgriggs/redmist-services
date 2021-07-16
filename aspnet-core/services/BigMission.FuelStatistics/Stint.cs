@@ -19,16 +19,24 @@ namespace BigMission.FuelStatistics
         {
             get
             {
-                var fl = Laps.First().Value;
-                return fl.Timestamp.AddSeconds(-fl.LastLapTimeSeconds);
+                if (Laps.Any())
+                {
+                    var fl = Laps.First().Value;
+                    return fl.Timestamp.AddSeconds(-fl.LastLapTimeSeconds);
+                }
+                return default;
             }
         }
         public override DateTime End
         {
             get
             {
-                var fl = Laps.Last().Value;
-                return fl.Timestamp;
+                if (Laps.Any())
+                {
+                    var fl = Laps.Last().Value;
+                    return fl.Timestamp;
+                }
+                return default;
             }
         }
 

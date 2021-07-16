@@ -6,6 +6,7 @@ using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
@@ -104,7 +105,7 @@ namespace BigMission.FuelStatistics
                             var eventId = int.Parse(settings.RaceHeroEventId);
                             if (!eventSubscriptions.TryGetValue(eventId, out Event e))
                             {
-                                e = new Event(settings, cacheMuxer, Config["ConnectionString"], Logger);
+                                e = new Event(settings, cacheMuxer, Config["ConnectionString"], Logger, new DateTimeHelper());
                                 e.Initialize();
                                 eventSubscriptions[eventId] = e;
 
@@ -217,6 +218,7 @@ namespace BigMission.FuelStatistics
                         try
                         {
                             var laps = PopEventLaps(evt.Key, cache);
+                            Logger.Debug($"Loaded {laps.Length} laps for event {evt.Key}");
                             evt.Value.UpdateLap(laps);
                         }
                         catch(Exception ex)
@@ -257,6 +259,7 @@ namespace BigMission.FuelStatistics
                     lap = new Lap
                     {
                         EventId = eventId,
+                        RunId = racer.RunId,
                         Timestamp = racer.Timestamp,
                         CarNumber = racer.CarNumber,
                         ClassName = racer.ClassName,

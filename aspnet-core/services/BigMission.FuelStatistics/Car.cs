@@ -54,7 +54,16 @@ namespace BigMission.FuelStatistics
                 }
             }
 
-            PositionOverall = Laps.Last().Value.PositionInRun;
+            if (Laps.Any())
+            {
+                PositionOverall = Laps.Last().Value.PositionInRun;
+                LastLapSecs = Laps.Last().Value.LastLapTimeSeconds;
+            }
+            else
+            {
+                PositionOverall = 0;
+                LastLapSecs = 0;
+            }
 
             // Update stats
             Stints.Clear();
@@ -124,7 +133,6 @@ namespace BigMission.FuelStatistics
             StintLaps = Stints.Last().TotalLaps;
             StintTimeSecs = (int)Stints.Last().StintDurationSecs;
             PitStops = Pits.Count;
-            LastLapSecs = Laps.Last().Value.LastLapTimeSeconds;
 
             if (Pits.Any() && Stints.Any())
             {

@@ -7,6 +7,7 @@ namespace BigMission.FuelStatistics
     public class Lap
     {
         public int EventId { get; set; }
+        public int RunId { get; set; }
         public string CarNumber { get; set; }
         public DateTime Timestamp { get; set; }
         public string ClassName { get; set; }

@@ -11,6 +11,7 @@ using NUglify.Helpers;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,6 +39,8 @@ namespace BigMission.RaceHeroAggregator
 
         private Timer pollLeaderboardTimer;
         private readonly object pollLeaderboardLock = new object();
+
+        private const bool LOG_RH_STATUS = true;
 
         /// <summary>
         /// Latest Car status
@@ -128,6 +131,8 @@ namespace BigMission.RaceHeroAggregator
                     Logger.Debug($"Checking for event {eventId} to start");
                     var evtTask = RhClient.GetEvent(eventId);
                     evtTask.Wait();
+                    LogEventPoll(evtTask.Result);
+
                     bool isLive, isEnded;
                     lock (lastEventLock)
                     {
@@ -201,6 +206,7 @@ namespace BigMission.RaceHeroAggregator
                     lbTask.Wait();
                     
                     var leaderboard = lbTask.Result;
+                    LogLeaderboardPoll(eventId, leaderboard);
 
                     // Stop polling when the event is over
                     if (leaderboard == null || leaderboard.Racers == null)
@@ -226,7 +232,7 @@ namespace BigMission.RaceHeroAggregator
                     {
                         var cf = leaderboard.CurrentFlag;
                         var flag = RaceHeroClient.ParseFlag(cf);
-                        flagStatus?.ProcessFlagStatus(flag).Wait();
+                        flagStatus?.ProcessFlagStatus(flag, leaderboard.RunId).Wait();
 
                         var logs = new List<Racer>();
                         Racer[] latestStatusCopy = null;
@@ -270,6 +276,7 @@ namespace BigMission.RaceHeroAggregator
                                 var log = new CarRaceLap
                                 {
                                     EventId = eid,
+                                    RunId = leaderboard.RunId,
                                     CarNumber = l.RacerNumber,
                                     Timestamp = now,
                                     CurrentLap = l.CurrentLap,
@@ -334,6 +341,39 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
+        private void LogEventPoll(Event @event)
+        {
+            if (LOG_RH_STATUS)
+            {
+                const string DIR_PREFIX = "Event-{0}";
+                var dir = string.Format(DIR_PREFIX, @event.Id);
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                var evtStr = JsonConvert.SerializeObject(@event);
+                File.WriteAllText($"{dir}\\evt-{DateTime.UtcNow.ToFileTimeUtc()}.json", evtStr);
+            }
+        }
+
+        private void LogLeaderboardPoll(string eventId, Leaderboard leaderboard)
+        {
+            if (LOG_RH_STATUS)
+            {
+                const string DIR_PREFIX = "Leaderboard-{0}-{1}";
+                var dir = string.Format(DIR_PREFIX, eventId, leaderboard.RunId);
+                if (!Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                var lbStr = JsonConvert.SerializeObject(leaderboard);
+                File.WriteAllText($"{dir}\\lb-{DateTime.UtcNow.ToFileTimeUtc()}.json", lbStr);
+            }
+        }
+
+        #region Dispose
 
         public void Dispose()
         {
@@ -375,5 +415,7 @@ namespace BigMission.RaceHeroAggregator
                 return new ValueTask(Task.FromException(exception));
             }
         }
+
+        #endregion
     }
 }

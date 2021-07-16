@@ -4,6 +4,7 @@ using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.RaceManagement;
+using BigMission.TestHelpers;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
@@ -14,26 +15,30 @@ using System.Threading;
 
 namespace BigMission.FuelStatistics
 {
+    /// <summary>
+    /// Processes data for a race hero event including pit stops and car range.
+    /// </summary>
     class Event : IDisposable
     {
         private readonly RaceEventSettings settings;
+        private readonly IDateTimeHelper dateTimeHelper;
         private ILogger Logger { get; }
         public int RhEventId { get; private set; }
         public Dictionary<string, Car> Cars { get; } = new Dictionary<string, Car>();
         private readonly Dictionary<int, CarRange> carRanges = new Dictionary<int, CarRange>();
+        private readonly HashSet<int> dirtyCarRanges = new HashSet<int>();
         private readonly Dictionary<int, int> deviceAppCarMappings = new Dictionary<int, int>();
         private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly string dbConnStr;
         private FuelRangeContext fuelRangeContext;
-        private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(2);
-        private DateTime lastFrUpdate;
-        private readonly TimeSpan flagUpdateInterval = TimeSpan.FromMilliseconds(500);
-        private Timer flagUpdateTimer;
-        private List<EventFlag> lastEventFlags = new List<EventFlag>();
+        private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(1);
+        private Timer fuelRangeUpdateTimer;
+        private DateTime lastStintTimestamp;
         private bool disposed;
 
-        public Event(RaceEventSettings settings, ConnectionMultiplexer cacheMuxer, string dbConnStr, ILogger logger)
+
+        public Event(RaceEventSettings settings, ConnectionMultiplexer cacheMuxer, string dbConnStr, ILogger logger, IDateTimeHelper dateTimeHelper)
         {
             this.settings = settings;
             if (!int.TryParse(settings.RaceHeroEventId, out var id)) { throw new ArgumentException("rhEventId"); }
@@ -41,6 +46,7 @@ namespace BigMission.FuelStatistics
             this.cacheMuxer = cacheMuxer;
             this.dbConnStr = dbConnStr;
             Logger = logger;
+            this.dateTimeHelper = dateTimeHelper;
         }
 
 
@@ -59,11 +65,19 @@ namespace BigMission.FuelStatistics
 
             // Load any saved laps from log for the event
             using var db = cf.CreateDbContext(new[] { dbConnStr });
+            int latestRunId = 0;
+            var runIds = db.CarRacerLaps.Where(l => l.EventId == RhEventId).Select(p => p.RunId);
+            if (runIds.Any())
+            {
+                latestRunId = runIds.Max();
+            }
+
             var laps = db.CarRacerLaps
-                .Where(l => l.EventId == RhEventId)
+                .Where(l => l.EventId == RhEventId && l.RunId == latestRunId)
                 .Select(l => new Lap
                 {
                     EventId = RhEventId,
+                    RunId = l.RunId,
                     CarNumber = l.CarNumber,
                     Timestamp = l.Timestamp,
                     ClassName = l.ClassName,
@@ -71,7 +85,8 @@ namespace BigMission.FuelStatistics
                     CurrentLap = l.CurrentLap,
                     LastLapTimeSeconds = l.LastLapTimeSeconds,
                     LastPitLap = l.LastPitLap,
-                    PitStops = l.PitStops
+                    PitStops = l.PitStops,
+                    Flag = l.Flag
                 })
                 .ToArray();
 
@@ -84,7 +99,7 @@ namespace BigMission.FuelStatistics
             Logger.Info($"Loaded {carSettings.Count()} fuel range settings");
             foreach (var cs in carSettings)
             {
-                var carRange = new CarRange(cs, fuelRangeContext);
+                var carRange = new CarRange(cs, dateTimeHelper);
                 carRanges[cs.CarId] = carRange;
             }
 
@@ -128,9 +143,13 @@ namespace BigMission.FuelStatistics
                 }
             }
 
-            flagUpdateTimer = new Timer(DoUpdateFlags, null, TimeSpan.FromMilliseconds(100), flagUpdateInterval);
+            fuelRangeUpdateTimer = new Timer(DoUpdateFuelRangeStints, null, TimeSpan.FromMilliseconds(500), frUpdateInterval);
         }
 
+        /// <summary>
+        /// Update statistics using new race hero lap data.
+        /// </summary>
+        /// <param name="laps"></param>
         public void UpdateLap(params Lap[] laps)
         {
             var carLaps = laps.GroupBy(l => l.CarNumber);
@@ -171,16 +190,18 @@ namespace BigMission.FuelStatistics
                 {
                     if (carRanges.TryGetValue(carId, out CarRange cr))
                     {
-                        cr.UpdateWithRaceHero(cl.ToArray());
-
-                        TryUpdateStints();
+                        var changed = cr.ProcessLaps(cl.ToArray());
+                        if (changed)
+                        {
+                            SetDirty(carId);
+                        }
                     }
                 }
             }
         }
 
         /// <summary>
-        /// Processes telemetry used by fuel range calculations.
+        /// Processes car's telemetry used by fuel range calculations.
         /// </summary>
         /// <param name="telem"></param>
         public void UpdateTelemetry(ChannelDataSetDto telem)
@@ -189,71 +210,127 @@ namespace BigMission.FuelStatistics
             {
                 if (carRanges.TryGetValue(carId, out CarRange cr))
                 {
-                    cr.UpdateWithTelemetry(telem);
-
-                    TryUpdateStints();
+                    var changed = cr.ProcessTelemetery(telem);
+                    if (changed)
+                    {
+                        SetDirty(carId);
+                    }
                 }
+            }
+        }
+
+        private void SetDirty(int carId)
+        {
+            lock (dirtyCarRanges)
+            {
+                dirtyCarRanges.Add(carId);
+            }
+        }
+
+        private int[] FlushDirtyCarRanges()
+        {
+            lock (dirtyCarRanges)
+            {
+                var cids = dirtyCarRanges.ToArray();
+                dirtyCarRanges.Clear();
+                return cids;
             }
         }
 
         /// <summary>
         /// Pull any updates from the cars and save them without exceeding an interval.
         /// </summary>
-        private void TryUpdateStints()
+        private void DoUpdateFuelRangeStints(object obj = null)
         {
-            var diff = DateTime.Now - lastFrUpdate;
-            if (diff >= frUpdateInterval)
-            {
-                var updates = new List<FuelRangeStint>();
-                foreach (var cr in carRanges)
-                {
-                    var frs = cr.Value.StintDataToSave;
-                    if (frs != null)
-                    {
-                        updates.Add(frs);
-                        cr.Value.StintDataToSave = null;
-                    }
-                }
-
-                if (updates.Any())
-                {
-                    fuelRangeContext.UpdateTeamStints(updates).Wait();
-                }
-
-                lastFrUpdate = DateTime.Now;
-            }
-        }
-
-        private void DoUpdateFlags(object obj)
-        {
-            if (Monitor.TryEnter(flagUpdateTimer))
+            if (Monitor.TryEnter(fuelRangeUpdateTimer))
             {
                 try
                 {
                     var cache = cacheMuxer.GetDatabase();
-                    var key = string.Format(Consts.EVENT_FLAGS, RhEventId);
-                    var json = cache.StringGet(key);
-                    if (!string.IsNullOrEmpty(json))
+
+                    // Check for user DB udpates
+                    var lastts = CheckReload(cache);
+                    if (lastts != null && lastStintTimestamp != lastts)
                     {
-                        var flags = JsonConvert.DeserializeObject<List<EventFlag>>(json);
-                        if (lastEventFlags.Count != flags.Count)
+                        var stints = LoadTeamStints(settings.TenantId, RhEventId);
+                        foreach (var car in carRanges.Values)
                         {
-                            foreach (var car in carRanges.Values)
-                            {
-                                car.UpdateFlagState(flags);
-                            }
-                            lastEventFlags = flags;
+                            car.MergeStintUserChanges(stints);
                         }
+
+                        lastStintTimestamp = lastts.Value;
+                    }
+
+                    // Apply flags
+                    var flags = GetFlags(cache);
+                    foreach (var car in carRanges.Values)
+                    {
+                        car.ApplyEventFlags(flags);
+                    }
+
+                    // Get updated cars
+                    var eventStints = new List<FuelRangeStint>();
+                    var carIdsToUpdate = FlushDirtyCarRanges();
+                    if (carIdsToUpdate.Any())
+                    {
+                        foreach (var car in carRanges.Values)
+                        {
+                            var carStints = car.GetStints();
+                            eventStints.AddRange(carStints);
+                        }
+                        fuelRangeContext.UpdateTeamStints(eventStints).Wait();
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error update flags");
+                    Logger.Error(ex, "Error saving fuel ranges");
                 }
                 finally
                 {
-                    Monitor.Exit(flagUpdateInterval);
+                    Monitor.Exit(fuelRangeUpdateTimer);
                 }
+            }
+            else
+            {
+                Logger.Info("Skipping DoUpdateFuelRangeStints");
+            }
+        }
+
+        private List<EventFlag> GetFlags(IDatabase cache)
+        {
+            var flags = new List<EventFlag>();
+            var key = string.Format(Consts.EVENT_FLAGS, RhEventId);
+            var json = cache.StringGet(key);
+            if (!string.IsNullOrEmpty(json))
+            {
+                var f = JsonConvert.DeserializeObject<List<EventFlag>>(json);
+                if (f != null)
+                {
+                    flags = f;
+                }
+            }
+            return flags;
+        }
+
+        private DateTime? CheckReload(IDatabase cache)
+        {
+            var key = string.Format(Consts.FUEL_RANGE_STATUS_UPDATED, settings.TenantId);
+            var dtstr = cache.StringGet(key);
+            if (!string.IsNullOrEmpty(dtstr))
+            {
+                return DateTime.Parse(dtstr).ToUniversalTime();
+            }
+            return null;
+        }
+
+        private List<FuelRangeStint> LoadTeamStints(int teamId, int eventId)
+        {
+            var cf = new BigMissionDbContextFactory();
+            var db = cf.CreateDbContext(new[] { dbConnStr });
+            using (db)
+            {
+                var latestRunId = db.FuelRangeStints.Where(s => s.TenantId == teamId && s.EventId == eventId).Select(p => p.RunId).DefaultIfEmpty(0).Max();
+                return db.FuelRangeStints.Where(s => s.TenantId == teamId && s.EventId == eventId && s.RunId == latestRunId).ToList();
             }
         }
 
@@ -272,14 +349,14 @@ namespace BigMission.FuelStatistics
 
             if (disposing)
             {
-                if (flagUpdateTimer != null)
+                if (fuelRangeUpdateTimer != null)
                 {
                     try
                     {
-                        flagUpdateTimer.Dispose();
+                        fuelRangeUpdateTimer.Dispose();
                     }
                     catch { }
-                    flagUpdateTimer = null;
+                    fuelRangeUpdateTimer = null;
                 }
             }
 
