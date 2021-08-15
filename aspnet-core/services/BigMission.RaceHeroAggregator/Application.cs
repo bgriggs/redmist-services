@@ -1,4 +1,6 @@
 ﻿using BigMission.EntityFrameworkCore;
+using BigMission.RaceHeroAggregator.Testing;
+using BigMission.RaceHeroSdk;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
@@ -28,6 +30,7 @@ namespace BigMission.RaceHeroAggregator
         private readonly object eventSubscriptionCheckLock = new object();
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
         private readonly ConnectionMultiplexer cacheMuxer;
+        private IRaceHeroClient RhClient { get; set; }
 
 
         public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking)
@@ -36,6 +39,16 @@ namespace BigMission.RaceHeroAggregator
             Config = config;
             ServiceTracking = serviceTracking;
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
+            var readTestFiles = bool.Parse(Config["ReadTestFiles"]);
+
+            if (readTestFiles)
+            {
+                RhClient = new FileRHClient(Config["EventTestFilesDir"], Config["LeaderboardTestFilesDir"]);
+            }
+            else
+            {
+                RhClient = new RaceHeroClient(Config["RaceHeroUrl"], Config["RaceHeroApiKey"]);
+            }
         }
 
 
@@ -89,7 +102,7 @@ namespace BigMission.RaceHeroAggregator
                         {
                             if (!eventSubscriptions.TryGetValue(settingGrg.Key, out EventSubscription subscription))
                             {
-                                subscription = new EventSubscription(Logger, Config, cacheMuxer);
+                                subscription = new EventSubscription(Logger, Config, cacheMuxer, RhClient);
                                 eventSubscriptions[settingGrg.Key] = subscription;
                                 subscription.Start();
                                 Logger.Info($"Adding event subscription for event ID '{settingGrg.Key}' and starting polling.");

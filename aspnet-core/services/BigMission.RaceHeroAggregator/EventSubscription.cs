@@ -1,4 +1,5 @@
 ﻿using BigMission.Cache.Models;
+using BigMission.CommandTools;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceHeroSdk;
 using BigMission.RaceHeroSdk.Models;
@@ -11,6 +12,7 @@ using NUglify.Helpers;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -30,7 +32,7 @@ namespace BigMission.RaceHeroAggregator
 
         private readonly List<CarSubscription> subscriberCars = new List<CarSubscription>();
         private readonly Dictionary<int, RaceEventSettings> settings = new Dictionary<int, RaceEventSettings>();
-        private RaceHeroClient RhClient { get; set; }
+        private IRaceHeroClient RhClient { get; set; }
 
         private Timer waitForStartTimer;
         private readonly object waitForStartLock = new object();
@@ -40,24 +42,28 @@ namespace BigMission.RaceHeroAggregator
         private Timer pollLeaderboardTimer;
         private readonly object pollLeaderboardLock = new object();
 
-        private const bool LOG_RH_STATUS = true;
-
         /// <summary>
         /// Latest Car status
         /// </summary>
         private readonly Dictionary<string, Racer> racerStatus = new Dictionary<string, Racer>();
 
-        private const int FUEL_STATS_MAX_LEN = 100;
+        private const int FUEL_STATS_MAX_LEN = 200;
         private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly ChannelData channelData;
         private FlagStatus flagStatus;
+        private readonly bool logRHToFile;
+        private readonly bool readTestFiles;
 
 
-        public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer)
+        public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IRaceHeroClient raceHeroClient)
         {
             Logger = logger;
             Config = config;
-            RhClient = new RaceHeroClient(Config["RaceHeroUrl"], Config["RaceHeroApiKey"]);
             this.cacheMuxer = cacheMuxer;
+            RhClient = raceHeroClient;
+            channelData = new ChannelData(Config["ServiceId"], Config["KafkaConnectionString"], Config["KafkaDataTopic"]);
+            logRHToFile = bool.Parse(Config["LogRHToFile"]);
+            readTestFiles = bool.Parse(Config["ReadTestFiles"]);
         }
 
 
@@ -96,7 +102,7 @@ namespace BigMission.RaceHeroAggregator
             {
                 newCars.ForEach(c =>
                 {
-                    var cs = new CarSubscription(Logger, Config) { CarId = c.Id, CarNumber = c.Number };
+                    var cs = new CarSubscription(Logger, Config, channelData) { CarId = c.Id, CarNumber = c.Number };
                     subscriberCars.Add(cs);
                     cs.InitializeChannels();
                 });
@@ -200,6 +206,7 @@ namespace BigMission.RaceHeroAggregator
             {
                 try
                 {
+                    var sw = Stopwatch.StartNew();
                     var eventId = EventId;
                     Logger.Trace($"Polling leaderboard for event {eventId}");
                     var lbTask = RhClient.GetLeaderboard(eventId);
@@ -264,6 +271,9 @@ namespace BigMission.RaceHeroAggregator
                             {
                                 subscriberCars.ForEach(c => { c.ProcessUpdate(latestStatusCopy); });
                             }
+
+                            Logger.Trace($"latestStatusCopy {sw.ElapsedMilliseconds}ms");
+                            sw = Stopwatch.StartNew();
                         }
 
                         if (logs.Any())
@@ -291,7 +301,12 @@ namespace BigMission.RaceHeroAggregator
                             }
 
                             CacheToFuelStatistics(carRaceLaps);
-                            LogLapChanges(carRaceLaps);
+                            Logger.Trace($"CacheToFuelStatistics {sw.ElapsedMilliseconds}ms");
+
+                            if (!readTestFiles)
+                            {
+                                LogLapChanges(carRaceLaps);
+                            }
                         }
                     }
                 }
@@ -343,7 +358,7 @@ namespace BigMission.RaceHeroAggregator
 
         private void LogEventPoll(Event @event)
         {
-            if (LOG_RH_STATUS)
+            if (logRHToFile)
             {
                 const string DIR_PREFIX = "Event-{0}";
                 var dir = string.Format(DIR_PREFIX, @event.Id);
@@ -359,7 +374,7 @@ namespace BigMission.RaceHeroAggregator
 
         private void LogLeaderboardPoll(string eventId, Leaderboard leaderboard)
         {
-            if (LOG_RH_STATUS)
+            if (logRHToFile)
             {
                 const string DIR_PREFIX = "Leaderboard-{0}-{1}";
                 var dir = string.Format(DIR_PREFIX, eventId, leaderboard.RunId);
@@ -408,6 +423,7 @@ namespace BigMission.RaceHeroAggregator
             try
             {
                 Dispose();
+                channelData.DisposeAsync();
                 return default;
             }
             catch (Exception exception)

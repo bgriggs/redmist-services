@@ -29,14 +29,14 @@ namespace BigMission.RaceHeroAggregator
         public int CarId { get; set; }
         public string CarNumber { get; set; }
         public ChannelMapping[] VirtualChannels { get; private set; }
+        private readonly ChannelData channelData;
 
-        //private Racer lastLap;
 
-
-        public CarSubscription(ILogger logger, IConfiguration config)
+        public CarSubscription(ILogger logger, IConfiguration config, ChannelData channelData)
         {
             Logger = logger;
             Config = config;
+            this.channelData = channelData;
         }
 
 
@@ -146,8 +146,7 @@ namespace BigMission.RaceHeroAggregator
                 }
 
                 var channelDs = new ChannelDataSetDto { IsVirtual = true, Timestamp = DateTime.UtcNow, Data = channelStatusUpdates.ToArray() };
-                var cd = new ChannelData(Config["ServiceId"], Config["KafkaConnectionString"], Config["KafkaDataTopic"]);
-                cd.SendData(channelDs).Wait();
+                channelData.SendData(channelDs).Wait();
             }
 
             //lastLap = lap;

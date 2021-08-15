@@ -67,8 +67,8 @@ namespace BigMission.RaceHeroAggregator
 
         public async Task EndEvent()
         {
-            var currentFlag = eventFlags.Last();
-            if (currentFlag.End == null)
+            var currentFlag = eventFlags.LastOrDefault();
+            if (currentFlag != null && currentFlag.End == null)
             {
                 currentFlag.End = DateTime.UtcNow;
 
