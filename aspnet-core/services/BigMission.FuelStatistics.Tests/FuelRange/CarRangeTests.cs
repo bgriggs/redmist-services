@@ -8,7 +8,7 @@ using System;
 using System.Linq;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
-namespace BigMission.FuelStatistics.Tests
+namespace BigMission.FuelStatistics.Tests.FuelRange
 {
     [TestClass]
     public class CarRangeTests

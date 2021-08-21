@@ -6,7 +6,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 
-namespace BigMission.FuelStatistics.Tests
+namespace BigMission.FuelStatistics.Tests.FuelRange
 {
     [TestClass]
     public class FlagDurationUtilsTests

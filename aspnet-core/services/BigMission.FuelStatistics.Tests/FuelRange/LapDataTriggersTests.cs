@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.Text;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
-namespace BigMission.FuelStatistics.Tests
+namespace BigMission.FuelStatistics.Tests.FuelRange
 {
     [TestClass]
     public class LapDataTriggersTests
