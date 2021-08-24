@@ -1,8 +1,12 @@
-﻿using BigMission.ServiceStatusTools;
+﻿using BigMission.Cache;
+using BigMission.EntityFrameworkCore;
+using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using NLog.Config;
+using StackExchange.Redis;
 using System;
 using System.IO;
 
@@ -31,12 +35,25 @@ namespace BigMission.FuelStatistics
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
+                var cf = new BigMissionDbContextFactory();
+                var db = cf.CreateDbContext(new[] { config["ConnectionString"] });
+                var cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
+
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);
                 services.AddSingleton<IConfiguration>(config);
+                services.AddTransient<ITimerHelper, TimerHelper>();
+                
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
                 services.AddSingleton(serviceStatus);
+
+                var fuelRangeContext = new FuelRangeContext(cacheMuxer, db);
+                services.AddSingleton(fuelRangeContext);
+
+                var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
+                services.AddSingleton<IDataContext>(dataContext);
+
                 services.AddTransient<Application>();
 
                 var provider = services.BuildServiceProvider();

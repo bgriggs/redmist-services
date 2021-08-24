@@ -7,12 +7,12 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace BigMission.RaceHeroAggregator.Testing
+namespace BigMission.RaceHeroTestHelpers
 {
     /// <summary>
     /// Used for testing by loading an old event from files.
     /// </summary>
-    class FileRHClient : IRaceHeroClient
+    public class FileRHClient : IRaceHeroClient
     {
         private readonly List<Tuple<DateTime, Event>> eventData = new List<Tuple<DateTime, Event>>();
         private readonly List<Tuple<DateTime, Leaderboard>> lbData = new List<Tuple<DateTime, Leaderboard>>();
@@ -45,8 +45,10 @@ namespace BigMission.RaceHeroAggregator.Testing
             // Load leaderboard files
             var lbPolls = new List<Tuple<DateTime, Leaderboard>>();
             var lbFiles = Directory.GetFiles(leaderboardPath);
-            foreach (var f in lbFiles)
+            Parallel.ForEach(lbFiles, f =>
             {
+                //foreach (var f in lbFiles)
+                //{
                 var fi = new FileInfo(f);
                 var ts = fi.Name.Remove(0, 3);
                 ts = ts.Replace(".json", "");
@@ -55,7 +57,8 @@ namespace BigMission.RaceHeroAggregator.Testing
                 var lb = JsonConvert.DeserializeObject<Leaderboard>(json);
                 var p = Tuple.Create(dt, lb);
                 lbPolls.Add(p);
-            }
+                //}
+            });
 
             var sequencedLbPolls = lbPolls.OrderBy(p => p.Item1);
             foreach (var sp in sequencedLbPolls)
@@ -78,16 +81,14 @@ namespace BigMission.RaceHeroAggregator.Testing
                             return Task.FromResult(eventData[i].Item2);
                         }
                     }
-                    else
+
+                    var evt = eventData[i].Item2;
+                    if (lastLb == default)
                     {
-                        var evt = eventData[i].Item2;
-                        if (lastLb == default)
-                        {
-                            // Pop off event entries until the event starts
-                            eventData.RemoveAt(0);
-                        }
-                        return Task.FromResult(evt);
+                        // Pop off event entries until the event starts
+                        eventData.RemoveAt(0);
                     }
+                    return Task.FromResult(evt);
                 }
             }
             return Task.FromResult(new Event());

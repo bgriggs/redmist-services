@@ -1,17 +1,14 @@
 ﻿using BigMission.Cache;
-using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.RaceManagement;
 using BigMission.TestHelpers;
-using Newtonsoft.Json;
 using NLog;
-using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics
 {
@@ -29,128 +26,108 @@ namespace BigMission.FuelStatistics
         private readonly HashSet<int> dirtyCarRanges = new HashSet<int>();
         private readonly Dictionary<int, int> deviceAppCarMappings = new Dictionary<int, int>();
         private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
-        private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly string dbConnStr;
-        private FuelRangeContext fuelRangeContext;
+        private readonly IDataContext dataContext;
+        private readonly FuelRangeContext fuelRangeContext;
         private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(1);
-        private Timer fuelRangeUpdateTimer;
+        private readonly ITimerHelper fuelRangeUpdateTimer;
+        private readonly SemaphoreSlim fuelRangeUpdateLock = new SemaphoreSlim(1, 1);
         private DateTime lastStintTimestamp;
         private bool disposed;
 
 
-        public Event(RaceEventSettings settings, ConnectionMultiplexer cacheMuxer, string dbConnStr, ILogger logger, IDateTimeHelper dateTimeHelper)
+        public Event(RaceEventSettings settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, FuelRangeContext fuelRangeContext, ITimerHelper fuelRangeUpdateTimer)
         {
             this.settings = settings;
             if (!int.TryParse(settings.RaceHeroEventId, out var id)) { throw new ArgumentException("rhEventId"); }
             RhEventId = id;
-            this.cacheMuxer = cacheMuxer;
-            this.dbConnStr = dbConnStr;
             Logger = logger;
             this.dateTimeHelper = dateTimeHelper;
+            this.dataContext = dataContext;
+            this.fuelRangeContext = fuelRangeContext;
+            this.fuelRangeUpdateTimer = fuelRangeUpdateTimer;
         }
 
 
         /// <summary>
         /// Pull in any existing data for the event to reset on service restart or event change.
         /// </summary>
-        public void Initialize()
+        public async Task Initialize()
         {
             carRanges.Clear();
             deviceAppCarMappings.Clear();
             carNumberToIdMappings.Clear();
 
-            var cf = new BigMissionDbContextFactory();
-
-            fuelRangeContext = new FuelRangeContext(cacheMuxer, cf.CreateDbContext(new[] { dbConnStr }));
-
-            // Load any saved laps from log for the event
-            using var db = cf.CreateDbContext(new[] { dbConnStr });
-            int latestRunId = 0;
-            var runIds = db.CarRacerLaps.Where(l => l.EventId == RhEventId).Select(p => p.RunId);
-            if (runIds.Any())
+            dataContext.StartBatch();
+            try
             {
-                latestRunId = runIds.Max();
-            }
+                // Load any saved laps from log for the event
+                var laps = await dataContext.GetSavedLaps(RhEventId);
+                await UpdateLap(laps);
 
-            var laps = db.CarRacerLaps
-                .Where(l => l.EventId == RhEventId && l.RunId == latestRunId)
-                .Select(l => new Lap
+                // Load range settings for event cars
+                Logger.Info("Loading Fuel Range Settings...");
+                var carIds = settings.GetCarIds();
+                var carSettings = await dataContext.GetFuelRangeSettings(carIds);
+                Logger.Info($"Loaded {carSettings.Count()} fuel range settings");
+                foreach (var cs in carSettings)
                 {
-                    EventId = RhEventId,
-                    RunId = l.RunId,
-                    CarNumber = l.CarNumber,
-                    Timestamp = l.Timestamp,
-                    ClassName = l.ClassName,
-                    PositionInRun = l.PositionInRun,
-                    CurrentLap = l.CurrentLap,
-                    LastLapTimeSeconds = l.LastLapTimeSeconds,
-                    LastPitLap = l.LastPitLap,
-                    PitStops = l.PitStops,
-                    Flag = l.Flag
-                })
-                .ToArray();
+                    var carRange = new CarRange(cs, dateTimeHelper);
+                    carRanges[cs.CarId] = carRange;
+                }
 
-            UpdateLap(laps);
-
-            // Load range settings for event cars
-            Logger.Info("Loading Fuel Range Settings...");
-            var carIds = settings.GetCarIds();
-            var carSettings = db.FuelRangeSettings.Where(c => carIds.Contains(c.CarId));
-            Logger.Info($"Loaded {carSettings.Count()} fuel range settings");
-            foreach (var cs in carSettings)
-            {
-                var carRange = new CarRange(cs, dateTimeHelper);
-                carRanges[cs.CarId] = carRange;
-            }
-
-            // Load mappings to associate telemetry from device ID to Car ID
-            Logger.Info("Loading device apps...");
-            var deviceApps = db.DeviceAppConfig.Where(d => d.CarId.HasValue && carIds.Contains(d.CarId.Value));
-            Logger.Info($"Loaded {deviceApps.Count()} device apps");
-            foreach (var da in deviceApps)
-            {
-                deviceAppCarMappings[da.Id] = da.CarId.Value;
-            }
-
-            // Load Cars to be able to go from RH car number to a car ID
-            Logger.Info("Loading cars...");
-            var cars = db.Cars.Where(c => !c.IsDeleted && carIds.Contains(c.Id));
-            Logger.Info($"Loaded {cars.Count()} cars");
-            foreach (var c in cars)
-            {
-                carNumberToIdMappings[c.Number.ToUpper()] = c.Id;
-            }
-
-            // Load car's telemetry channel definitions
-            var deviceAppIds = deviceAppCarMappings.Keys.ToArray();
-            var channelNames = new[] { ReservedChannel.SPEED, ReservedChannel.FUEL_LEVEL };
-            var channels = db.ChannelMappings.Where(ch => deviceAppIds.Contains(ch.DeviceAppId) && channelNames.Contains(ch.ReservedName));
-            foreach (var chMap in channels)
-            {
-                if (deviceAppCarMappings.TryGetValue(chMap.DeviceAppId, out int carId))
+                // Load mappings to associate telemetry from device ID to Car ID
+                Logger.Info("Loading device apps...");
+                var deviceApps = await dataContext.GetDeviceAppConfig(carIds);
+                Logger.Info($"Loaded {deviceApps.Count()} device apps");
+                foreach (var da in deviceApps)
                 {
-                    if (carRanges.TryGetValue(carId, out CarRange cr))
+                    deviceAppCarMappings[da.Id] = da.CarId.Value;
+                }
+
+                // Load Cars to be able to go from RH car number to a car ID
+                Logger.Info("Loading cars...");
+                var cars = await dataContext.GetCars(carIds);
+                Logger.Info($"Loaded {cars.Count()} cars");
+                foreach (var c in cars)
+                {
+                    carNumberToIdMappings[c.Number.ToUpper()] = c.Id;
+                }
+
+                // Load car's telemetry channel definitions
+                var deviceAppIds = deviceAppCarMappings.Keys.ToArray();
+                var channelNames = new[] { ReservedChannel.SPEED, ReservedChannel.FUEL_LEVEL };
+                var channels = await dataContext.GetChannelMappings(deviceAppIds, channelNames);
+                foreach (var chMap in channels)
+                {
+                    if (deviceAppCarMappings.TryGetValue(chMap.DeviceAppId, out int carId))
                     {
-                        if (chMap.ReservedName == ReservedChannel.SPEED)
+                        if (carRanges.TryGetValue(carId, out CarRange cr))
                         {
-                            cr.SpeedChannel = chMap;
-                        }
-                        else if (chMap.ReservedName == ReservedChannel.FUEL_LEVEL)
-                        {
-                            cr.FuelLevelChannel = chMap;
+                            if (chMap.ReservedName == ReservedChannel.SPEED)
+                            {
+                                cr.SpeedChannel = chMap;
+                            }
+                            else if (chMap.ReservedName == ReservedChannel.FUEL_LEVEL)
+                            {
+                                cr.FuelLevelChannel = chMap;
+                            }
                         }
                     }
                 }
             }
+            finally
+            {
+                await dataContext.EndBatch();
+            }
 
-            fuelRangeUpdateTimer = new Timer(DoUpdateFuelRangeStints, null, TimeSpan.FromMilliseconds(500), frUpdateInterval);
+            fuelRangeUpdateTimer.Create(DoUpdateFuelRangeStints, null, TimeSpan.FromMilliseconds(500), frUpdateInterval);
         }
 
         /// <summary>
         /// Update statistics using new race hero lap data.
         /// </summary>
         /// <param name="laps"></param>
-        public void UpdateLap(params Lap[] laps)
+        public async Task UpdateLap(List<Lap> laps)
         {
             var carLaps = laps.GroupBy(l => l.CarNumber);
             foreach (var cl in carLaps)
@@ -176,10 +153,8 @@ namespace BigMission.FuelStatistics
                 car.AddLap(cl.ToArray());
 
                 // Save car status
-                var cache = cacheMuxer.GetDatabase();
-                var eventKey = string.Format(Consts.FUEL_STAT, RhEventId);
-                var carJson = JsonConvert.SerializeObject(car);
-                cache.HashSet(eventKey, car.Number, carJson);
+                await dataContext.UpdateCarStatus(car, RhEventId);
+                
                 //Newtonsoft.Json.Serialization.ITraceWriter traceWriter = new Newtonsoft.Json.Serialization.MemoryTraceWriter();
                 //var jss = new JsonSerializerSettings { TraceWriter = traceWriter, Converters = { new Newtonsoft.Json.Converters.JavaScriptDateTimeConverter() } };
                 //var c = JsonConvert.DeserializeObject<CarBase>(carJson, jss);
@@ -240,19 +215,17 @@ namespace BigMission.FuelStatistics
         /// <summary>
         /// Pull any updates from the cars and save them without exceeding an interval.
         /// </summary>
-        private void DoUpdateFuelRangeStints(object obj = null)
+        private async void DoUpdateFuelRangeStints(object obj = null)
         {
-            if (Monitor.TryEnter(fuelRangeUpdateTimer))
+            if (await fuelRangeUpdateLock.WaitAsync(10))
             {
                 try
                 {
-                    var cache = cacheMuxer.GetDatabase();
-
                     // Check for user DB udpates
-                    var lastts = CheckReload(cache);
+                    var lastts = await dataContext.CheckReload(settings.TenantId);
                     if (lastts != null && lastStintTimestamp != lastts)
                     {
-                        var stints = LoadTeamStints(settings.TenantId, RhEventId);
+                        var stints = await dataContext.GetTeamStints(settings.TenantId, RhEventId);
                         foreach (var car in carRanges.Values)
                         {
                             car.MergeStintUserChanges(stints);
@@ -262,7 +235,7 @@ namespace BigMission.FuelStatistics
                     }
 
                     // Apply flags
-                    var flags = GetFlags(cache);
+                    var flags = await dataContext.GetFlags(RhEventId);
                     foreach (var car in carRanges.Values)
                     {
                         car.ApplyEventFlags(flags);
@@ -278,7 +251,7 @@ namespace BigMission.FuelStatistics
                             var carStints = car.GetStints();
                             eventStints.AddRange(carStints);
                         }
-                        fuelRangeContext.UpdateTeamStints(eventStints).Wait();
+                        await fuelRangeContext.UpdateTeamStints(eventStints);
                     }
                 }
                 catch (Exception ex)
@@ -287,50 +260,12 @@ namespace BigMission.FuelStatistics
                 }
                 finally
                 {
-                    Monitor.Exit(fuelRangeUpdateTimer);
+                    fuelRangeUpdateLock.Release();
                 }
             }
             else
             {
                 Logger.Info("Skipping DoUpdateFuelRangeStints");
-            }
-        }
-
-        private List<EventFlag> GetFlags(IDatabase cache)
-        {
-            var flags = new List<EventFlag>();
-            var key = string.Format(Consts.EVENT_FLAGS, RhEventId);
-            var json = cache.StringGet(key);
-            if (!string.IsNullOrEmpty(json))
-            {
-                var f = JsonConvert.DeserializeObject<List<EventFlag>>(json);
-                if (f != null)
-                {
-                    flags = f;
-                }
-            }
-            return flags;
-        }
-
-        private DateTime? CheckReload(IDatabase cache)
-        {
-            var key = string.Format(Consts.FUEL_RANGE_STATUS_UPDATED, settings.TenantId);
-            var dtstr = cache.StringGet(key);
-            if (!string.IsNullOrEmpty(dtstr))
-            {
-                return DateTime.Parse(dtstr).ToUniversalTime();
-            }
-            return null;
-        }
-
-        private List<FuelRangeStint> LoadTeamStints(int teamId, int eventId)
-        {
-            var cf = new BigMissionDbContextFactory();
-            var db = cf.CreateDbContext(new[] { dbConnStr });
-            using (db)
-            {
-                var latestRunId = db.FuelRangeStints.Where(s => s.TenantId == teamId && s.EventId == eventId).Select(p => p.RunId).DefaultIfEmpty(0).Max();
-                return db.FuelRangeStints.Where(s => s.TenantId == teamId && s.EventId == eventId && s.RunId == latestRunId).ToList();
             }
         }
 
@@ -356,7 +291,6 @@ namespace BigMission.FuelStatistics
                         fuelRangeUpdateTimer.Dispose();
                     }
                     catch { }
-                    fuelRangeUpdateTimer = null;
                 }
             }
 

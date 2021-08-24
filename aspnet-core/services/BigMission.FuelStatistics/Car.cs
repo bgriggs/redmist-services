@@ -16,7 +16,6 @@ namespace BigMission.FuelStatistics
         {
             if (string.IsNullOrWhiteSpace(number)) { throw new ArgumentException("number"); }
             Number = number;
-            if (string.IsNullOrWhiteSpace(className)) { throw new ArgumentException("className"); }
             ClassName = className;
         }
 
