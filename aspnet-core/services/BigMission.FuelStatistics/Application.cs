@@ -39,10 +39,10 @@ namespace BigMission.FuelStatistics
         private readonly ITimerHelper eventSubTimer;
         private readonly ITimerHelper lapCheckTimer;
         private readonly FuelRangeContext fuelRangeContext;
-
+        private readonly ITelemetryConsumer telemetryConsumer;
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDataContext dataContext, 
-            ITimerHelper eventSubTimer, ITimerHelper lapCheckTimer, FuelRangeContext fuelRangeContext)
+            ITimerHelper eventSubTimer, ITimerHelper lapCheckTimer, FuelRangeContext fuelRangeContext, ITelemetryConsumer telemetryConsumer)
         {
             Config = config;
             Logger = logger;
@@ -52,6 +52,7 @@ namespace BigMission.FuelStatistics
             this.eventSubTimer = eventSubTimer;
             this.lapCheckTimer = lapCheckTimer;
             this.fuelRangeContext = fuelRangeContext;
+            this.telemetryConsumer = telemetryConsumer;
         }
 
 
@@ -62,11 +63,9 @@ namespace BigMission.FuelStatistics
             // Load event subscriptions
             eventSubTimer.Create(RunSubscriptionCheck, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(int.Parse(Config["EventSubscriptionCheckMs"])));
 
-            // todo: remove
             // Process changes from stream and cache them here is the service
-            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
-                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+            telemetryConsumer.ReceiveData = ReceivedEventCallback;
+            telemetryConsumer.Connect();
 
             //InitializeEvents();
 
@@ -82,7 +81,6 @@ namespace BigMission.FuelStatistics
             //        Console.WriteLine($"\tLap={l.Value.CurrentLap} TS={l.Value.Timestamp} LastPitLap={l.Value.LastPitLap} LapTime={l.Value.LastLapTimeSeconds}");
             //    }
             //}
-
 
             // Start timer to read redis list of laps
             lapCheckTimer.Create(CheckForEventLaps, null, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500));
@@ -236,28 +234,13 @@ namespace BigMission.FuelStatistics
         }
 
 
-        // todo: extract this to a generic interface for event hub, i.e. telemetry provider
-        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        private void ReceivedEventCallback(ChannelDataSetDto chDataSet)
         {
             try
             {
-                var sw = Stopwatch.StartNew();
                 if (!eventSubscriptions.Any())
                 {
                     return;
-                }
-                if (receivedEvent.Data.Properties.Count > 0 && receivedEvent.Data.Properties.ContainsKey("ChannelDataSetDto"))
-                {
-                    if (receivedEvent.Data.Properties["Type"].ToString() != "ChannelDataSetDto")
-                        return;
-                }
-
-                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
-
-                if (chDataSet.Data == null)
-                {
-                    chDataSet.Data = new ChannelStatusDto[] { };
                 }
 
                 Event[] events;
@@ -275,12 +258,10 @@ namespace BigMission.FuelStatistics
                 {
                     evt.UpdateTelemetry(chDataSet);
                 });
-
-                Logger.Trace($"Processed car status in {sw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Unable to process event from event hub partition");
+                Logger.Error(ex, "Unable to process telemetry data");
             }
         }
 

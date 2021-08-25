@@ -54,6 +54,8 @@ namespace BigMission.FuelStatistics
                 var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
                 services.AddSingleton<IDataContext>(dataContext);
 
+                services.AddScoped<ITelemetryConsumer, EHTelemetryConsumer>();
+
                 services.AddTransient<Application>();
 
                 var provider = services.BuildServiceProvider();
