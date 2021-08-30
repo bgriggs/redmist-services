@@ -1,4 +1,5 @@
-﻿using BigMission.RaceHeroSdk;
+﻿using BigMission.FuelStatistics;
+using BigMission.RaceHeroSdk;
 using BigMission.RaceHeroSdk.Models;
 using Newtonsoft.Json;
 using System;
@@ -14,7 +15,7 @@ namespace BigMission.RaceHeroTestHelpers
     /// </summary>
     public class FileRHClient : IRaceHeroClient
     {
-        private readonly List<Tuple<DateTime, Event>> eventData = new List<Tuple<DateTime, Event>>();
+        private readonly List<Tuple<DateTime, RaceHeroSdk.Models.Event>> eventData = new List<Tuple<DateTime, RaceHeroSdk.Models.Event>>();
         private readonly List<Tuple<DateTime, Leaderboard>> lbData = new List<Tuple<DateTime, Leaderboard>>();
         private DateTime lastLb;
 
@@ -22,7 +23,7 @@ namespace BigMission.RaceHeroTestHelpers
         public FileRHClient(string eventPath, string leaderboardPath)
         {
             // Load Event files
-            var evtPolls = new List<Tuple<DateTime, Event>>();
+            var evtPolls = new List<Tuple<DateTime, RaceHeroSdk.Models.Event>>();
             var evtFiles = Directory.GetFiles(eventPath);
             foreach (var f in evtFiles)
             {
@@ -31,7 +32,7 @@ namespace BigMission.RaceHeroTestHelpers
                 ts = ts.Replace(".json", "");
                 var dt = DateTime.FromFileTimeUtc(long.Parse(ts));
                 var json = File.ReadAllText(f);
-                var evt = JsonConvert.DeserializeObject<Event>(json);
+                var evt = JsonConvert.DeserializeObject<RaceHeroSdk.Models.Event>(json);
                 var p = Tuple.Create(dt, evt);
                 evtPolls.Add(p);
             }
@@ -67,7 +68,7 @@ namespace BigMission.RaceHeroTestHelpers
             }
         }
 
-        public Task<Event> GetEvent(string eventId)
+        public Task<RaceHeroSdk.Models.Event> GetEvent(string eventId)
         {
             if (eventData.Any())
             {
@@ -91,7 +92,7 @@ namespace BigMission.RaceHeroTestHelpers
                     return Task.FromResult(evt);
                 }
             }
-            return Task.FromResult(new Event());
+            return Task.FromResult(new RaceHeroSdk.Models.Event());
         }
 
         public Task<Events> GetEvents(int limit = 25, int offset = 0, bool live = false)
@@ -110,6 +111,40 @@ namespace BigMission.RaceHeroTestHelpers
             }
 
             return Task.FromResult(new Leaderboard());
+        }
+
+        public List<Lap> GetNextLaps()
+        {
+            var lbtask = GetLeaderboard(null);
+            lbtask.Wait();
+            var lb = lbtask.Result;
+
+            var startTime = DateTime.Parse(lb.StartedAt);
+            var currentTime = startTime + TimeSpan.FromSeconds(lb.CurrentTime);
+
+            var cf = lb.CurrentFlag;
+            var flag = RaceHeroClient.ParseFlag(cf);
+
+            var carRaceLaps = new List<Lap>();
+            foreach (var l in lb.Racers)
+            {
+                var log = new Lap
+                {
+                    RunId = lb.RunId,
+                    CarNumber = l.RacerNumber,
+                    Timestamp = currentTime,
+                    CurrentLap = l.CurrentLap,
+                    ClassName = l.RacerClassName,
+                    LastLapTimeSeconds = l.LastLapTimeSeconds,
+                    PositionInRun = l.PositionInRun,
+                    LastPitLap = l.LastPitLap,
+                    PitStops = l.PitStops,
+                    Flag = (byte)flag
+                };
+
+                carRaceLaps.Add(log);
+            }
+            return carRaceLaps;
         }
     }
 }

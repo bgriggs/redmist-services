@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\common\BigMission.RaceHeroSdk\BigMission.RaceHeroSdk.csproj" />
+    <ProjectReference Include="..\BigMission.FuelStatistics\BigMission.FuelStatistics.csproj" />
   </ItemGroup>
 
 </Project>

@@ -49,7 +49,7 @@ namespace BigMission.FuelStatistics
                 services.AddSingleton(serviceStatus);
 
                 var fuelRangeContext = new FuelRangeContext(cacheMuxer, db);
-                services.AddSingleton(fuelRangeContext);
+                services.AddSingleton<IFuelRangeContext>(fuelRangeContext);
 
                 var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
                 services.AddSingleton<IDataContext>(dataContext);

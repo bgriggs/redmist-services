@@ -1,22 +1,16 @@
-﻿using Azure.Messaging.EventHubs.Consumer;
-using BigMission.Cache;
-using BigMission.Cache.Models;
-using BigMission.CommandTools;
+﻿using BigMission.Cache;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
 using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
 using NLog;
 using NUglify.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -34,20 +28,18 @@ namespace BigMission.FuelStatistics
         private readonly Dictionary<int, Event> eventSubscriptions = new Dictionary<int, Event>();
         private readonly SemaphoreSlim eventSubscriptionLock = new SemaphoreSlim(1, 1);
         private readonly SemaphoreSlim lapCheckLock = new SemaphoreSlim(1, 1);
-        private readonly EventHubHelpers ehReader;
         private readonly IDataContext dataContext;
         private readonly ITimerHelper eventSubTimer;
         private readonly ITimerHelper lapCheckTimer;
-        private readonly FuelRangeContext fuelRangeContext;
+        private readonly IFuelRangeContext fuelRangeContext;
         private readonly ITelemetryConsumer telemetryConsumer;
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDataContext dataContext, 
-            ITimerHelper eventSubTimer, ITimerHelper lapCheckTimer, FuelRangeContext fuelRangeContext, ITelemetryConsumer telemetryConsumer)
+            ITimerHelper eventSubTimer, ITimerHelper lapCheckTimer, IFuelRangeContext fuelRangeContext, ITelemetryConsumer telemetryConsumer)
         {
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
-            ehReader = new EventHubHelpers(logger);
             this.dataContext = dataContext;
             this.eventSubTimer = eventSubTimer;
             this.lapCheckTimer = lapCheckTimer;

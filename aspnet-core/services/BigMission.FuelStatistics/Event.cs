@@ -15,19 +15,19 @@ namespace BigMission.FuelStatistics
     /// <summary>
     /// Processes data for a race hero event including pit stops and car range.
     /// </summary>
-    class Event : IDisposable
+    public class Event : IDisposable
     {
         private readonly RaceEventSettings settings;
         private readonly IDateTimeHelper dateTimeHelper;
         private ILogger Logger { get; }
         public int RhEventId { get; private set; }
-        public Dictionary<string, Car> Cars { get; } = new Dictionary<string, Car>();
+        private Dictionary<string, Car> Cars { get; } = new Dictionary<string, Car>();
         private readonly Dictionary<int, CarRange> carRanges = new Dictionary<int, CarRange>();
         private readonly HashSet<int> dirtyCarRanges = new HashSet<int>();
         private readonly Dictionary<int, int> deviceAppCarMappings = new Dictionary<int, int>();
         private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
         private readonly IDataContext dataContext;
-        private readonly FuelRangeContext fuelRangeContext;
+        private readonly IFuelRangeContext fuelRangeContext;
         private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(1);
         private readonly ITimerHelper fuelRangeUpdateTimer;
         private readonly SemaphoreSlim fuelRangeUpdateLock = new SemaphoreSlim(1, 1);
@@ -35,7 +35,7 @@ namespace BigMission.FuelStatistics
         private bool disposed;
 
 
-        public Event(RaceEventSettings settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, FuelRangeContext fuelRangeContext, ITimerHelper fuelRangeUpdateTimer)
+        public Event(RaceEventSettings settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, IFuelRangeContext fuelRangeContext, ITimerHelper fuelRangeUpdateTimer)
         {
             this.settings = settings;
             if (!int.TryParse(settings.RaceHeroEventId, out var id)) { throw new ArgumentException("rhEventId"); }
@@ -267,6 +267,11 @@ namespace BigMission.FuelStatistics
             {
                 Logger.Info("Skipping DoUpdateFuelRangeStints");
             }
+        }
+
+        public Car[] GetCars()
+        {
+            return Cars.Values.ToArray();
         }
 
         #region Dispose
