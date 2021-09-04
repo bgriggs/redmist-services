@@ -70,7 +70,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             serviceBlock.WaitOne();
         }
 
-        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        private Task ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
             {
@@ -147,6 +147,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             {
                 Logger.Error(ex, "Unable to process event from event hub partition");
             }
+
+            return Task.CompletedTask;
         }
 
         /// <summary>

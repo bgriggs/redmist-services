@@ -1,4 +1,4 @@
-﻿using BigMission.Cache;
+﻿using BigMission.Cache.FuelRange;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.RaceManagement;
@@ -6,8 +6,8 @@ using BigMission.TestHelpers;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics
@@ -28,10 +28,7 @@ namespace BigMission.FuelStatistics
         private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
-        private readonly TimeSpan frUpdateInterval = TimeSpan.FromSeconds(1);
         private readonly ITimerHelper fuelRangeUpdateTimer;
-        private readonly SemaphoreSlim fuelRangeUpdateLock = new SemaphoreSlim(1, 1);
-        private DateTime lastStintTimestamp;
         private bool disposed;
 
 
@@ -71,7 +68,7 @@ namespace BigMission.FuelStatistics
                 Logger.Info($"Loaded {carSettings.Count()} fuel range settings");
                 foreach (var cs in carSettings)
                 {
-                    var carRange = new CarRange(cs, dateTimeHelper);
+                    var carRange = new CarRange(cs, dateTimeHelper, fuelRangeContext, Logger);
                     carRanges[cs.CarId] = carRange;
                 }
 
@@ -119,8 +116,6 @@ namespace BigMission.FuelStatistics
             {
                 await dataContext.EndBatch();
             }
-
-            fuelRangeUpdateTimer.Create(DoUpdateFuelRangeStints, null, TimeSpan.FromMilliseconds(500), frUpdateInterval);
         }
 
         /// <summary>
@@ -154,7 +149,7 @@ namespace BigMission.FuelStatistics
 
                 // Save car status
                 await dataContext.UpdateCarStatus(car, RhEventId);
-                
+
                 //Newtonsoft.Json.Serialization.ITraceWriter traceWriter = new Newtonsoft.Json.Serialization.MemoryTraceWriter();
                 //var jss = new JsonSerializerSettings { TraceWriter = traceWriter, Converters = { new Newtonsoft.Json.Converters.JavaScriptDateTimeConverter() } };
                 //var c = JsonConvert.DeserializeObject<CarBase>(carJson, jss);
@@ -165,7 +160,7 @@ namespace BigMission.FuelStatistics
                 {
                     if (carRanges.TryGetValue(carId, out CarRange cr))
                     {
-                        var changed = cr.ProcessLaps(cl.ToArray());
+                        var changed = await cr.ProcessLaps(cl.ToArray());
                         if (changed)
                         {
                             SetDirty(carId);
@@ -179,13 +174,13 @@ namespace BigMission.FuelStatistics
         /// Processes car's telemetry used by fuel range calculations.
         /// </summary>
         /// <param name="telem"></param>
-        public void UpdateTelemetry(ChannelDataSetDto telem)
+        public async Task UpdateTelemetry(ChannelDataSetDto telem)
         {
             if (deviceAppCarMappings.TryGetValue(telem.DeviceAppId, out int carId))
             {
                 if (carRanges.TryGetValue(carId, out CarRange cr))
                 {
-                    var changed = cr.ProcessTelemetery(telem);
+                    var changed = await cr.ProcessTelemetery(telem);
                     if (changed)
                     {
                         SetDirty(carId);
@@ -194,78 +189,64 @@ namespace BigMission.FuelStatistics
             }
         }
 
+        public async Task OverrideStint(FuelRangeUpdate stint)
+        {
+            foreach (var car in carRanges.Values)
+            {
+                var dirty = await car.OverrideStint(stint);
+                if (dirty)
+                {
+                    SetDirty(car.CarId);
+                }
+            }
+        }
+
         private void SetDirty(int carId)
         {
-            lock (dirtyCarRanges)
-            {
-                dirtyCarRanges.Add(carId);
-            }
+            dirtyCarRanges.Add(carId);
         }
 
         private int[] FlushDirtyCarRanges()
         {
-            lock (dirtyCarRanges)
-            {
-                var cids = dirtyCarRanges.ToArray();
-                dirtyCarRanges.Clear();
-                return cids;
-            }
+            var cids = dirtyCarRanges.ToArray();
+            dirtyCarRanges.Clear();
+            return cids;
         }
 
         /// <summary>
         /// Pull any updates from the cars and save them without exceeding an interval.
         /// </summary>
-        private async void DoUpdateFuelRangeStints(object obj = null)
+        public async Task CommitFuelRangeStintUpdates()
         {
-            if (await fuelRangeUpdateLock.WaitAsync(10))
+            try
             {
-                try
+                var sw = Stopwatch.StartNew();
+
+                // Apply flags
+                var flags = await dataContext.GetFlags(RhEventId);
+                foreach (var car in carRanges.Values)
                 {
-                    // Check for user DB udpates
-                    var lastts = await dataContext.CheckReload(settings.TenantId);
-                    if (lastts != null && lastStintTimestamp != lastts)
-                    {
-                        var stints = await dataContext.GetTeamStints(settings.TenantId, RhEventId);
-                        foreach (var car in carRanges.Values)
-                        {
-                            car.MergeStintUserChanges(stints);
-                        }
+                    car.ApplyEventFlags(flags);
+                }
 
-                        lastStintTimestamp = lastts.Value;
-                    }
-
-                    // Apply flags
-                    var flags = await dataContext.GetFlags(RhEventId);
+                // Get updated cars
+                var eventStints = new List<FuelRangeStint>();
+                var carIdsToUpdate = FlushDirtyCarRanges();
+                if (carIdsToUpdate.Any())
+                {
                     foreach (var car in carRanges.Values)
                     {
-                        car.ApplyEventFlags(flags);
+                        var carStints = car.GetStints();
+                        eventStints.AddRange(carStints);
                     }
+                    await fuelRangeContext.UpdateTeamStints(eventStints);
+                }
 
-                    // Get updated cars
-                    var eventStints = new List<FuelRangeStint>();
-                    var carIdsToUpdate = FlushDirtyCarRanges();
-                    if (carIdsToUpdate.Any())
-                    {
-                        foreach (var car in carRanges.Values)
-                        {
-                            var carStints = car.GetStints();
-                            eventStints.AddRange(carStints);
-                        }
-                        await fuelRangeContext.UpdateTeamStints(eventStints);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Error saving fuel ranges");
-                }
-                finally
-                {
-                    fuelRangeUpdateLock.Release();
-                }
+                Logger.Trace($"CommitFuelRangeStintUpdates for event {RhEventId} in {sw.ElapsedMilliseconds}ms");
             }
-            else
+            catch (Exception ex)
             {
-                Logger.Info("Skipping DoUpdateFuelRangeStints");
+                Logger.Error(ex, "Error saving fuel ranges");
             }
         }
 

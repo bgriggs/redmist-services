@@ -89,7 +89,7 @@ namespace BigMission.AlarmProcessor
             serviceBlock.WaitOne();
         }
 
-        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        private Task ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             var sw = Stopwatch.StartNew();
             try
@@ -144,6 +144,7 @@ namespace BigMission.AlarmProcessor
             {
                 Logger.Trace($"Processed channels in {sw.ElapsedMilliseconds}ms");
             }
+            return Task.CompletedTask;
         }
 
         #region Alarm Configuration
@@ -161,7 +162,7 @@ namespace BigMission.AlarmProcessor
                     .ToArray();
 
                 Logger.Info($"Loaded {alarmConfig.Count()} Alarms");
-                
+
                 var delKeys = new List<RedisKey>();
                 foreach (var ac in alarmConfig)
                 {
@@ -179,7 +180,7 @@ namespace BigMission.AlarmProcessor
 
                 var cache = cacheMuxer.GetDatabase();
                 cache.KeyDelete(delKeys.ToArray(), CommandFlags.FireAndForget);
-                
+
                 // Filter down to active alarms
                 alarmConfig = alarmConfig.Where(a => !a.IsDeleted && a.IsEnabled).ToArray();
                 Logger.Debug($"Found {alarmConfig.Count()} enabled alarms");
@@ -220,7 +221,7 @@ namespace BigMission.AlarmProcessor
         /// When a change to devices or channels is received invalidate and reload.
         /// </summary>
         /// <param name="command"></param>
-        private void ProcessConfigurationChange(KeyValuePair<string, string> command)
+        private Task ProcessConfigurationChange(KeyValuePair<string, string> command)
         {
             if (command.Key == ConfigurationCommandTypes.CHANNEL_MODIFIED || command.Key == ConfigurationCommandTypes.DEVICE_MODIFIED)
             {
@@ -230,6 +231,8 @@ namespace BigMission.AlarmProcessor
             {
                 LoadAlarmConfiguration(null);
             }
+
+            return Task.CompletedTask;
         }
     }
 }

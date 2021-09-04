@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BigMission.FuelStatistics\BigMission.FuelStatistics.csproj" />
+    <ProjectReference Include="..\BigMission.RaceHeroTestHelpers\BigMission.RaceHeroTestHelpers.csproj" />
   </ItemGroup>
 
 </Project>

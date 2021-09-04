@@ -58,7 +58,7 @@ namespace BigMission.KeypadServices
             serviceBlock.WaitOne();
         }
 
-        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        private Task ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
             {
@@ -66,7 +66,7 @@ namespace BigMission.KeypadServices
                 if (receivedEvent.Data.Properties.Count > 0 && receivedEvent.Data.Properties.ContainsKey("KeypadStatusDto"))
                 {
                     if (receivedEvent.Data.Properties["Type"].ToString() != "KeypadStatusDto")
-                        return;
+                        return Task.CompletedTask;
                 }
 
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
@@ -105,6 +105,8 @@ namespace BigMission.KeypadServices
             {
                 Logger.Error(ex, "Unable to process event from event hub partition");
             }
+
+            return Task.CompletedTask;
         }
     }
 }

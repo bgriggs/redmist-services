@@ -25,17 +25,14 @@ namespace BigMission.FuelStatistics
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
-        private readonly Dictionary<int, Event> eventSubscriptions = new Dictionary<int, Event>();
-        private readonly SemaphoreSlim eventSubscriptionLock = new SemaphoreSlim(1, 1);
         private readonly SemaphoreSlim lapCheckLock = new SemaphoreSlim(1, 1);
         private readonly IDataContext dataContext;
         private readonly ITimerHelper eventSubTimer;
         private readonly ITimerHelper lapCheckTimer;
         private readonly IFuelRangeContext fuelRangeContext;
-        private readonly ITelemetryConsumer telemetryConsumer;
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDataContext dataContext, 
-            ITimerHelper eventSubTimer, ITimerHelper lapCheckTimer, IFuelRangeContext fuelRangeContext, ITelemetryConsumer telemetryConsumer)
+            ITimerHelper eventSubTimer, ITimerHelper lapCheckTimer, IFuelRangeContext fuelRangeContext)
         {
             Config = config;
             Logger = logger;
@@ -44,20 +41,12 @@ namespace BigMission.FuelStatistics
             this.eventSubTimer = eventSubTimer;
             this.lapCheckTimer = lapCheckTimer;
             this.fuelRangeContext = fuelRangeContext;
-            this.telemetryConsumer = telemetryConsumer;
         }
 
 
         public void Run()
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
-
-            // Load event subscriptions
-            eventSubTimer.Create(RunSubscriptionCheck, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(int.Parse(Config["EventSubscriptionCheckMs"])));
-
-            // Process changes from stream and cache them here is the service
-            telemetryConsumer.ReceiveData = ReceivedEventCallback;
-            telemetryConsumer.Connect();
 
             //InitializeEvents();
 
@@ -74,8 +63,6 @@ namespace BigMission.FuelStatistics
             //    }
             //}
 
-            // Start timer to read redis list of laps
-            lapCheckTimer.Create(CheckForEventLaps, null, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500));
 
             // Start updating service status
             ServiceTracking.Start();
@@ -83,179 +70,40 @@ namespace BigMission.FuelStatistics
             serviceBlock.WaitOne();
         }
 
-        private async void RunSubscriptionCheck(object obj)
-        {
-            if (await eventSubscriptionLock.WaitAsync(50))
-            {
-                try
-                {
-                    var eventSettings = await LoadEventSettings();
-                    Logger.Info($"Loaded {eventSettings.Length} event subscriptions.");
-                    var settingEventGrps = eventSettings.GroupBy(s => s.RaceHeroEventId);
-                    var eventIds = eventSettings.Select(s => int.Parse(s.RaceHeroEventId)).Distinct();
-
-                    foreach (var settings in eventSettings)
-                    {
-                        var eventId = int.Parse(settings.RaceHeroEventId);
-                        if (!eventSubscriptions.TryGetValue(eventId, out Event e))
-                        {
-                            e = new Event(settings, Logger, new DateTimeHelper(), dataContext, fuelRangeContext, new TimerHelper());
-                            await e.Initialize();
-                            eventSubscriptions[eventId] = e;
-
-                            // Clear event in cache
-                            await dataContext.ClearCachedEvent(e.RhEventId);
-                        }
-                    }
-
-                    // Remove deleted
-                    var expiredEvents = eventSubscriptions.Keys.Except(eventIds);
-                    expiredEvents.ForEach(e =>
-                    {
-                        Logger.Info($"Removing event subscription {e}");
-                        if (eventSubscriptions.Remove(e, out Event sub))
-                        {
-                            try
-                            {
-                                sub.Dispose();
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Error(ex, $"Error stopping event subscription {sub.RhEventId}.");
-                            }
-                        }
-                    });
-
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Error polling subscriptions");
-                }
-                finally
-                {
-                    eventSubscriptionLock.Release();
-                }
-            }
-            else
-            {
-                Logger.Info("Skipping RunSubscriptionCheck");
-            }
-        }
-
-        private async Task<RaceEventSettings[]> LoadEventSettings()
-        {
-            try
-            {
-                var events = await dataContext.GetEventSettings();
-
-                // Filter by subscription time
-                var activeSubscriptions = new List<RaceEventSettings>();
-                foreach (var evt in events)
-                {
-                    // Get the local time zone info if available
-                    TimeZoneInfo tz = null;
-                    if (!string.IsNullOrWhiteSpace(evt.EventTimeZoneId))
-                    {
-                        try
-                        {
-                            tz = TimeZoneInfo.FindSystemTimeZoneById(evt.EventTimeZoneId);
-                        }
-                        catch { }
-                    }
-
-                    // Attempt to use local time, otherwise use UTC
-                    var now = DateTime.UtcNow;
-                    if (tz != null)
-                    {
-                        now = TimeZoneInfo.ConvertTimeFromUtc(now, tz);
-                    }
-
-                    // The end date should go to the end of the day the that the user specified
-                    var end = new DateTime(evt.EventEnd.Year, evt.EventEnd.Month, evt.EventEnd.Day, 23, 59, 59);
-                    if (evt.EventStart <= now && end >= now)
-                    {
-                        activeSubscriptions.Add(evt);
-                    }
-                }
-
-                return activeSubscriptions.ToArray();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Unable to load events");
-            }
-            return new RaceEventSettings[0];
-        }
-
-        private async void CheckForEventLaps(object o)
-        {
-            if (await lapCheckLock.WaitAsync(25))
-            {
-                try
-                {
-                    var sw = Stopwatch.StartNew();
-                    foreach (var evt in eventSubscriptions)
-                    {
-                        try
-                        {
-                            var laps = await dataContext.PopEventLaps(evt.Key);
-                            Logger.Debug($"Loaded {laps.Count} laps for event {evt.Key}");
-                            await evt.Value.UpdateLap(laps);
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Error(ex, $"Error processing event laps for event={evt.Key}");
-                        }
-                    }
-
-                    Logger.Debug($"Processed lap updates in {sw.ElapsedMilliseconds}ms");
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Error checking for laps to process");
-                }
-                finally
-                {
-                    lapCheckLock.Release();
-                }
-            }
-            else
-            {
-                Logger.Debug("Skipping lap processing");
-            }
-        }
+      
+        
 
 
-        private void ReceivedEventCallback(ChannelDataSetDto chDataSet)
-        {
-            try
-            {
-                if (!eventSubscriptions.Any())
-                {
-                    return;
-                }
+        //private async void ReceivedEventCallback(ChannelDataSetDto chDataSet)
+        //{
+        //    try
+        //    {
+        //        if (!eventSubscriptions.Any())
+        //        {
+        //            return;
+        //        }
 
-                Event[] events;
-                eventSubscriptionLock.Wait();
-                try 
-                {
-                    events = eventSubscriptions.Values.ToArray();
-                }
-                finally
-                {
-                    eventSubscriptionLock.Release();
-                }
+        //        Event[] events;
+        //        eventSubscriptionLock.Wait();
+        //        try 
+        //        {
+        //            events = eventSubscriptions.Values.ToArray();
+        //        }
+        //        finally
+        //        {
+        //            eventSubscriptionLock.Release();
+        //        }
 
-                Parallel.ForEach(events, evt =>
-                {
-                    evt.UpdateTelemetry(chDataSet);
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Unable to process telemetry data");
-            }
-        }
+        //        Parallel.ForEach(events, evt =>
+        //        {
+        //            evt.UpdateTelemetry(chDataSet).Wait();
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Logger.Error(ex, "Unable to process telemetry data");
+        //    }
+        //}
 
         #region Testing
 

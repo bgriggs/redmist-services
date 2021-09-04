@@ -1,11 +1,15 @@
-﻿using BigMission.DeviceApp.Shared;
+﻿using BigMission.Cache;
+using BigMission.Cache.FuelRange;
+using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using NLog;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
 namespace BigMission.FuelStatistics.Tests.FuelRange
@@ -29,6 +33,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var dtMock = new Mock<IDateTimeHelper>();
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
+            var fuelRangeContextMock = new Mock<IFuelRangeContext>();
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+
+            var loggerMock = new Mock<ILogger>();
+
             var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = false };
 
             var laps = new[]
@@ -38,10 +47,10 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
                 new Lap { CurrentLap = 2, LastPitLap = 0, Timestamp = DateTime.Parse("7/4/2021 8:02:00.0 am"), LastLapTimeSeconds = 60 }
             };
 
-            var carRange = new CarRange(settings, dtMock.Object);
+            var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object);
             carRange.ResetForNewRace(123, 4444);
             var changed = carRange.ProcessLaps(laps);
-            Assert.IsTrue(changed);
+            Assert.IsTrue(changed.Result);
             var stints = carRange.GetStints();
             Assert.AreEqual(1, stints.Length);
             Assert.AreEqual(DateTime.Parse("7/4/2021 8:00:00.0 am"), stints[0].Start);
@@ -53,8 +62,13 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var dtMock = new Mock<IDateTimeHelper>();
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
+            var fuelRangeContextMock = new Mock<IFuelRangeContext>();
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+
+            var loggerMock = new Mock<ILogger>();
+
             var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
-            var carRange = new CarRange(settings, dtMock.Object)
+            var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object)
             {
                 SpeedChannel = GetSpeedChannel(),
                 FuelLevelChannel = GetFuelLevelChannel()
@@ -110,7 +124,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
                 ds.Data = new[] { data[i], fuelCh };
                 dtMock.Setup(p => p.UtcNow).Returns(timestamps[i]);
                 var changed = carRange.ProcessTelemetery(ds);
-                Assert.IsFalse(changed);
+                Assert.IsFalse(changed.Result);
                 var stints = carRange.GetStints();
                 Assert.AreEqual(0, stints.Length);
             }
@@ -118,7 +132,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             ds.Data = new[] { data.Last(), fuelCh };
             dtMock.Setup(p => p.UtcNow).Returns(timestamps.Last());
             var changed2 = carRange.ProcessTelemetery(ds);
-            Assert.IsTrue(changed2);
+            Assert.IsTrue(changed2.Result);
             var stints2 = carRange.GetStints();
             Assert.AreEqual(1, stints2.Length);
             Assert.AreEqual(timestamps.Last(), stints2[0].Start);
@@ -129,6 +143,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
         {
             var dtMock = new Mock<IDateTimeHelper>();
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
+
+            var fuelRangeContextMock = new Mock<IFuelRangeContext>();
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+
+            var loggerMock = new Mock<ILogger>();
 
             var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
 
@@ -149,14 +168,14 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var ds = new ChannelDataSetDto { Data = new[] { fuelCh, speedCh } };
 
             // Init event
-            var carRange = new CarRange(settings, dtMock.Object);
+            var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object);
             carRange.ResetForNewRace(123, 4444);
 
             // Start the race with telemetry
             for (int i = 0; i < telemTimestamps.Length; i++)
             {
                 dtMock.Setup(p => p.UtcNow).Returns(telemTimestamps[i]);
-                carRange.ProcessTelemetery(ds);
+                carRange.ProcessTelemetery(ds).Wait();
             }
 
             // Telemetry stops after 16 seconds, next run the laps to take over
@@ -171,7 +190,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var changed = carRange.ProcessLaps(laps);
-            Assert.IsTrue(changed);
+            Assert.IsTrue(changed.Result);
             var stints = carRange.GetStints();
             Assert.AreEqual(2, stints.Length);
             Assert.AreEqual(DateTime.Parse("7/4/2021 8:09:00.0 am"), stints[1].Start);
@@ -182,6 +201,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
         {
             var dtMock = new Mock<IDateTimeHelper>();
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
+
+            var fuelRangeContextMock = new Mock<IFuelRangeContext>();
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+
+            var loggerMock = new Mock<ILogger>();
 
             var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
 
@@ -202,14 +226,14 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var ds = new ChannelDataSetDto { Data = new[] { fuelCh, speedCh } };
 
             // Init event
-            var carRange = new CarRange(settings, dtMock.Object);
+            var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object);
             carRange.ResetForNewRace(123, 4444);
 
             // Start the race with telemetry
             for (int i = 0; i < telemTimestamps.Length; i++)
             {
                 dtMock.Setup(p => p.UtcNow).Returns(telemTimestamps[i]);
-                carRange.ProcessTelemetery(ds);
+                carRange.ProcessTelemetery(ds).Wait();
             }
 
             // Telemetry stops after 16 seconds, next run the laps to take over
@@ -224,7 +248,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var changed = carRange.ProcessLaps(laps);
-            Assert.IsTrue(changed);
+            Assert.IsTrue(changed.Result);
             var stints = carRange.GetStints();
             Assert.AreEqual(2, stints.Length);
             Assert.AreEqual(DateTime.Parse("7/4/2021 3:10:00.0 pm"), stints[1].End);
@@ -236,8 +260,13 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var dtMock = new Mock<IDateTimeHelper>();
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
+            var fuelRangeContextMock = new Mock<IFuelRangeContext>();
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+
+            var loggerMock = new Mock<ILogger>();
+
             var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
-            var carRange = new CarRange(settings, dtMock.Object);
+            var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object);
             carRange.ResetForNewRace(123, 4444);
             var laps = new[]
             {
@@ -250,7 +279,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var changed = carRange.ProcessLaps(laps);
-            Assert.IsTrue(changed);
+            Assert.IsTrue(changed.Result);
             var stints = carRange.GetStints();
             Assert.AreEqual(2, stints.Length);
 
@@ -266,7 +295,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             changed = carRange.ProcessLaps(laps);
-            Assert.IsTrue(changed);
+            Assert.IsTrue(changed.Result);
             stints = carRange.GetStints();
             Assert.AreEqual(1, stints.Length);
         }

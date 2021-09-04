@@ -1,14 +1,18 @@
 ﻿using BigMission.Cache;
+using BigMission.Cache.FuelRange;
 using BigMission.EntityFrameworkCore;
+using BigMission.FuelStatistics.FuelRange;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NLog;
 using NLog.Config;
 using StackExchange.Redis;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics
 {
@@ -16,10 +20,12 @@ namespace BigMission.FuelStatistics
     {
         private static Logger logger;
 
-        static void Main(string[] args)
+        static async Task Main()
         {
             try
             {
+                AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
                 var basePath = Directory.GetCurrentDirectory();
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
                 if (env.ToUpper() == "PRODUCTION")
@@ -40,28 +46,84 @@ namespace BigMission.FuelStatistics
                 var cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
 
 
-                var services = new ServiceCollection();
-                services.AddSingleton<NLog.ILogger>(logger);
-                services.AddSingleton<IConfiguration>(config);
-                services.AddTransient<ITimerHelper, TimerHelper>();
-                
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
-                services.AddSingleton(serviceStatus);
-
                 var fuelRangeContext = new FuelRangeContext(cacheMuxer, db);
-                services.AddSingleton<IFuelRangeContext>(fuelRangeContext);
-
                 var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
-                services.AddSingleton<IDataContext>(dataContext);
 
-                services.AddScoped<ITelemetryConsumer, EHTelemetryConsumer>();
 
-                services.AddTransient<Application>();
+                var host = new HostBuilder()
+                    .ConfigureAppConfiguration((context, builder) =>
+                    {
+                        //builder.AddJsonFile("appsettings.json", false, true);
+                        //builder.AddJsonFile($"appsettings.{context.HostingEnvironment.EnvironmentName}.json", true, true);
+                        //builder.AddEnvironmentVariables();
+                    })
+                    .ConfigureServices((builderContext, services) =>
+                    {
+                        services.AddSingleton<ILogger>(logger);
+                        services.AddSingleton<IConfiguration>(config);
+                        services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+                        services.AddSingleton(serviceStatus);
+                        services.AddSingleton<IFuelRangeContext>(fuelRangeContext);
+                        services.AddSingleton<IDataContext>(dataContext);
 
-                var provider = services.BuildServiceProvider();
+                        services.AddSingleton<ILapConsumer, EventService>();
+                        services.AddSingleton<ICarTelemetryConsumer>(s =>
+                        {
+                            var svs = s.GetServices<ILapConsumer>();
+                            foreach (var lc in svs)
+                            {
+                                var es = lc as EventService;
+                                if (es != null)
+                                {
+                                    return es;
+                                }
+                            }
+                            throw new InvalidOperationException("Missing dependency");
+                        });
 
-                var application = provider.GetService<Application>();
-                application.Run();
+                        services.AddSingleton<IStintOverrideConsumer>(s =>
+                        {
+                            var svs = s.GetServices<ILapConsumer>();
+                            foreach (var lc in svs)
+                            {
+                                var es = lc as EventService;
+                                if (es != null)
+                                {
+                                    return es;
+                                }
+                            }
+                            throw new InvalidOperationException("Missing dependency");
+                        });
+
+                        // Services
+                        services.AddHostedService(s =>
+                        {
+                            var svs = s.GetServices<ILapConsumer>();
+                            foreach (var lc in svs)
+                            {
+                                var es = lc as EventService;
+                                if (es != null)
+                                {
+                                    return es;
+                                }
+                            }
+                            throw new InvalidOperationException("Missing dependency");
+                        });
+                        services.AddHostedService<LapProcessorService>();
+                        services.AddHostedService<StintOverrideService>();
+                        services.AddHostedService<CarTelemetryService>();
+                    })
+                    .Build();
+
+                try
+                {
+                    await host.RunAsync();
+                }
+                catch (OperationCanceledException)
+                {
+                    // suppress
+                }
             }
             catch (Exception ex)
             {
@@ -70,6 +132,29 @@ namespace BigMission.FuelStatistics
             finally
             {
                 LogManager.Shutdown();
+            }
+        }
+
+        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            try
+            {
+                var exception = e.ExceptionObject as Exception;
+                if (exception != null)
+                {
+                    logger.Fatal(exception, "Unhandled exception");
+                }
+                else
+                {
+                    logger.Fatal("Unhandled exception, but unable to retrieve the exception.");
+                }
+            }
+            catch (Exception)
+            {
+                // This is a really bad place to be. We are currently in the unhandled exception event and
+                // as such we are going down already, but we can't necessarily figure out how to log the
+                // event. The only reason this catch is here is to prevent us generating yet another unhandled
+                // exception.
             }
         }
     }

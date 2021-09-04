@@ -62,7 +62,7 @@ namespace BigMission.CarRealTimeStatusProcessor
         }
 
 
-        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        private Task ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
             {
@@ -70,7 +70,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                 if (receivedEvent.Data.Properties.Count > 0 && receivedEvent.Data.Properties.ContainsKey("ChannelDataSetDto"))
                 {
                     if (receivedEvent.Data.Properties["Type"].ToString() != "ChannelDataSetDto")
-                        return;
+                        return Task.CompletedTask;
                 }
                 
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
@@ -82,7 +82,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                 }
 
                 Logger.Trace($"Received log: {chDataSet.DeviceAppId} Count={chDataSet.Data.Length}");
-                if (!chDataSet.Data.Any()) { return; }
+                if (!chDataSet.Data.Any()) { return Task.CompletedTask; }
 
                 var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
                 foreach (var ch in chDataSet.Data)
@@ -160,6 +160,8 @@ namespace BigMission.CarRealTimeStatusProcessor
             {
                 Logger.Error(ex, "Unable to process event from event hub partition");
             }
+
+            return Task.CompletedTask;
         }
 
         private IDatabase GetCache()

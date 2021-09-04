@@ -6,6 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Application.cs" />
+    <Compile Remove="EHTelemetryConsumer.cs" />
+    <Compile Remove="ITelemetryConsumer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.2\contentFiles\any\any\NLog.config" />
   </ItemGroup>
   <ItemGroup>

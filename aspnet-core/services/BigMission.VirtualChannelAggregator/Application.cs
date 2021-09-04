@@ -90,7 +90,7 @@ namespace BigMission.VirtualChannelAggregator
             }
         }
 
-        private void ReceivedEventCallback(PartitionEvent receivedEvent)
+        private async Task ReceivedEventCallback(PartitionEvent receivedEvent)
         {
             try
             {
@@ -103,7 +103,7 @@ namespace BigMission.VirtualChannelAggregator
                     // Only process virtual channels
                     if (chDataSet.IsVirtual)
                     {
-                        SendChannelStaus(chDataSet.Data).Wait();
+                        await SendChannelStaus(chDataSet.Data);
                     }
                 }
             }
@@ -231,10 +231,11 @@ namespace BigMission.VirtualChannelAggregator
         /// When a change to devices or channels is received go ahead and reload everything.
         /// </summary>
         /// <param name="command"></param>
-        private void ProcessConfigurationChange(KeyValuePair<string, string> command)
+        private Task ProcessConfigurationChange(KeyValuePair<string, string> command)
         {
             TearDown();
             InternalRun();
+            return Task.CompletedTask;
         }
 
         /// <summary>

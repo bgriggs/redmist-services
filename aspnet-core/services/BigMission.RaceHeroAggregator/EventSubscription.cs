@@ -273,7 +273,6 @@ namespace BigMission.RaceHeroAggregator
                             }
 
                             Logger.Trace($"latestStatusCopy {sw.ElapsedMilliseconds}ms");
-                            sw = Stopwatch.StartNew();
                         }
 
                         if (logs.Any())
