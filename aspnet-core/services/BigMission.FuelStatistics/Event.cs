@@ -226,7 +226,11 @@ namespace BigMission.FuelStatistics
                 var flags = await dataContext.GetFlags(RhEventId);
                 foreach (var car in carRanges.Values)
                 {
-                    car.ApplyEventFlags(flags);
+                    var changed = car.ApplyEventFlags(flags);
+                    if (changed)
+                    {
+                        SetDirty(car.CarId);
+                    }
                 }
 
                 // Get updated cars

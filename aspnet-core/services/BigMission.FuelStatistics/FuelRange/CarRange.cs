@@ -169,9 +169,9 @@ namespace BigMission.FuelStatistics.FuelRange
             return changed;
         }
 
-        public void ApplyEventFlags(List<EventFlag> flags)
+        public bool ApplyEventFlags(List<EventFlag> flags)
         {
-            flagUtils.UpdateStintFlagDurations(flags, ref stints);
+            return flagUtils.UpdateStintFlagDurations(flags, ref stints);
         }
 
         /// <summary>

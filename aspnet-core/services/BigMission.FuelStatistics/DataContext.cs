@@ -225,6 +225,10 @@ namespace BigMission.FuelStatistics
                 if (f != null)
                 {
                     flags = f;
+                    foreach(var g in flags)
+                    {
+                        g.Flag = "yellow";
+                    }
                 }
             }
             return flags;
