@@ -21,7 +21,13 @@ namespace BigMission.FuelStatistics
                 if (RefLapTimeSecs > 0 && Laps.Any())
                 {
                     var totalTime = Laps.Sum(l => l.Value.LastLapTimeSeconds);
-                    return totalTime - RefLapTimeSecs;
+                    var eps = totalTime - RefLapTimeSecs;
+                    if (eps < 0)
+                    {
+                        // Likely an issue with RH where there are back to back laps tagged as pits.
+                        return totalTime;
+                    }
+                    return eps;
                 }
                 return 0;
             }

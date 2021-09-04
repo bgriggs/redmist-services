@@ -118,12 +118,17 @@ namespace BigMission.RaceHeroTestHelpers
             var lbtask = GetLeaderboard(null);
             lbtask.Wait();
             var lb = lbtask.Result;
+            if (string.IsNullOrEmpty(lb.StartedAt))
+            {
+                return null;
+            }
 
             var startTime = DateTime.Parse(lb.StartedAt);
             var currentTime = startTime + TimeSpan.FromSeconds(lb.CurrentTime);
 
             var cf = lb.CurrentFlag;
             var flag = RaceHeroClient.ParseFlag(cf);
+            flag = RaceHeroClient.Flag.Yellow;
 
             var carRaceLaps = new List<Lap>();
             foreach (var l in lb.Racers)
