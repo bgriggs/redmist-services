@@ -128,7 +128,6 @@ namespace BigMission.RaceHeroTestHelpers
 
             var cf = lb.CurrentFlag;
             var flag = RaceHeroClient.ParseFlag(cf);
-            flag = RaceHeroClient.Flag.Yellow;
 
             var carRaceLaps = new List<Lap>();
             foreach (var l in lb.Racers)
