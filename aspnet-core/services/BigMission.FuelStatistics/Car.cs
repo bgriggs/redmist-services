@@ -87,7 +87,7 @@ namespace BigMission.FuelStatistics
                     // Create a new stint on pit lap
                     if (currentStint.Laps.Any())
                     {
-                        currentStint = new Stint { StintNumber = Stints.Count + 1};
+                        currentStint = new Stint { StintNumber = Stints.Count + 1 };
                         Stints.Add(currentStint);
                     }
                 }
@@ -136,7 +136,15 @@ namespace BigMission.FuelStatistics
             if (Pits.Any() && Stints.Any())
             {
                 var lps = (PitStop)Pits.Last();
-                LastStop = lps.EndPitTime;
+
+                if (lps.EndPitTime != default)
+                {
+                    LastStop = lps.EndPitTime;
+                }
+                else
+                {
+                    LastStop = null;
+                }
                 LastPitLap = lps.Laps.Last().Key;
 
                 var estStopTimes = Pits.Select(p => p.EstPitStopSecs);
@@ -153,8 +161,17 @@ namespace BigMission.FuelStatistics
 
                 if (MaxRangeSecs.HasValue && MaxRangeSecs > 0)
                 {
-                    NextPitTime = LastStop + TimeSpan.FromSeconds(MaxRangeSecs ?? 0);
-                    MinutesRemaining = (NextPitTime.Value - Laps.Last().Value.Timestamp).TotalMinutes;
+                    if (LastStop.HasValue)
+                    {
+                        NextPitTime = LastStop + TimeSpan.FromSeconds(MaxRangeSecs ?? 0);
+                        MinutesRemaining = (NextPitTime.Value - Laps.Last().Value.Timestamp).TotalMinutes;
+                    }
+                    else
+                    {
+                        NextPitTime = null;
+                        MinutesRemaining = null;
+                    }
+
                     if (MinutesRemaining > 0)
                     {
                         LapsRemaining = MinutesRemaining / (Stints.Last().MedianLapTimeSecs / 60);
