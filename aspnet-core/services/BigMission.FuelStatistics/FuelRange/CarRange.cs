@@ -35,7 +35,7 @@ namespace BigMission.FuelStatistics.FuelRange
         public ILogger Logger { get; }
 
         private List<FuelRangeStint> stints = new List<FuelRangeStint>();
-        private HashSet<Lap> laps = new HashSet<Lap>();
+        private readonly HashSet<Lap> laps = new HashSet<Lap>();
         private readonly LapDataTriggers lapDataTriggers;
         private readonly TelemetryTriggers telemetryTriggers;
         private readonly FlagDurationUtils flagUtils;
@@ -70,6 +70,20 @@ namespace BigMission.FuelStatistics.FuelRange
             RunId = runId;
             stints.Clear();
             laps.Clear();
+        }
+
+        /// <summary>
+        /// Update calculated values.
+        /// </summary>
+        /// <returns>true if there is a value change to publish</returns>
+        public bool Refresh()
+        {
+            bool changed = false;
+            foreach (var stint in stints)
+            {
+                changed |= UpdateCalculatedValues(stint);
+            }
+            return changed;
         }
 
         public async Task<bool> ProcessLaps(Lap[] laps)
@@ -112,11 +126,7 @@ namespace BigMission.FuelStatistics.FuelRange
             // Update calculated values when we get more laps
             foreach (var stint in stints)
             {
-                var calcChanged = UpdateCalculatedValues(stint);
-                if (calcChanged)
-                {
-                    changed = true;
-                }
+                changed |= UpdateCalculatedValues(stint);
             }
 
             return changed;
@@ -160,6 +170,7 @@ namespace BigMission.FuelStatistics.FuelRange
                 updatedStint.EventId = EventId;
                 updatedStint.RunId = RunId;
                 updatedStint.StartingFuelGals = settings.CapacityGals;
+                updatedStint.DefaultRangeMins = settings.RangeMins;
                 stints.Add(updatedStint);
 
                 var savedStint = await fuelRangeContext.SaveTeamStint(updatedStint);
@@ -199,8 +210,6 @@ namespace BigMission.FuelStatistics.FuelRange
                     var st = stints.FirstOrDefault(s => s.Id == update.Stint.Id);
                     if (st != null)
                     {
-                        // Manual add needs to include eventId and run Id.
-
                         if (update.Stint.StartOverride != null)
                         {
                             st.StartOverride = update.Stint.StartOverride;
@@ -233,12 +242,12 @@ namespace BigMission.FuelStatistics.FuelRange
                         }
 
                         st.RefuelAmountGal = update.Stint.RefuelAmountGal;
+                        st.PitInMins = update.Stint.PitInMins;
                         st.Note = update.Stint.Note;
-                        var calcChanged = UpdateCalculatedValues(st);
-                        if (calcChanged)
-                        {
-                            changed = true;
-                        }
+
+                        // Recalculate values
+                        UpdateCalculatedValues(st);
+
                         Logger.Debug($"Updating user changes for stint ID={update.Stint.Id}");
                     }
                     changed = true;
@@ -352,6 +361,20 @@ namespace BigMission.FuelStatistics.FuelRange
                 else
                 {
                     stint.AverageLapTime = null;
+                }
+            }
+
+            // Update current stint max range from previous stints.
+            // Calculated range will change when user updates fuel used on past stints.
+            foreach (var ps in stints)
+            {
+                if (ps.CalculatedRange.HasValue && ps != stint)
+                {
+                    if (ps.CalculatedRange.Value > (stint.MaxRangeMins ?? 0))
+                    {
+                        stint.MaxRangeMins = ps.CalculatedRange.Value;
+                        changed = true;
+                    }
                 }
             }
 

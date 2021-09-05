@@ -24,9 +24,9 @@ namespace BigMission.FuelStatistics.Tests
             var dateTime = new Mock<IDateTimeHelper>();
             var dataContext = new Mock<IDataContext>();
             var fuelRangeContext = new Mock<IFuelRangeContext>();
-            var timer = new Mock<ITimerHelper>();
+            var flagContext = new Mock<IFlagContext>();
 
-            var evt = new Event(settings, logger.Object, dateTime.Object, dataContext.Object, fuelRangeContext.Object, timer.Object);
+            var evt = new Event(settings, logger.Object, dateTime.Object, dataContext.Object, fuelRangeContext.Object, flagContext.Object);
             var frh = new FileRHClient("../../../EventTestData/Event-29201", "../../../EventTestData/Leaderboard-29201-47955237");
             var laps = frh.GetNextLaps();
             do

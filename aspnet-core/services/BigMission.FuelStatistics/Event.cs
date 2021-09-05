@@ -222,11 +222,12 @@ namespace BigMission.FuelStatistics
             {
                 var sw = Stopwatch.StartNew();
 
-                // Apply flags
+                // Apply flags and update calculated values
                 var flags = await flagContext.GetFlags(RhEventId);
                 foreach (var car in carRanges.Values)
                 {
                     var changed = car.ApplyEventFlags(flags);
+                    changed |= car.Refresh();
                     if (changed)
                     {
                         SetDirty(car.CarId);
