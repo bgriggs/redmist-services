@@ -1,4 +1,5 @@
-﻿using BigMission.Cache.FuelRange;
+﻿using BigMission.Cache;
+using BigMission.Cache.FuelRange;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.RaceManagement;
@@ -15,7 +16,7 @@ namespace BigMission.FuelStatistics
     /// <summary>
     /// Processes data for a race hero event including pit stops and car range.
     /// </summary>
-    public class Event : IDisposable
+    public class Event
     {
         private readonly RaceEventSettings settings;
         private readonly IDateTimeHelper dateTimeHelper;
@@ -28,11 +29,10 @@ namespace BigMission.FuelStatistics
         private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
-        private readonly ITimerHelper fuelRangeUpdateTimer;
-        private bool disposed;
+        private readonly IFlagContext flagContext;
 
-
-        public Event(RaceEventSettings settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, IFuelRangeContext fuelRangeContext, ITimerHelper fuelRangeUpdateTimer)
+        public Event(RaceEventSettings settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, 
+            IFuelRangeContext fuelRangeContext, IFlagContext flagContext)
         {
             this.settings = settings;
             if (!int.TryParse(settings.RaceHeroEventId, out var id)) { throw new ArgumentException("rhEventId"); }
@@ -41,7 +41,7 @@ namespace BigMission.FuelStatistics
             this.dateTimeHelper = dateTimeHelper;
             this.dataContext = dataContext;
             this.fuelRangeContext = fuelRangeContext;
-            this.fuelRangeUpdateTimer = fuelRangeUpdateTimer;
+            this.flagContext = flagContext;
         }
 
 
@@ -223,7 +223,7 @@ namespace BigMission.FuelStatistics
                 var sw = Stopwatch.StartNew();
 
                 // Apply flags
-                var flags = await dataContext.GetFlags(RhEventId);
+                var flags = await flagContext.GetFlags(RhEventId);
                 foreach (var car in carRanges.Values)
                 {
                     var changed = car.ApplyEventFlags(flags);
@@ -258,35 +258,5 @@ namespace BigMission.FuelStatistics
         {
             return Cars.Values.ToArray();
         }
-
-        #region Dispose
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposed)
-                return;
-
-            if (disposing)
-            {
-                if (fuelRangeUpdateTimer != null)
-                {
-                    try
-                    {
-                        fuelRangeUpdateTimer.Dispose();
-                    }
-                    catch { }
-                }
-            }
-
-            disposed = true;
-        }
-
-        #endregion
     }
 }

@@ -30,15 +30,18 @@ namespace BigMission.FuelStatistics
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
         private readonly IDateTimeHelper dateTimeHelper;
+        private readonly IFlagContext flagContext;
         private readonly Dictionary<int, Event> eventSubscriptions = new Dictionary<int, Event>();
 
 
-        public EventService(IConfiguration configuration, ILogger logger, IDataContext dataContext, IFuelRangeContext fuelRangeContext, IDateTimeHelper dateTimeHelper)
+        public EventService(IConfiguration configuration, ILogger logger, IDataContext dataContext, IFuelRangeContext fuelRangeContext, 
+            IDateTimeHelper dateTimeHelper, IFlagContext flagContext)
         {
             Logger = logger;
             this.dataContext = dataContext;
             this.fuelRangeContext = fuelRangeContext;
             this.dateTimeHelper = dateTimeHelper;
+            this.flagContext = flagContext;
             subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EventSubscriptionCheckMs"]));
             commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EventCommitMs"]));
         }
@@ -63,7 +66,7 @@ namespace BigMission.FuelStatistics
                             var eventId = int.Parse(settings.RaceHeroEventId);
                             if (!eventSubscriptions.TryGetValue(eventId, out Event e))
                             {
-                                e = new Event(settings, Logger, new DateTimeHelper(), dataContext, fuelRangeContext, new TimerHelper());
+                                e = new Event(settings, Logger, new DateTimeHelper(), dataContext, fuelRangeContext, flagContext);
                                 await e.Initialize();
                                 eventSubscriptions[eventId] = e;
 
@@ -77,17 +80,7 @@ namespace BigMission.FuelStatistics
                         expiredEvents.ForEach(e =>
                         {
                             Logger.Info($"Removing event subscription {e}");
-                            if (eventSubscriptions.Remove(e, out Event sub))
-                            {
-                                try
-                                {
-                                    sub.Dispose();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Logger.Error(ex, $"Error stopping event subscription {sub.RhEventId}.");
-                                }
-                            }
+                            eventSubscriptions.Remove(e);
                         });
 
                         lastSubCheck = dateTimeHelper.UtcNow;

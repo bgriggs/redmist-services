@@ -49,7 +49,7 @@ namespace BigMission.FuelStatistics
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
                 var fuelRangeContext = new FuelRangeContext(cacheMuxer, db);
                 var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
-
+                var flagContext = new FlagContext(cacheMuxer);
 
                 var host = new HostBuilder()
                     .ConfigureAppConfiguration((context, builder) =>
@@ -66,6 +66,7 @@ namespace BigMission.FuelStatistics
                         services.AddSingleton(serviceStatus);
                         services.AddSingleton<IFuelRangeContext>(fuelRangeContext);
                         services.AddSingleton<IDataContext>(dataContext);
+                        services.AddSingleton<IFlagContext>(flagContext);
 
                         services.AddSingleton<ILapConsumer, EventService>();
                         services.AddSingleton<ICarTelemetryConsumer>(s =>

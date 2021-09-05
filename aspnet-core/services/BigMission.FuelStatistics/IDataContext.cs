@@ -30,7 +30,6 @@ namespace BigMission.FuelStatistics
         Task<List<RaceEventSettings>> GetEventSettings();
 
         Task UpdateCarStatus(Car car, int eventId);
-        Task<List<EventFlag>> GetFlags(int eventId);
         Task<DateTime?> CheckReload(int teamId);
         Task<List<Lap>> PopEventLaps(int eventId);
         Task ClearCachedEvent(int rhEventId);

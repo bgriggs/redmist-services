@@ -213,23 +213,6 @@ namespace BigMission.FuelStatistics
             await cache.HashSetAsync(eventKey, car.Number, carJson);
         }
 
-        public async Task<List<EventFlag>> GetFlags(int rhEventId)
-        {
-            var cache = cacheMuxer.GetDatabase();
-            var flags = new List<EventFlag>();
-            var key = string.Format(Consts.EVENT_FLAGS, rhEventId);
-            var json = await cache.StringGetAsync(key);
-            if (!string.IsNullOrEmpty(json))
-            {
-                var f = JsonConvert.DeserializeObject<List<EventFlag>>(json);
-                if (f != null)
-                {
-                    flags = f;
-                }
-            }
-            return flags;
-        }
-
         public async Task<DateTime?> CheckReload(int teamId)
         {
             var cache = cacheMuxer.GetDatabase();
