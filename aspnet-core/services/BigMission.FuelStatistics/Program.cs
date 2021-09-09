@@ -2,6 +2,7 @@
 using BigMission.Cache.FuelRange;
 using BigMission.EntityFrameworkCore;
 using BigMission.FuelStatistics.FuelRange;
+using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
@@ -33,20 +34,22 @@ namespace BigMission.FuelStatistics
                     LogManager.Configuration = new XmlLoggingConfiguration($"{basePath}{Path.DirectorySeparatorChar}nlog.Production.config");
                 }
                 logger = LogManager.GetCurrentClassLogger();
-
                 logger.Info($"Starting env={env}...");
+
                 var config = new ConfigurationBuilder()
                     .SetBasePath(basePath)
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
+                serviceStatus.Update(ServiceState.STARTING, string.Empty);
+
                 var cf = new BigMissionDbContextFactory();
                 var db = cf.CreateDbContext(new[] { config["ConnectionString"] });
                 var cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
 
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
                 var fuelRangeContext = new FuelRangeContext(cacheMuxer, db);
                 var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
                 var flagContext = new FlagContext(cacheMuxer);
@@ -63,7 +66,6 @@ namespace BigMission.FuelStatistics
                         services.AddSingleton<ILogger>(logger);
                         services.AddSingleton<IConfiguration>(config);
                         services.AddTransient<IDateTimeHelper, DateTimeHelper>();
-                        services.AddSingleton(serviceStatus);
                         services.AddSingleton<IFuelRangeContext>(fuelRangeContext);
                         services.AddSingleton<IDataContext>(dataContext);
                         services.AddSingleton<IFlagContext>(flagContext);
@@ -119,6 +121,7 @@ namespace BigMission.FuelStatistics
 
                 try
                 {
+                    serviceStatus.Start();
                     await host.RunAsync();
                 }
                 catch (OperationCanceledException)
