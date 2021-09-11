@@ -173,6 +173,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         {
             Logger.Debug($"Validate configuration for: {hb.DeviceAppId}");
             var serverConfigId = await deviceAppContext.GetDeviceConfigId(deviceAppKey);
+            Logger.Debug($"Server config ID={serverConfigId} HD Config ID={hb.ConfigurationId}");
+
             // Determine if the configuration guid is the same as whats in the database
             if (serverConfigId != null && new Guid(serverConfigId) != hb.ConfigurationId)
             {
