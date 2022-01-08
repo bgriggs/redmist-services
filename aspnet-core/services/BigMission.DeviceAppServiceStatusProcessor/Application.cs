@@ -42,7 +42,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
-            Commands = new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], logger);
+            var serviceId = new Guid(Config["ServiceId"]);
+            Commands = new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], logger);
             ehReader = new EventHubHelpers(logger);
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
             deviceAppContext = new DeviceAppContext(cacheMuxer);
@@ -200,7 +201,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
                     AppCommands.EncodeCommandData(latestConfig, cmd);
 
-                    await Commands.SendCommand(cmd, Config["KafkaCommandTopic"], cmd.DestinationId);
+                    await Commands.SendCommand(cmd, new Guid(cmd.DestinationId));
 
                     Logger.Info($"Sending updated configuraiton to application: {latestConfig.DeviceAppId}");
                 }
@@ -241,7 +242,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                             DestinationId = deviceAppKey,
                             Timestamp = DateTime.UtcNow
                         };
-                        await Commands.SendCommand(cmd, Config["KafkaCommandTopic"], cmd.DestinationId);
+                        await Commands.SendCommand(cmd, new Guid(cmd.DestinationId));
                     }
                 }
                 catch (ArgumentException) { }

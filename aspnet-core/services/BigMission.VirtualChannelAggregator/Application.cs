@@ -135,11 +135,12 @@ namespace BigMission.VirtualChannelAggregator
                 var deviceIds = devices.Select(d => d.Id);
                 var channels = context.ChannelMappings.Where(c => c.IsVirtual).ToArray();
 
+                var serviceId = new Guid(Config["ServiceId"]);
                 foreach (var d in devices)
                 {
                     var devVirtChs = channels.Where(c => c.DeviceAppId == d.Id).Select(c => c.Id).ToArray();
                     var t = new Tuple<AppCommands, DeviceAppConfig, int[]>(
-                        new AppCommands(Config["ServiceId"], Config["KafkaConnectionString"], Logger), d, devVirtChs);
+                        new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], Logger), d, devVirtChs);
                     deviceCommandClients[d.Id] = t;
                 }
             }
@@ -215,7 +216,7 @@ namespace BigMission.VirtualChannelAggregator
                         };
                         AppCommands.EncodeCommandData(dataSet, cmd);
 
-                        await client.Item1.SendCommand(cmd, Config["KafkaCommandTopic"], cmd.DestinationId);
+                        await client.Item1.SendCommand(cmd, new Guid(cmd.DestinationId));
                     }
                 }
                 catch (Exception ex)
