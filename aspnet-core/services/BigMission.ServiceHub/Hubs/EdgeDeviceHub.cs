@@ -10,14 +10,14 @@ namespace BigMission.ServiceHub.Hubs
         public async override Task OnConnectedAsync()
         {
             var details = GetAuthDetails();
-            await Groups.AddToGroupAsync(Context.ConnectionId, details.apiKey.ToString());
+            await Groups.AddToGroupAsync(Context.ConnectionId, details.appId.ToString().ToUpper());
             await base.OnConnectedAsync();
         }
 
         public async override Task OnDisconnectedAsync(Exception? exception)
         {
             var details = GetAuthDetails();
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, details.apiKey.ToString());
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, details.appId.ToString().ToUpper());
             await base.OnDisconnectedAsync(exception);
         }
 
@@ -38,7 +38,7 @@ namespace BigMission.ServiceHub.Hubs
 
         public async Task<bool> SendCommandV1(Command command, Guid destinationGuid)
         {
-            var c = Clients.Group(destinationGuid.ToString());
+            var c = Clients.Group(destinationGuid.ToString().ToUpper());
             if (c != null)
             {
                 await c.SendAsync("ReceiveCommandV1", command);

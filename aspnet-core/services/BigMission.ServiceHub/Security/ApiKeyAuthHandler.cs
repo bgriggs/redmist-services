@@ -1,4 +1,5 @@
 ﻿using BigMission.CommandTools;
+using BigMission.Database;
 using BigMission.EntityFrameworkCore;
 using BigMission.TestHelpers;
 using Microsoft.AspNetCore.Authentication;
@@ -53,8 +54,7 @@ namespace BigMission.ServiceHub.Security
 
         private (bool isValid, string message) ValidateToken(Guid appId, string apiKey)
         {
-            var cf = new BigMissionDbContextFactory();
-            using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+            using var db = new RedMist(Config["ConnectionString"]);
             var key = db.ApiKeys.FirstOrDefault(k => k.ServiceId == appId && k.Key == apiKey);
 
             if (key == null)
