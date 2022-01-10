@@ -7,6 +7,26 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Content Remove="nlog.config" />
+	  <Content Remove="nlog.Production.config" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.13\contentFiles\any\any\NLog.config" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="nlog.config">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Include="nlog.Production.config">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="NLog" Version="4.7.13" />
+		<PackageReference Include="NLog.Extensions.Logging" Version="1.7.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="6.0.1" />

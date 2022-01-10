@@ -201,7 +201,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
                     AppCommands.EncodeCommandData(latestConfig, cmd);
 
-                    await Commands.SendCommand(cmd, new Guid(cmd.DestinationId));
+                    await Commands.SendCommandAsync(cmd, new Guid(cmd.DestinationId));
 
                     Logger.Info($"Sending updated configuraiton to application: {latestConfig.DeviceAppId}");
                 }
@@ -242,7 +242,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                             DestinationId = deviceAppKey,
                             Timestamp = DateTime.UtcNow
                         };
-                        await Commands.SendCommand(cmd, new Guid(cmd.DestinationId));
+                        await Commands.SendCommandAsync(cmd, new Guid(cmd.DestinationId));
                     }
                 }
                 catch (ArgumentException) { }

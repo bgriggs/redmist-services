@@ -216,7 +216,7 @@ namespace BigMission.VirtualChannelAggregator
                         };
                         AppCommands.EncodeCommandData(dataSet, cmd);
 
-                        await client.Item1.SendCommand(cmd, new Guid(cmd.DestinationId));
+                        await client.Item1.SendCommandAsync(cmd, new Guid(cmd.DestinationId));
                     }
                 }
                 catch (Exception ex)
