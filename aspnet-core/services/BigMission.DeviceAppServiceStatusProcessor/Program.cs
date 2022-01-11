@@ -1,10 +1,12 @@
 ﻿using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NLog;
 using NLog.Config;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace BigMission.DeviceAppServiceStatusProcessor
 {
@@ -12,7 +14,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
     {
         private static Logger logger;
 
-        static void Main()
+        async static Task Main()
         {
             try
             {
@@ -36,13 +38,14 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);
                 services.AddSingleton<IConfiguration>(config);
+                services.AddSingleton<IDateTimeHelper, DateTimeHelper>();
                 services.AddSingleton(serviceStatus);
                 services.AddTransient<Application>();
 
                 var provider = services.BuildServiceProvider();
 
                 var application = provider.GetService<Application>();
-                application.Run();
+                await application.Run();
             }
             catch (Exception ex)
             {

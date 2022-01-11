@@ -1,7 +1,9 @@
-﻿using BigMission.CommandTools;
+﻿using BigMission.Cache.Models;
+using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.DeviceApp.Shared;
 using Microsoft.AspNetCore.SignalR;
+using NLog.Targets.ServiceHub;
 using System.Security.Claims;
 
 namespace BigMission.ServiceHub.Hubs
@@ -9,10 +11,12 @@ namespace BigMission.ServiceHub.Hubs
     public class EdgeDeviceHub : Hub
     {
         private NLog.ILogger Logger { get; }
+        private DataClearinghouse Clearinghouse { get; }
 
-        public EdgeDeviceHub(NLog.ILogger logger)
+        public EdgeDeviceHub(NLog.ILogger logger, DataClearinghouse clearinghouse)
         {
             Logger = logger;
+            Clearinghouse = clearinghouse;
         }
 
         public async override Task OnConnectedAsync()
@@ -59,9 +63,26 @@ namespace BigMission.ServiceHub.Hubs
             return false;
         }
 
-        public void RegisterHeartbeatV1(DeviceAppHeartbeat heartbeat)
+        /// <summary>
+        /// Handle a heartbeat message from a device can app.
+        /// </summary>
+        /// <param name="heartbeat"></param>
+        /// <returns></returns>
+        public async Task RegisterHeartbeatV1(DeviceAppHeartbeat heartbeat)
         {
             Logger.Debug($"Heartbeat from {heartbeat.DeviceAppId}.");
+            await Clearinghouse.PublishHeartbeat(heartbeat);
+        }
+
+        /// <summary>
+        /// Process a console log message.
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public async Task PostLogMessage(LogMessage message)
+        {
+            Logger.Trace($"RX log from: {message.SourceKey}");
+            await Clearinghouse.PublishLog(message);
         }
     }
 }

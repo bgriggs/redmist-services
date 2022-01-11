@@ -25,8 +25,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
 		<PackageReference Include="NLog" Version="4.7.13" />
 		<PackageReference Include="NLog.Extensions.Logging" Version="1.7.4" />
+		<PackageReference Include="StackExchange.Redis" Version="2.2.88" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="6.0.1" />
@@ -37,6 +39,7 @@
 		<ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.Database\BigMission.Database.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.TestHelpers\BigMission.TestHelpers.csproj" />
+		<ProjectReference Include="..\..\common\NLog.Targets.ServiceHub\NLog.Targets.ServiceHub.csproj" />
 	</ItemGroup>
 	
 </Project>

@@ -1,3 +1,4 @@
+using BigMission.ServiceHub;
 using BigMission.ServiceHub.Hubs;
 using BigMission.ServiceHub.Security;
 using BigMission.TestHelpers;
@@ -33,6 +34,7 @@ builder.Services.AddAuthentication(
         .AddScheme<ApiKeyAuthSchemeOptions, ApiKeyAuthHandler>("ApiKey", options => { });
 
 builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+builder.Services.AddSingleton<DataClearinghouse>();
 
 var app = builder.Build();
 

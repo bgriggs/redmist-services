@@ -72,7 +72,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                     if (receivedEvent.Data.Properties["Type"].ToString() != "ChannelDataSetDto")
                         return Task.CompletedTask;
                 }
-                
+
                 var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
                 var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
 
@@ -95,7 +95,7 @@ namespace BigMission.CarRealTimeStatusProcessor
                 if (db != null)
                 {
                     //db.StringSet(kvps.ToArray(), flags: CommandFlags.FireAndForget);
-                    foreach(var kvp in kvps)
+                    foreach (var kvp in kvps)
                     {
                         db.StringSet(kvp.Key, kvp.Value, expiry: TimeSpan.FromMinutes(1), flags: CommandFlags.FireAndForget);
                     }

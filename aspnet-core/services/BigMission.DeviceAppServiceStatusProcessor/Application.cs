@@ -1,19 +1,17 @@
-﻿using Azure.Messaging.EventHubs.Consumer;
-using BigMission.Cache;
+﻿using BigMission.Cache;
 using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.EntityFrameworkCore;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,21 +25,20 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
+        private IDateTimeHelper DateTime { get; }
         private AppCommands Commands { get; }
         private readonly EventHubHelpers ehReader;
         private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly int _maxListLength = 1000;
-        private readonly TimeSpan _lengthTrim = TimeSpan.FromSeconds(30);
-        private readonly Dictionary<string, DateTime> _lastTrims = new Dictionary<string, DateTime>();
         private readonly DeviceAppContext deviceAppContext;
 
 
-        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
+        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDateTimeHelper dateTime)
         {
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
+            DateTime = dateTime;
             var serviceId = new Guid(Config["ServiceId"]);
             Commands = new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], logger);
             ehReader = new EventHubHelpers(logger);
@@ -50,7 +47,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         }
 
 
-        public void Run()
+        public async Task Run()
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
@@ -58,98 +55,47 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
             deviceAppContext.WarmUpDeviceConfigIds(db);
 
-            // Process changes from stream and cache them here is the service
-            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(
-                Config["KafkaConnectionString"], Config["KafkaHeartbeatTopic"], Config["KafkaConsumerGroup"],
-                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+            var sub = cacheMuxer.GetSubscriber();
+            await sub.SubscribeAsync(Consts.HEARTBEAT_CH, async (channel, message) =>
+            {
+                await HandleHeartbeat(channel, message);
+            });
 
             // Start updating service status
             ServiceTracking.Start();
             Logger.Info("Started");
-            receiveStatus.Wait();
             serviceBlock.WaitOne();
         }
 
-        private Task ReceivedEventCallback(PartitionEvent receivedEvent)
+        private async Task HandleHeartbeat(RedisChannel channel, RedisValue value)
         {
-            try
+            var heartbeatData = JsonConvert.DeserializeObject<DeviceApp.Shared.DeviceAppHeartbeat>(value);
+            Logger.Debug($"Received HB from: '{heartbeatData.DeviceAppId}'");
+
+            var cf = new BigMissionDbContextFactory();
+            using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+
+            if (heartbeatData.DeviceAppId == 0)
             {
-                // Check for heartbeat
-                if (receivedEvent.Data.Properties.TryGetValue("DeviceKey", out object keyObject))
+                var deviceApp = db.DeviceAppConfig.FirstOrDefault(d => d.DeviceAppKey == heartbeatData.DeviceKey);
+                if (deviceApp != null)
                 {
-                    string deviceKey = keyObject.ToString();
-
-                    var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                    var heartbeatData = JsonConvert.DeserializeObject<DeviceApp.Shared.DeviceAppHeartbeat>(json);
-                    Logger.Debug($"Received HB from: '{heartbeatData.DeviceAppId}'");
-
-                    var cf = new BigMissionDbContextFactory();
-                    using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-
-                    if (heartbeatData.DeviceAppId == 0 && !string.IsNullOrWhiteSpace(deviceKey))
-                    {
-                        var key = Guid.Parse(deviceKey);
-                        var deviceApp = db.DeviceAppConfig.FirstOrDefault(d => d.DeviceAppKey == key);
-                        if (deviceApp != null)
-                        {
-                            heartbeatData.DeviceAppId = deviceApp.Id;
-                        }
-                        else
-                        {
-                            Logger.Debug($"No app configured with key {deviceKey}");
-                        }
-                    }
-
-                    if (heartbeatData.DeviceAppId > 0)
-                    {
-                        // Update heartbeat
-                        CommitHeartbeat(heartbeatData, json).Wait();
-
-                        // Check configuration
-                        ValidateConfiguration(deviceKey, heartbeatData, db).Wait();
-
-                        // Check log level
-                        CheckDeviceAppLogLevel(heartbeatData, deviceKey).Wait();
-                    }
+                    heartbeatData.DeviceAppId = deviceApp.Id;
                 }
-                // Check for logs
-                else if (receivedEvent.Data.Properties.TryGetValue("LogSourceID", out object sourceId))
+                else
                 {
-                    var deviceKey = sourceId.ToString();
-                    Logger.Trace($"RX log from: {deviceKey}");
-                    var cacheKey = string.Format(Consts.DEVICEAPP_LOG, deviceKey);
-                    var cache = cacheMuxer.GetDatabase();
-                    var log = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                    cache.ListLeftPush(cacheKey, log, flags: CommandFlags.FireAndForget);
-
-                    if (_maxListLength > 0)
-                    {
-                        lock (_lastTrims)
-                        {
-                            if (_lastTrims.TryGetValue(deviceKey, out var lastTrim))
-                            {
-                                if ((DateTime.UtcNow - lastTrim) > _lengthTrim)
-                                {
-                                    cache.ListTrim(cacheKey, 0, _maxListLength, flags: CommandFlags.FireAndForget);
-                                    _lastTrims[deviceKey] = DateTime.UtcNow;
-                                    Logger.Trace($"Trimed logs for: {deviceKey}");
-                                }
-                            }
-                            else
-                            {
-                                _lastTrims[deviceKey] = DateTime.UtcNow;
-                            }
-                        }
-                    }
+                    Logger.Debug($"No app configured with key {heartbeatData.DeviceKey}");
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Unable to process event from event hub partition");
-            }
 
-            return Task.CompletedTask;
+            if (heartbeatData.DeviceAppId > 0)
+            {
+                // Update heartbeat
+                await CommitHeartbeat(heartbeatData, value);
+
+                // Check log level
+                await CheckDeviceAppLogLevel(heartbeatData);
+            }
         }
 
         /// <summary>
@@ -166,63 +112,14 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         }
 
         /// <summary>
-        /// Determine if the app is running the latest configuration.  If not, send the latest configuration to the application.
-        /// </summary>
-        /// <param name="hb"></param>
-        /// <param name="db"></param>
-        private async Task ValidateConfiguration(string deviceAppKey, DeviceApp.Shared.DeviceAppHeartbeat hb, BigMissionDbContext db)
-        {
-            Logger.Debug($"Validate configuration for: {hb.DeviceAppId}");
-            var serverConfigId = await deviceAppContext.GetDeviceConfigId(deviceAppKey);
-            Logger.Debug($"Server config ID={serverConfigId} HD Config ID={hb.ConfigurationId}");
-
-            // Determine if the configuration guid is the same as whats in the database
-            if (serverConfigId != null && new Guid(serverConfigId) != hb.ConfigurationId)
-            {
-                // The configuration changed, send it to the app
-                Logger.Info($"Configuration for {hb.DeviceAppId} is expired.");
-
-                // Load the new configuration
-                var latestConfig = db.CanAppConfig.SingleOrDefault(c => c.DeviceAppId == hb.DeviceAppId);
-                if (latestConfig != null)
-                {
-                    latestConfig.DeviceAppKey = deviceAppKey;
-
-                    // Load channel mappings
-                    var channelMappings = db.ChannelMappings.Where(m => m.DeviceAppId == hb.DeviceAppId);
-                    latestConfig.ChannelMappings = channelMappings.ToArray();
-
-                    var cmd = new Command
-                    {
-                        DestinationId = latestConfig.DeviceAppKey.ToString(),
-                        CommandType = CommandTypes.UPDATE_CONFIG,
-                        Timestamp = DateTime.UtcNow
-                    };
-
-                    AppCommands.EncodeCommandData(latestConfig, cmd);
-
-                    await Commands.SendCommandAsync(cmd, new Guid(cmd.DestinationId));
-
-                    Logger.Info($"Sending updated configuraiton to application: {latestConfig.DeviceAppId}");
-                }
-                else
-                {
-                    Logger.Warn($"Configuration for {hb.DeviceAppId} not found in DB. Leaving app configuration in place.");
-                }
-            }
-
-            Logger.Debug($"Finished validating configuration for: {hb.DeviceAppId}");
-        }
-
-        /// <summary>
         /// Determine if there is a user log level override set for the device.  If so, send it to the device.
         /// </summary>
         /// <param name="hb"></param>
         /// <param name="deviceAppKey"></param>
-        private async Task CheckDeviceAppLogLevel(DeviceApp.Shared.DeviceAppHeartbeat hb, string deviceAppKey)
+        private async Task CheckDeviceAppLogLevel(DeviceApp.Shared.DeviceAppHeartbeat hb)
         {
             var cache = cacheMuxer.GetDatabase();
-            var key = string.Format(Consts.DEVICEAPP_LOG_DESIRED_LEVEL, deviceAppKey);
+            var key = string.Format(Consts.DEVICEAPP_LOG_DESIRED_LEVEL, hb.DeviceKey);
             var rv = await cache.StringGetAsync(key);
             if (rv.HasValue)
             {
@@ -234,12 +131,12 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     var currentLevel = LogLevel.FromString(hb.LogLevel);
                     if (desiredLevel != currentLevel)
                     {
-                        Logger.Debug($"Sending log level update for device {deviceAppKey}");
+                        Logger.Debug($"Sending log level update for device {hb.DeviceKey}");
                         var cmd = new Command
                         {
                             CommandType = CommandTypes.SET_LOG_LEVEL,
                             Data = desiredLevel.Name,
-                            DestinationId = deviceAppKey,
+                            DestinationId = hb.DeviceKey.ToString(),
                             Timestamp = DateTime.UtcNow
                         };
                         await Commands.SendCommandAsync(cmd, new Guid(cmd.DestinationId));
