@@ -5,9 +5,6 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <AssemblyName>BigMission.DeviceAppServiceStatusProcessor</AssemblyName>
     <RootNamespace>BigMission.DeviceAppServiceStatusProcessor</RootNamespace>
-    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <DockerfileContext>..\..</DockerfileContext>
-    <DockerfileRunArguments>--network=host</DockerfileRunArguments>
   </PropertyGroup>
   
   <ItemGroup>
