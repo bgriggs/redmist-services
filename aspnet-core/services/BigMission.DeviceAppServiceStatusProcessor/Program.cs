@@ -2,6 +2,7 @@
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NLog;
 using NLog.Config;
 using System;
@@ -18,6 +19,8 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         {
             try
             {
+                AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
                 var basePath = Directory.GetCurrentDirectory();
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
                 if (env.ToUpper() == "PRODUCTION")
@@ -35,17 +38,26 @@ namespace BigMission.DeviceAppServiceStatusProcessor
 
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "DeviceAppStatusProcessor", config["RedisConn"], logger);
 
-                var services = new ServiceCollection();
-                services.AddSingleton<NLog.ILogger>(logger);
-                services.AddSingleton<IConfiguration>(config);
-                services.AddSingleton<IDateTimeHelper, DateTimeHelper>();
-                services.AddSingleton(serviceStatus);
-                services.AddTransient<Application>();
+                var host = new HostBuilder()
+                    .ConfigureServices((builderContext, services) =>
+                    {
+                        services.AddSingleton<ILogger>(logger);
+                        services.AddSingleton<IConfiguration>(config);
+                        services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+                        services.AddSingleton(serviceStatus);
+                        services.AddHostedService<Application>();
+                    })
+                    .Build();
 
-                var provider = services.BuildServiceProvider();
-
-                var application = provider.GetService<Application>();
-                await application.Run();
+                try
+                {
+                    serviceStatus.Start();
+                    await host.RunAsync();
+                }
+                catch (OperationCanceledException)
+                {
+                    // suppress
+                }
             }
             catch (Exception ex)
             {
@@ -54,6 +66,29 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             finally
             {
                 LogManager.Shutdown();
+            }
+        }
+
+        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            try
+            {
+                var exception = e.ExceptionObject as Exception;
+                if (exception != null)
+                {
+                    logger.Fatal(exception, "Unhandled exception");
+                }
+                else
+                {
+                    logger.Fatal("Unhandled exception, but unable to retrieve the exception.");
+                }
+            }
+            catch (Exception)
+            {
+                // This is a really bad place to be. We are currently in the unhandled exception event and
+                // as such we are going down already, but we can't necessarily figure out how to log the
+                // event. The only reason this catch is here is to prevent us generating yet another unhandled
+                // exception.
             }
         }
     }

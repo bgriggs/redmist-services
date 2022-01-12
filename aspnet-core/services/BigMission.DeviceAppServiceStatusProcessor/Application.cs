@@ -7,6 +7,7 @@ using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
@@ -20,15 +21,13 @@ namespace BigMission.DeviceAppServiceStatusProcessor
     /// <summary>
     /// Processes application status from the in car apps. (not channel status)
     /// </summary>
-    class Application
+    class Application : BackgroundService
     {
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
         private IDateTimeHelper DateTime { get; }
         private AppCommands Commands { get; }
-        private readonly EventHubHelpers ehReader;
-        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly DeviceAppContext deviceAppContext;
 
@@ -41,13 +40,12 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             DateTime = dateTime;
             var serviceId = new Guid(Config["ServiceId"]);
             Commands = new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], logger);
-            ehReader = new EventHubHelpers(logger);
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
             deviceAppContext = new DeviceAppContext(cacheMuxer);
         }
 
 
-        public async Task Run()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
@@ -61,10 +59,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                 await HandleHeartbeat(channel, message);
             });
 
-            // Start updating service status
-            ServiceTracking.Start();
             Logger.Info("Started");
-            serviceBlock.WaitOne();
         }
 
         private async Task HandleHeartbeat(RedisChannel channel, RedisValue value)
