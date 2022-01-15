@@ -1,5 +1,4 @@
-﻿using BigMission.Cache.Models;
-using BigMission.CommandTools;
+﻿using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.DeviceApp.Shared;
 using Microsoft.AspNetCore.SignalR;
@@ -83,6 +82,18 @@ namespace BigMission.ServiceHub.Hubs
         {
             Logger.Trace($"RX log from: {message.SourceKey}");
             await Clearinghouse.PublishLog(message);
+        }
+
+        public void ReceiveChannelStatusV1(ChannelDataSetDto dataSet)
+        {
+            Logger.Trace($"Channel status from {dataSet.DeviceAppId}.");
+            //await Clearinghouse.PublishChannelStatus(dataSet);
+        }
+
+        public void ReceiveKeypadStatusV1(KeypadStatusDto keypadStatus)
+        {
+            Logger.Trace($"Keyboard status from {keypadStatus.DeviceAppId}.");
+            //await Clearinghouse.PublishKeyboardStatus(dataSet);
         }
     }
 }

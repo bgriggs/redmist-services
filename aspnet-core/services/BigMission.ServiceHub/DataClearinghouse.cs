@@ -59,5 +59,15 @@ namespace BigMission.ServiceHub
                 }
             }
         }
+
+        //public async Task PublishChannelStatus(ChannelDataSetDto dataSet)
+        //{
+
+        //}
+
+        //public async Task PublishKeyboardStatus(KeypadStatusDto keypadStatus)
+        //{
+
+        //}
     }
 }
