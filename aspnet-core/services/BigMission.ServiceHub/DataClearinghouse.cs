@@ -36,7 +36,7 @@ namespace BigMission.ServiceHub
             await pub.PublishAsync(Consts.HEARTBEAT_CH, hbjson);
         }
 
-        public async Task PublishLog(LogMessage message)
+        public async Task PublishConsoleLog(LogMessage message)
         {
             var cacheKey = string.Format(Consts.DEVICEAPP_LOG, message.SourceKey);
             var cache = cacheMuxer.GetDatabase();
@@ -60,14 +60,18 @@ namespace BigMission.ServiceHub
             }
         }
 
-        //public async Task PublishChannelStatus(ChannelDataSetDto dataSet)
-        //{
+        public async Task PublishChannelStatus(ChannelDataSetDto dataSet)
+        {
+            var json = JsonConvert.SerializeObject(dataSet);
+            var pub = cacheMuxer.GetSubscriber();
+            await pub.PublishAsync(Consts.CAR_TELEM_SUB, json);
+        }
 
-        //}
-
-        //public async Task PublishKeyboardStatus(KeypadStatusDto keypadStatus)
-        //{
-
-        //}
+        public async Task PublishKeyboardStatus(KeypadStatusDto keypadStatus)
+        {
+            var json = JsonConvert.SerializeObject(keypadStatus);
+            var pub = cacheMuxer.GetSubscriber();
+            await pub.PublishAsync(Consts.CAR_KEYPAD_SUB, json);
+        }
     }
 }

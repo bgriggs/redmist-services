@@ -49,7 +49,6 @@ namespace BigMission.RaceHeroAggregator
 
         private const int FUEL_STATS_MAX_LEN = 200;
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly ChannelData channelData;
         private FlagStatus flagStatus;
         private readonly bool logRHToFile;
         private readonly bool readTestFiles;
@@ -61,7 +60,6 @@ namespace BigMission.RaceHeroAggregator
             Config = config;
             this.cacheMuxer = cacheMuxer;
             RhClient = raceHeroClient;
-            channelData = new ChannelData(Config["ServiceId"], Config["KafkaConnectionString"], Config["KafkaDataTopic"]);
             logRHToFile = bool.Parse(Config["LogRHToFile"]);
             readTestFiles = bool.Parse(Config["ReadTestFiles"]);
         }
@@ -102,7 +100,7 @@ namespace BigMission.RaceHeroAggregator
             {
                 newCars.ForEach(c =>
                 {
-                    var cs = new CarSubscription(Logger, Config, channelData) { CarId = c.Id, CarNumber = c.Number };
+                    var cs = new CarSubscription(Logger, Config, cacheMuxer) { CarId = c.Id, CarNumber = c.Number };
                     subscriberCars.Add(cs);
                     cs.InitializeChannels();
                 });
@@ -422,7 +420,6 @@ namespace BigMission.RaceHeroAggregator
             try
             {
                 Dispose();
-                channelData.DisposeAsync();
                 return default;
             }
             catch (Exception exception)

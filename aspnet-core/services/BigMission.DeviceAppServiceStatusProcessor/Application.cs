@@ -56,13 +56,13 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             var sub = cacheMuxer.GetSubscriber();
             await sub.SubscribeAsync(Consts.HEARTBEAT_CH, async (channel, message) =>
             {
-                await HandleHeartbeat(channel, message);
+                await HandleHeartbeat(message);
             });
 
             Logger.Info("Started");
         }
 
-        private async Task HandleHeartbeat(RedisChannel channel, RedisValue value)
+        private async Task HandleHeartbeat(RedisValue value)
         {
             var heartbeatData = JsonConvert.DeserializeObject<DeviceApp.Shared.DeviceAppHeartbeat>(value);
             Logger.Debug($"Received HB from: '{heartbeatData.DeviceAppId}'");

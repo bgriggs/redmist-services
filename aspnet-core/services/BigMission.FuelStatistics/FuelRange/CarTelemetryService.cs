@@ -1,13 +1,11 @@
-﻿using Azure.Messaging.EventHubs.Consumer;
-using BigMission.CommandTools;
+﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
-using NLog;
+using StackExchange.Redis;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,38 +17,38 @@ namespace BigMission.FuelStatistics.FuelRange
     public class CarTelemetryService : BackgroundService
     {
         public IConfiguration Config { get; }
-        private readonly EventHubHelpers ehReader;
         private readonly IEnumerable<ICarTelemetryConsumer> telemetryConsumers;
+        private readonly ConnectionMultiplexer cacheMuxer;
 
-
-        public CarTelemetryService(IConfiguration config, ILogger logger, IEnumerable<ICarTelemetryConsumer> telemetryConsumers)
+        public CarTelemetryService(IConfiguration config, IEnumerable<ICarTelemetryConsumer> telemetryConsumers)
         {
             Config = config;
             this.telemetryConsumers = telemetryConsumers;
-            ehReader = new EventHubHelpers(logger);
+            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            await ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
-                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+            var sub = cacheMuxer.GetSubscriber();
+            await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
+            {
+                await HandleTelemetry(message);
+            });
         }
 
-        private async Task ReceivedEventCallback(PartitionEvent receivedEvent)
+        private async Task HandleTelemetry(RedisValue value)
         {
-            var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-            var chDataSet = JsonConvert.DeserializeObject<ChannelDataSetDto>(json);
+            var telemetryData = JsonConvert.DeserializeObject<ChannelDataSetDto>(value);
 
-            if (chDataSet.Data == null)
+            if (telemetryData.Data == null)
             {
-                chDataSet.Data = new ChannelStatusDto[] { };
+                telemetryData.Data = new ChannelStatusDto[] { };
             }
 
-            var consumerTasks = telemetryConsumers.Select(async (consumer) => 
+            var consumerTasks = telemetryConsumers.Select(async (consumer) =>
             {
-                await consumer.UpdateTelemetry(chDataSet);
+                await consumer.UpdateTelemetry(telemetryData);
             });
 
             await Task.WhenAll(consumerTasks);

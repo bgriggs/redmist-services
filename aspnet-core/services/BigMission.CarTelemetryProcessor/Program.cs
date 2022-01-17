@@ -5,23 +5,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NLog;
 using NLog.Config;
-using System;
-using System.IO;
-using System.Threading.Tasks;
 
-namespace BigMission.VirtualChannelAggregator
+namespace BigMission.CarTelemetryProcessor
 {
-    class Program
+    internal class Program
     {
-        private static Logger logger;
+        private static Logger? logger;
 
-        static async Task Main()
+        async static Task Main()
         {
             try
             {
                 AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
                 var basePath = Directory.GetCurrentDirectory();
-                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty;
                 if (env.ToUpper() == "PRODUCTION")
                 {
                     LogManager.Configuration = new XmlLoggingConfiguration($"{basePath}{Path.DirectorySeparatorChar}nlog.Production.config");
@@ -32,20 +30,24 @@ namespace BigMission.VirtualChannelAggregator
                 var config = new ConfigurationBuilder()
                     .SetBasePath(basePath)
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "VirtualChannelAggregator", config["RedisConn"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarTelemetryProcessor", config["RedisConn"], logger);
 
                 var host = new HostBuilder()
-                   .ConfigureServices((builderContext, services) =>
-                   {
-                       services.AddSingleton<ILogger>(logger);
-                       services.AddSingleton<IConfiguration>(config);
-                       services.AddTransient<IDateTimeHelper, DateTimeHelper>();
-                       services.AddSingleton(serviceStatus);
-                       services.AddHostedService<Application>();
-                   })
-                   .Build();
+                    .ConfigureServices((builderContext, services) =>
+                    {
+                        services.AddSingleton<ILogger>(logger);
+                        services.AddSingleton<IConfiguration>(config);
+                        services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+                        services.AddSingleton(serviceStatus);
+                        services.AddSingleton<ITelemetryConsumer, StatusPublisher>();
+                        services.AddSingleton<ITelemetryConsumer, ChannelHistoryPublisher>();
+                        services.AddSingleton<ITelemetryConsumer, ChannelLogging>();
+                        services.AddHostedService<TelemetryPipeline>();
+                    })
+                    .Build();
 
                 try
                 {
@@ -59,7 +61,7 @@ namespace BigMission.VirtualChannelAggregator
             }
             catch (Exception ex)
             {
-                logger.Error(ex);
+                logger?.Error(ex);
             }
             finally
             {
@@ -74,11 +76,11 @@ namespace BigMission.VirtualChannelAggregator
                 var exception = e.ExceptionObject as Exception;
                 if (exception != null)
                 {
-                    logger.Fatal(exception, "Unhandled exception");
+                    logger?.Fatal(exception, "Unhandled exception");
                 }
                 else
                 {
-                    logger.Fatal("Unhandled exception, but unable to retrieve the exception.");
+                    logger?.Fatal("Unhandled exception, but unable to retrieve the exception.");
                 }
             }
             catch (Exception)

@@ -81,19 +81,19 @@ namespace BigMission.ServiceHub.Hubs
         public async Task PostLogMessage(LogMessage message)
         {
             Logger.Trace($"RX log from: {message.SourceKey}");
-            await Clearinghouse.PublishLog(message);
+            await Clearinghouse.PublishConsoleLog(message);
         }
 
-        public void ReceiveChannelStatusV1(ChannelDataSetDto dataSet)
+        public async Task ReceiveChannelStatusV1(ChannelDataSetDto dataSet)
         {
             Logger.Trace($"Channel status from {dataSet.DeviceAppId}.");
-            //await Clearinghouse.PublishChannelStatus(dataSet);
+            await Clearinghouse.PublishChannelStatus(dataSet);
         }
 
-        public void ReceiveKeypadStatusV1(KeypadStatusDto keypadStatus)
+        public async Task ReceiveKeypadStatusV1(KeypadStatusDto keypadStatus)
         {
             Logger.Trace($"Keyboard status from {keypadStatus.DeviceAppId}.");
-            //await Clearinghouse.PublishKeyboardStatus(dataSet);
+            await Clearinghouse.PublishKeyboardStatus(keypadStatus);
         }
     }
 }

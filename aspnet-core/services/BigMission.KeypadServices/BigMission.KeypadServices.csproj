@@ -23,8 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\common\BigMission.Cache\BigMission.Cache.csproj" />
-    <ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
     <ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj" />
     <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
   </ItemGroup>

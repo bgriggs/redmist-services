@@ -1,112 +1,78 @@
-﻿using Azure.Messaging.EventHubs.Consumer;
-using BigMission.Cache;
-using BigMission.Cache.Models;
-using BigMission.CommandTools;
+﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace BigMission.KeypadServices
 {
-    class Application
+    class Application : BackgroundService
     {
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
-        private readonly EventHubHelpers ehReader;
+        public IDateTimeHelper DateTime { get; }
 
-        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
-
-        private ConnectionMultiplexer cacheMuxer;
+        private readonly ConnectionMultiplexer cacheMuxer;
 
 
-        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
+        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDateTimeHelper dateTimeHelper)
         {
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
-            ehReader = new EventHubHelpers(logger);
+            DateTime = dateTimeHelper;
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
         }
 
 
-        public void Run()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
 
-            // Process changes from stream and cache them here is the service
-            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            Task receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
-                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
+            var sub = cacheMuxer.GetSubscriber();
+            await sub.SubscribeAsync(Consts.CAR_KEYPAD_SUB, async (channel, message) =>
+            {
+                await HandleKeypadStatus(message);
+            });
 
-            // Start updating service status
-            ServiceTracking.Start();
             Logger.Info("Started");
-            receiveStatus.Wait();
-            serviceBlock.WaitOne();
         }
 
-        private Task ReceivedEventCallback(PartitionEvent receivedEvent)
+        private async Task HandleKeypadStatus(RedisValue value)
         {
-            try
+            var sw = Stopwatch.StartNew();
+            var keypadStatus = JsonConvert.DeserializeObject<KeypadStatusDto>(value);
+
+            Logger.Trace($"Received keypad status: {keypadStatus.DeviceAppId} Count={keypadStatus.LedStates.Count}");
+
+            // Reset time to server time to prevent timeouts when data is being updated.
+            keypadStatus.Timestamp = DateTime.UtcNow;
+
+            var db = cacheMuxer.GetDatabase();
+
+            var key = string.Format(Consts.KEYPAD_STATUS, keypadStatus.DeviceAppId);
+            var buttonEntries = new List<HashEntry>();
+            foreach (var bStatus in keypadStatus.LedStates)
             {
-                var sw = Stopwatch.StartNew();
-                if (receivedEvent.Data.Properties.Count > 0 && receivedEvent.Data.Properties.ContainsKey("KeypadStatusDto"))
-                {
-                    if (receivedEvent.Data.Properties["Type"].ToString() != "KeypadStatusDto")
-                        return Task.CompletedTask;
-                }
-
-                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                var keypadStatus = JsonConvert.DeserializeObject<KeypadStatusDto>(json);
-
-                Logger.Trace($"Received keypad status: {keypadStatus.DeviceAppId} Count={keypadStatus.LedStates.Count}");
-
-                // Reset time to server time to prevent timeouts when data is being updated.
-                keypadStatus.Timestamp = DateTime.UtcNow;
-                var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
-                
-                var db = cacheMuxer.GetDatabase();
-                if (db != null)
-                {
-                    var key = string.Format(Consts.KEYPAD_STATUS, keypadStatus.DeviceAppId);
-                    var buttonEntries = new List<HashEntry>();
-                    foreach(var bStatus in keypadStatus.LedStates)
-                    {
-                        var ledjson = JsonConvert.SerializeObject(bStatus);
-                        var h = new HashEntry(bStatus.ButtonNumber, ledjson);
-                        buttonEntries.Add(h);
-                    }
-
-                    db.HashSet(key, buttonEntries.ToArray());
-                  
-                    Logger.Trace($"Cached new keypad status for device: {keypadStatus.DeviceAppId}");
-                }
-                else
-                {
-                    Logger.Warn("Cache was not available, failed to update status.");
-                }
-
-                Logger.Trace($"Processed status in {sw.ElapsedMilliseconds}ms");
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Unable to process event from event hub partition");
+                var ledjson = JsonConvert.SerializeObject(bStatus);
+                var h = new HashEntry(bStatus.ButtonNumber, ledjson);
+                buttonEntries.Add(h);
             }
 
-            return Task.CompletedTask;
+            await db.HashSetAsync(key, buttonEntries.ToArray());
+
+            Logger.Trace($"Cached new keypad status for device: {keypadStatus.DeviceAppId}");
+            Logger.Trace($"Processed status in {sw.ElapsedMilliseconds}ms");
         }
     }
 }

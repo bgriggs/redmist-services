@@ -1,11 +1,13 @@
-﻿using BigMission.CommandTools;
+﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.EntityFrameworkCore;
 using BigMission.RaceHeroSdk.Models;
 using BigMission.RaceManagement;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using NLog;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,14 +31,14 @@ namespace BigMission.RaceHeroAggregator
         public int CarId { get; set; }
         public string CarNumber { get; set; }
         public ChannelMapping[] VirtualChannels { get; private set; }
-        private readonly ChannelData channelData;
+        private readonly ConnectionMultiplexer cacheMuxer;
 
 
-        public CarSubscription(ILogger logger, IConfiguration config, ChannelData channelData)
+        public CarSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer)
         {
             Logger = logger;
             Config = config;
-            this.channelData = channelData;
+            this.cacheMuxer = cacheMuxer;
         }
 
 
@@ -146,7 +148,9 @@ namespace BigMission.RaceHeroAggregator
                 }
 
                 var channelDs = new ChannelDataSetDto { IsVirtual = true, Timestamp = DateTime.UtcNow, Data = channelStatusUpdates.ToArray() };
-                channelData.SendData(channelDs).Wait();
+                var json = JsonConvert.SerializeObject(channelDs);
+                var pub = cacheMuxer.GetSubscriber();
+                pub.PublishAsync(Consts.CAR_TELEM_SUB, json).Wait();
             }
 
             //lastLap = lap;

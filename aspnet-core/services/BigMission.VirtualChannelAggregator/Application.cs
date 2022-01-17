@@ -1,21 +1,23 @@
-﻿using Azure.Messaging.EventHubs.Consumer;
-using BigMission.Cache;
+﻿using BigMission.Cache;
+using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
+using BigMission.Database;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
 using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using NLog;
-using NUglify.Helpers;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -28,162 +30,118 @@ namespace BigMission.VirtualChannelAggregator
     /// responsible for publishing that data to the cardata channel.  The StatusProcessor will
     /// make sure that data get pushed to the DB as well.
     /// </summary>
-    class Application
+    class Application : BackgroundService
     {
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private ServiceTracking ServiceTracking { get; }
-        private ConfigurationCommands configurationChanges;
-        private static readonly string[] configChanges = new[] { ConfigurationCommandTypes.DEVICE_MODIFIED, ConfigurationCommandTypes.CHANNEL_MODIFIED };
-        private readonly BigMissionDbContextFactory contextFactory = new BigMissionDbContextFactory();
-        private EventHubHelpers ehReader;
-        private Task receiveStatus;
-        private readonly Dictionary<int, Tuple<AppCommands, DeviceAppConfig, int[]>> deviceCommandClients = new Dictionary<int, Tuple<AppCommands, DeviceAppConfig, int[]>>();
-        private Timer fullUpdateTimer;
-        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
+        public IDateTimeHelper DateTime { get; }
+
+        private readonly Dictionary<int, Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>>> deviceCommandClients = new();
         private readonly ConnectionMultiplexer cacheMuxer;
 
-        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
+
+        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDateTimeHelper dateTimeHelper)
         {
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
+            DateTime = dateTimeHelper;
             cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
         }
 
 
-        public void Run()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
+            await InitDeviceClients();
 
-            InternalRun();
+            var sub = cacheMuxer.GetSubscriber();
 
-            // Start updating service status
-            ServiceTracking.Start();
-            serviceBlock.WaitOne();
-        }
-
-        private void InternalRun()
-        {
-            InitDeviceClients();
+            // Watch for changes in device app configuraiton such as channels
+            await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
+            {
+                Logger.Info("Channel configuration notification received");
+                await InitDeviceClients();
+            });
 
             // Process changes from stream and cache them here in the service
-            ehReader = new EventHubHelpers(Logger);
-            var partitionFilter = EventHubHelpers.GetPartitionFilter(Config["PartitionFilter"]);
-            receiveStatus = ehReader.ReadEventHubPartitionsAsync(Config["KafkaConnectionString"], Config["KafkaDataTopic"], Config["KafkaConsumerGroup"],
-                partitionFilter, EventPosition.Latest, ReceivedEventCallback);
-
-            if (configurationChanges == null)
+            await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
             {
-                var group = "config-" + Config["ServiceId"];
-                configurationChanges = new ConfigurationCommands(Config["KafkaConnectionString"], group, Config["KafkaConfigurationTopic"], Logger);
-                configurationChanges.Subscribe(configChanges, ProcessConfigurationChange);
+                await HandleTelemetry(message);
+            });
+
+            // Start loop for sending full updates
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var sw = Stopwatch.StartNew();
+                await SendFullUpdate();
+                Logger.Debug($"Sent full update in {sw.ElapsedMilliseconds}ms");
+                await Task.Delay(int.Parse(Config["FullUpdateFrequenceMs"]), stoppingToken);
             }
+        }
 
-            if (fullUpdateTimer == null)
+        private async Task HandleTelemetry(RedisValue value)
+        {
+            var telemetryData = JsonConvert.DeserializeObject<ChannelDataSetDto>(value);
+            if (telemetryData != null)
             {
-                var fullUpdateInterval = int.Parse(Config["FullUpdateFrequenceMs"]);
-                if (fullUpdateInterval > 0)
+                Logger.Debug($"Received status from: '{telemetryData.DeviceAppId}'");
+
+                // Only process virtual channels
+                if (telemetryData.IsVirtual)
                 {
-                    fullUpdateTimer = new Timer(FullUpdateCallback, null, 50, fullUpdateInterval);
+                    await SendChannelStaus(telemetryData.Data);
                 }
             }
         }
 
-        private async Task ReceivedEventCallback(PartitionEvent receivedEvent)
+        private async Task InitDeviceClients()
         {
+            Logger.Debug("Loading device channel mappings");
+            deviceCommandClients.Clear();
+
             try
             {
-                var json = Encoding.UTF8.GetString(receivedEvent.Data.Body.ToArray());
-                var chDataSet = JsonConvert.DeserializeObject<DeviceApp.Shared.ChannelDataSetDto>(json);
-                if (chDataSet != null)
-                {
-                    Logger.Debug($"Received status from: '{chDataSet.DeviceAppId}'");
-
-                    // Only process virtual channels
-                    if (chDataSet.IsVirtual)
-                    {
-                        await SendChannelStaus(chDataSet.Data);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Unable to process event from event hub partition");
-            }
-        }
-
-        private void InitDeviceClients()
-        {
-            lock (deviceCommandClients)
-            {
-                // Clean up any existing clients
-                if (deviceCommandClients.Any())
-                {
-                    deviceCommandClients.ForEach(ds =>
-                    {
-                        try
-                        {
-                            ds.Value.Item1.Dispose();
-                        }
-                        catch { }
-                    });
-                    deviceCommandClients.Clear();
-                }
-                using var context = contextFactory.CreateDbContext(new[] { Config["ConnectionString"] });
-                var devices = context.DeviceAppConfig.Where(d => !d.IsDeleted);
+                using var context = new RedMist(Config["ConnectionString"]);
+                var devices = await context.DeviceAppConfigs.Where(d => !d.IsDeleted).ToListAsync();
                 var deviceIds = devices.Select(d => d.Id);
-                var channels = context.ChannelMappings.Where(c => c.IsVirtual).ToArray();
+                var channels = await context.ChannelMappings.Where(c => c.IsVirtual).ToListAsync();
 
                 var serviceId = new Guid(Config["ServiceId"]);
                 foreach (var d in devices)
                 {
-                    var devVirtChs = channels.Where(c => c.DeviceAppId == d.Id).Select(c => c.Id).ToArray();
-                    var t = new Tuple<AppCommands, DeviceAppConfig, int[]>(
+                    var devVirtChs = channels.Where(c => c.DeviceAppId == d.Id).Select(c => c.Id);
+                    var t = new Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>>(
                         new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], Logger), d, devVirtChs);
                     deviceCommandClients[d.Id] = t;
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Could not initialize car app devices.");
             }
         }
 
         /// <summary>
         /// On a regular frequency send a full status update of all virtual channels to each device.
         /// </summary>
-        /// <param name="obj"></param>
-        private void FullUpdateCallback(object obj)
+        private async Task SendFullUpdate()
         {
             try
             {
-                if (Monitor.TryEnter(fullUpdateTimer))
-                {
-                    try
-                    {
-                        Logger.Info("Sending full status udpate");
+                Logger.Info("Sending full status udpate");
 
-                        int[] deviceIds;
-                        int[] channelIds;
-                        lock (deviceCommandClients)
-                        {
-                            deviceIds = deviceCommandClients.Keys.ToArray();
-                            channelIds = deviceCommandClients.Values.SelectMany(v => v.Item3).ToArray();
-                        }
+                var deviceIds = deviceCommandClients.Keys.ToArray();
+                var channelIds = deviceCommandClients.Values.SelectMany(v => v.Item3).ToArray();
 
-                        // Load current status
-                        var cache = cacheMuxer.GetDatabase();
-                        var rks = channelIds.Select(i => new RedisKey(string.Format(Cache.Models.Consts.CHANNEL_KEY, i))).ToArray();
-                        var channelStatusStrs = cache.StringGet(rks);
-                        var channelStatus = ChannelContext.ConvertToDeviceChStatus(channelIds, channelStatusStrs);
-                        SendChannelStaus(channelStatus.ToArray()).Wait();
-                    }
-                    finally
-                    {
-                        Monitor.Exit(fullUpdateTimer);
-                    }
-                }
-                else
-                {
-                    Logger.Debug("Full update timer skipped");
-                }
+
+                // Load current status
+                var cache = cacheMuxer.GetDatabase();
+                var rks = channelIds.Select(i => new RedisKey(string.Format(Consts.CHANNEL_KEY, i))).ToArray();
+                var channelStatusStrs = await cache.StringGetAsync(rks);
+                var channelStatus = ChannelContext.ConvertToDeviceChStatus(channelIds, channelStatusStrs);
+                await SendChannelStaus(channelStatus.ToArray());
             }
             catch (Exception ex)
             {
@@ -198,12 +156,7 @@ namespace BigMission.VirtualChannelAggregator
             {
                 try
                 {
-                    bool hasDevice;
-                    Tuple<AppCommands, DeviceAppConfig, int[]> client;
-                    lock (deviceCommandClients)
-                    {
-                        hasDevice = deviceCommandClients.TryGetValue(ds.Key, out client);
-                    }
+                    var hasDevice = deviceCommandClients.TryGetValue(ds.Key, out Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>> client);
                     if (hasDevice)
                     {
                         Logger.Trace($"Sending virtual status to device {ds.Key}");
@@ -226,32 +179,6 @@ namespace BigMission.VirtualChannelAggregator
             });
 
             await Task.WhenAll(tasks);
-        }
-
-        /// <summary>
-        /// When a change to devices or channels is received go ahead and reload everything.
-        /// </summary>
-        /// <param name="command"></param>
-        private Task ProcessConfigurationChange(KeyValuePair<string, string> command)
-        {
-            TearDown();
-            InternalRun();
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Psuedo dispose for closing down the channels to recreate with new configuration.  
-        /// Does not kill the object though.
-        /// </summary>
-        public void TearDown()
-        {
-            ehReader.CancelProcessing();
-
-            var clientDispose = deviceCommandClients.Select(async c =>
-            {
-                await c.Value.Item1.DisposeAsync();
-            });
-            Task.WaitAll(clientDispose.ToArray());
         }
     }
 }
