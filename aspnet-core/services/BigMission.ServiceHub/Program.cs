@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 var basePath = Directory.GetCurrentDirectory();
 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-if (env.ToUpper() == "PRODUCTION")
+if (env?.ToUpper() == "PRODUCTION")
 {
     LogManager.Configuration = new XmlLoggingConfiguration($"{basePath}{Path.DirectorySeparatorChar}nlog.Production.config");
 }

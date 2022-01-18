@@ -1,7 +1,5 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 using System;
@@ -10,26 +8,27 @@ using System.Threading.Tasks;
 
 namespace BigMission.AlarmProcessor
 {
-    class ConditionStatus : IDisposable, IAsyncDisposable
+    class ConditionStatus
     {
-        public RaceManagement.AlarmCondition ConditionConfig { get; }
-        private readonly BigMissionDbContext context;
-        private bool disposed;
+        public Database.Models.AlarmCondition ConditionConfig { get; }
         private readonly ConnectionMultiplexer cacheMuxer;
         private bool? lastConditionActive;
 
-        public ConditionStatus(RaceManagement.AlarmCondition conditionConfig, string connectionString, ConnectionMultiplexer cacheMuxer)
-        {
-            if (conditionConfig == null || connectionString == null || cacheMuxer == null) { throw new ArgumentNullException(); }
-            ConditionConfig = conditionConfig;
+        public static string GREATER_THAN = "GreaterThan";
+        public static string LESS_THAN = "LessThan";
+        public static string EQUALS = "Equals";
+        public static string NOT_EQUAL = "NotEqual";
 
-            var cf = new BigMissionDbContextFactory();
-            context = cf.CreateDbContext(new[] { connectionString });
+
+        public ConditionStatus(Database.Models.AlarmCondition conditionConfig, ConnectionMultiplexer cacheMuxer)
+        {
+            if (conditionConfig == null || cacheMuxer == null) { throw new ArgumentNullException(); }
+            ConditionConfig = conditionConfig;
             this.cacheMuxer = cacheMuxer;
         }
 
 
-        public bool? CheckConditions(ChannelStatusDto[] channelStatus)
+        public async Task<bool?> CheckConditions(ChannelStatusDto[] channelStatus)
         {
             bool conditionActive = false;
             var chstatus = channelStatus.FirstOrDefault(s => s.ChannelId == ConditionConfig.ChannelId);
@@ -38,11 +37,11 @@ namespace BigMission.AlarmProcessor
                 int.TryParse(ConditionConfig.OnFor, out int onfor);
 
                 var cache = cacheMuxer.GetDatabase();
-                var rv = cache.StringGet(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
-                Cache.Models.AlarmCondition condStatus = null;
+                var rv = await cache.StringGetAsync(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
+                AlarmCondition condStatus = null;
                 if (rv.HasValue)
                 {
-                    condStatus = JsonConvert.DeserializeObject<Cache.Models.AlarmCondition>(rv);
+                    condStatus = JsonConvert.DeserializeObject<AlarmCondition>(rv);
                 }
 
                 var conditionState = EvalCondition(chstatus);
@@ -53,7 +52,7 @@ namespace BigMission.AlarmProcessor
                     var row = new Cache.Models.AlarmCondition { ActiveTimestamp = DateTime.UtcNow };
                     row.OnForMet = onfor == 0;
                     var str = JsonConvert.SerializeObject(row);
-                    cache.StringSet(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id), str);
+                    await cache.StringSetAsync(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id), str);
                     conditionActive = row.OnForMet;
                 }
                 // When active, see if it has been on for the requisite duration
@@ -72,7 +71,7 @@ namespace BigMission.AlarmProcessor
                 // No longer on, clear out
                 else if (!conditionState && condStatus != null)
                 {
-                    cache.KeyDelete(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
+                    await cache.KeyDeleteAsync(string.Format(Consts.ALARM_CONDS, ConditionConfig.Id));
                 }
                 lastConditionActive = conditionActive;
                 return conditionActive;
@@ -90,58 +89,23 @@ namespace BigMission.AlarmProcessor
         private bool EvalCondition(ChannelStatusDto channelStatus)
         {
             var configVal = float.Parse(ConditionConfig.ChannelValue);
-            if (ConditionConfig.ConditionType == AlarmConditionType.EQUALS)
+            if (ConditionConfig.ConditionType == EQUALS)
             {
                 return channelStatus.Value == configVal;
             }
-            if (ConditionConfig.ConditionType == AlarmConditionType.GREATER_THAN)
+            if (ConditionConfig.ConditionType == GREATER_THAN)
             {
                 return channelStatus.Value > configVal;
             }
-            if (ConditionConfig.ConditionType == AlarmConditionType.LESS_THAN)
+            if (ConditionConfig.ConditionType == LESS_THAN)
             {
                 return channelStatus.Value < configVal;
             }
-            if (ConditionConfig.ConditionType == AlarmConditionType.NOT_EQUAL)
+            if (ConditionConfig.ConditionType == NOT_EQUAL)
             {
                 return channelStatus.Value != configVal;
             }
             throw new NotImplementedException("Unknown condition: " + ConditionConfig.ConditionType);
         }
-
-        #region Dispose
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposed)
-                return;
-
-            if (disposing)
-            {
-                context.Dispose();
-            }
-
-            disposed = true;
-        }
-
-        public virtual ValueTask DisposeAsync()
-        {
-            try
-            {
-                return context.DisposeAsync();
-            }
-            catch (Exception exception)
-            {
-                return new ValueTask(Task.FromException(exception));
-            }
-        }
-
-        #endregion
     }
 }

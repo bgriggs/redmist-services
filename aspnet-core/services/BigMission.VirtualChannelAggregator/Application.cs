@@ -61,6 +61,11 @@ namespace BigMission.VirtualChannelAggregator
             // Watch for changes in device app configuraiton such as channels
             await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
             {
+                Logger.Info("Car device app configuration notification received");
+                await InitDeviceClients();
+            });
+            await sub.SubscribeAsync(Consts.CAR_CHANNEL_CONFIG_CHANGED_SUB, async (channel, message) =>
+            {
                 Logger.Info("Channel configuration notification received");
                 await InitDeviceClients();
             });

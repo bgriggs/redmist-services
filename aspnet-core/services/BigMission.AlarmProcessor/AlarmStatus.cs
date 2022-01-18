@@ -1,8 +1,7 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.Models;
+﻿using BigMission.Cache.Models;
+using BigMission.Database;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
 using NLog;
 using StackExchange.Redis;
 using System;
@@ -14,13 +13,14 @@ namespace BigMission.AlarmProcessor
 {
     class AlarmStatus
     {
-        public CarAlarms Alarm { get; }
+        public CarAlarm Alarm { get; }
         public string ConnectionString { get; }
-        private readonly BigMissionDbContext context;
         private readonly List<ConditionStatus> conditionStatus = new List<ConditionStatus>();
         private ILogger Logger { get; }
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly ChannelContext channelContext;
+        private readonly RedMist context;
+        private readonly Dictionary<int, int[]> deviceToChannelMappings;
+        public const string HIGHLIGHT_COLOR = "HighlightColor";
 
         public string AlarmGroup
         {
@@ -36,49 +36,39 @@ namespace BigMission.AlarmProcessor
         private const string ANY = "Any";
 
 
-        public AlarmStatus(CarAlarms alarm, string connectionString, ILogger logger, ConnectionMultiplexer cacheMuxer, ChannelContext channelContext)
+        public AlarmStatus(CarAlarm alarm, string connectionString, ILogger logger, ConnectionMultiplexer cacheMuxer, Dictionary<int, int[]> deviceToChannelMappings)
         {
             Alarm = alarm ?? throw new ArgumentNullException();
             ConnectionString = connectionString ?? throw new ArgumentNullException();
             Logger = logger ?? throw new ArgumentNullException();
             this.cacheMuxer = cacheMuxer ?? throw new ArgumentNullException();
-            this.channelContext = channelContext;
+            this.deviceToChannelMappings = deviceToChannelMappings;
 
-            var cf = new BigMissionDbContextFactory();
-            context = cf.CreateDbContext(new[] { connectionString });
+            context = new RedMist(connectionString);
 
-            InitializeConditions(alarm.Conditions.ToArray());
+            InitializeConditions(alarm.AlarmConditions.ToArray());
         }
 
 
-        public void InitializeConditions(RaceManagement.AlarmCondition[] conditions)
+        public void InitializeConditions(Database.Models.AlarmCondition[] conditions)
         {
-            foreach (var cond in conditionStatus)
-            {
-                try
-                {
-                    cond.Dispose();
-                }
-                catch { }
-            }
-
             conditionStatus.Clear();
 
             foreach (var cond in conditions)
             {
-                var cs = new ConditionStatus(cond, ConnectionString, cacheMuxer);
+                var cs = new ConditionStatus(cond, cacheMuxer);
                 conditionStatus.Add(cs);
             }
         }
 
-        public bool CheckConditions(ChannelStatusDto[] channelStatus)
+        public async Task<bool> CheckConditions(ChannelStatusDto[] channelStatus)
         {
             var results = new List<bool?>();
-            Parallel.ForEach(conditionStatus, (condStatus) =>
+            var conditionTasks = conditionStatus.Select(async condStatus =>
             {
                 try
                 {
-                    var result = condStatus.CheckConditions(channelStatus);
+                    var result = await condStatus.CheckConditions(channelStatus);
                     Logger.Trace($"Checking condition {condStatus.ConditionConfig.Id} is {result}");
                     results.Add(result);
                 }
@@ -87,6 +77,7 @@ namespace BigMission.AlarmProcessor
                     Logger.Error(ex, "Error updating condition status");
                 }
             });
+            await Task.WhenAll(conditionTasks);
 
             if (results.Contains(null))
             {
@@ -104,32 +95,32 @@ namespace BigMission.AlarmProcessor
                 alarmOn = results.Any(r => r.Value);
             }
 
-            UpdateStatus(alarmOn, true);
+            await UpdateStatus(alarmOn, true);
 
             return alarmOn;
         }
 
-        private void UpdateStatus(bool alarmOn, bool applyTriggers)
+        private async Task UpdateStatus(bool alarmOn, bool applyTriggers)
         {
             Logger.Trace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
             var cache = cacheMuxer.GetDatabase();
             var alarmKey = string.Format(Consts.ALARM_STATUS, Alarm.Id);
-            var rv = cache.StringGet(alarmKey);
+            var rv = await cache.StringGetAsync(alarmKey);
 
             // Turn alarm off if it's active
             if (rv.HasValue && !alarmOn)
             {
                 Logger.Trace($"Alarm {Alarm.Name} turning off");
-                cache.KeyDelete(alarmKey);
+                await cache.KeyDeleteAsync(alarmKey);
 
                 // Log change
                 var log = new CarAlarmLog { AlarmId = Alarm.Id, Timestamp = DateTime.UtcNow, IsActive = false };
-                context.CarAlarmLog.Add(log);
+                context.CarAlarmLogs.Add(log);
 
                 // Turn off applicable triggers
                 if (applyTriggers)
                 {
-                    RemoveTriggers();
+                    await RemoveTriggers();
                 }
             }
             // Turn alarm on if it's off
@@ -137,40 +128,40 @@ namespace BigMission.AlarmProcessor
             {
                 Logger.Trace($"Alarm {Alarm.Name} turning on");
 
-                cache.StringSet(alarmKey, DateTime.UtcNow.ToString());
+                await cache.StringSetAsync(alarmKey, DateTime.UtcNow.ToString());
 
                 // Log change
                 var log = new CarAlarmLog { AlarmId = Alarm.Id, Timestamp = DateTime.UtcNow, IsActive = true };
-                context.CarAlarmLog.Add(log);
+                context.CarAlarmLogs.Add(log);
 
                 // Activate triggers when alarms turn on
                 if (applyTriggers)
                 {
-                    ProcessTriggers();
+                    await ProcessTriggers();
                 }
             }
 
             Logger.Trace($"Alarm {Alarm.Name} saving...");
-            context.SaveChanges();
+            await context.SaveChangesAsync();
             Logger.Trace($"Alarm {Alarm.Name} saving finished");
         }
 
-        private void ProcessTriggers()
+        private async Task ProcessTriggers()
         {
-            Parallel.ForEach(Alarm.Triggers, (trigger) =>
+            var triggerTasks = Alarm.AlarmTriggers.Select(async trigger =>
             {
                 try
                 {
                     Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active");
 
                     // Dashboard highlight
-                    if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
+                    if (trigger.TriggerType == HIGHLIGHT_COLOR)
                     {
                         // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First();
+                        var ch = Alarm.AlarmConditions.First();
                         var cache = cacheMuxer.GetDatabase();
-                        var deviceAppId = channelContext.GetDeviceAppId(ch.ChannelId);
-                        cache.HashSet(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString(), trigger.Color);
+                        var deviceAppId = GetDeviceAppId(ch.ChannelId);
+                        await cache.HashSetAsync(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString(), trigger.Color);
                         Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
                     }
                     else
@@ -183,24 +174,26 @@ namespace BigMission.AlarmProcessor
                     Logger.Error(ex, "Error creating triggers");
                 }
             });
+
+            await Task.WhenAll(triggerTasks);
         }
 
-        private void RemoveTriggers()
+        private async Task RemoveTriggers()
         {
-            Parallel.ForEach(Alarm.Triggers, (trigger) =>
+            var triggerTasks = Alarm.AlarmTriggers.Select(async trigger =>
             {
                 try
                 {
                     Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off");
 
                     // Dashboard highlight
-                    if (trigger.TriggerType == AlarmTriggerType.HIGHLIGHT_COLOR)
+                    if (trigger.TriggerType == HIGHLIGHT_COLOR)
                     {
                         // At the moment, use the first condition's channel
-                        var ch = Alarm.Conditions.First();
+                        var ch = Alarm.AlarmConditions.First();
                         var cache = cacheMuxer.GetDatabase();
-                        var deviceAppId = channelContext.GetDeviceAppId(ch.ChannelId);
-                        cache.HashDelete(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString());
+                        var deviceAppId = GetDeviceAppId(ch.ChannelId);
+                        await cache.HashDeleteAsync(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString());
                         Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
                     }
                 }
@@ -209,11 +202,24 @@ namespace BigMission.AlarmProcessor
                     Logger.Error(ex, "Error creating triggers");
                 }
             });
+            await Task.WhenAll(triggerTasks);
         }
 
-        public void Supersede()
+        public async Task Supersede()
         {
-            UpdateStatus(alarmOn: false, applyTriggers: false);
+            await UpdateStatus(alarmOn: false, applyTriggers: false);
+        }
+
+        private int GetDeviceAppId(int channelId)
+        {
+            foreach(var kvp in deviceToChannelMappings)
+            {
+                if (kvp.Value.Contains(channelId))
+                {
+                    return kvp.Key;
+                }
+            }
+            return 0;
         }
     }
 }
