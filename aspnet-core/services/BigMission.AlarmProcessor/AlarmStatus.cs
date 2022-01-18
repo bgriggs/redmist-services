@@ -69,7 +69,14 @@ namespace BigMission.AlarmProcessor
                 try
                 {
                     var result = await condStatus.CheckConditions(channelStatus);
-                    Logger.Trace($"Checking condition {condStatus.ConditionConfig.Id} is {result}");
+                    if (result != null)
+                    {
+                        Logger.Trace($"Checking condition {condStatus.ConditionConfig.Id} is {result}");
+                    }
+                    else
+                    {
+                        Logger.Trace($"Checking condition {condStatus.ConditionConfig.Id} is <null>");
+                    }
                     results.Add(result);
                 }
                 catch (Exception ex)
