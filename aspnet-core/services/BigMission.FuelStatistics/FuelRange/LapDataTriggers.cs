@@ -1,5 +1,4 @@
-﻿using BigMission.RaceManagement;
-using System;
+﻿using System;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
 namespace BigMission.FuelStatistics.FuelRange
@@ -10,9 +9,9 @@ namespace BigMission.FuelStatistics.FuelRange
     /// </summary>
     public class LapDataTriggers
     {
-        public FuelRangeStint ProcessLap(Lap lap, FuelRangeStint currentStint)
+        public Cache.Models.FuelRange.Stint ProcessLap(Lap lap, Cache.Models.FuelRange.Stint currentStint)
         {
-            var stintUpdates = new FuelRangeStint();
+            var stintUpdates = new Cache.Models.FuelRange.Stint();
 
             // Check for start of race
             if (currentStint == null)

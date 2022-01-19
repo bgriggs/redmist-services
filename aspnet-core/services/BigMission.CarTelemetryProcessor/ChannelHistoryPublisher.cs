@@ -1,7 +1,8 @@
-﻿using BigMission.Cache;
+﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
 
@@ -44,7 +45,7 @@ namespace BigMission.CarTelemetryProcessor
                     if (row.Value != ch.Value)
                     {
                         row.Value = ch.Value;
-                        var p = ChannelContext.CreateChannelHistoryCacheEntry(ch);
+                        var p = CreateChannelHistoryCacheEntry(ch);
                         history.Add(p);
                     }
 
@@ -55,7 +56,7 @@ namespace BigMission.CarTelemetryProcessor
                 {
                     var cr = new ChannelStatusDto { DeviceAppId = ch.DeviceAppId, ChannelId = ch.ChannelId, Value = ch.Value, Timestamp = ch.Timestamp };
                     last[ch.ChannelId] = cr;
-                    var p = ChannelContext.CreateChannelHistoryCacheEntry(ch);
+                    var p = CreateChannelHistoryCacheEntry(ch);
                     history.Add(p);
                 }
             }
@@ -74,6 +75,13 @@ namespace BigMission.CarTelemetryProcessor
                 }
                 Logger.Trace($"Cached new history for device: {receivedTelem.DeviceAppId}");
             }
+        }
+
+        private static KeyValuePair<RedisKey, RedisValue> CreateChannelHistoryCacheEntry(DeviceApp.Shared.ChannelStatusDto ch)
+        {
+            var v = JsonConvert.SerializeObject(ch);
+            var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(Consts.CHANNEL_HIST_KEY, ch.ChannelId), v);
+            return p;
         }
     }
 }

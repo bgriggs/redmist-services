@@ -10,6 +10,8 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
     <PackageReference Include="NLog" Version="4.7.13" />
     <PackageReference Include="NLog.Config" Version="4.7.13" />
     <PackageReference Include="NLog.Extensions.Logging" Version="1.7.4" />
@@ -17,6 +19,7 @@
 
    <ItemGroup>
     <ProjectReference Include="..\..\common\BigMission.Database\BigMission.Database.csproj" />
+    <ProjectReference Include="..\..\common\BigMission.DeviceApp.Shared\BigMission.DeviceApp.Shared.csproj" />
     <ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj" />
     <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
   </ItemGroup>  

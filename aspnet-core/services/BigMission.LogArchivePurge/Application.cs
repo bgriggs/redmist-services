@@ -1,14 +1,13 @@
 ﻿using Azure.Storage.Blobs;
-using BigMission.EntityFrameworkCore;
-using BigMission.Logging;
-using BigMission.RaceManagement;
-using BigMission.ServiceData;
+using BigMission.Cache.Models;
+using BigMission.Database;
+using BigMission.Database.Models;
 using BigMission.ServiceStatusTools;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -63,8 +62,7 @@ namespace BigMission.LogArchivePurge
                     {
                         Logger.Info("Checking log settings");
 
-                        var cf = new BigMissionDbContextFactory();
-                        using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+                        using var db = new RedMist(Config["ConnectionString"]);
                         var settings = db.ArchivePurgeSettings.FirstOrDefault();
                         if (settings != null)
                         {
@@ -128,7 +126,7 @@ namespace BigMission.LogArchivePurge
         /// </summary>
         /// <param name="db"></param>
         /// <param name="conn"></param>
-        private void ArchiveChannelLogs(BigMissionDbContext db, SqlConnection conn, ArchivePurgeSettings settings)
+        private void ArchiveChannelLogs(RedMist db, SqlConnection conn, ArchivePurgeSetting settings)
         {
             Logger.Info($"Running ArchiveChannelLog...");
 
@@ -185,7 +183,7 @@ namespace BigMission.LogArchivePurge
         /// <summary>
         /// Retention settings are set according to the team's edition.
         /// </summary>
-        private TeamRetentionPolicy[] LoadTeamRetentionSettings(BigMissionDbContext db)
+        private static TeamRetentionPolicy[] LoadTeamRetentionSettings(RedMist db)
         {
             // Keep deleted row in the list so old data does not stay in the DB
             return db.TeamRetentionPolicies.ToArray();
@@ -195,16 +193,16 @@ namespace BigMission.LogArchivePurge
         /// <summary>
         /// Get the devices in use by a team.  Data is associated with the device ID.
         /// </summary>
-        private int[] LoadTeamDeviceIds(BigMissionDbContext db, int teamId)
+        private static int[] LoadTeamDeviceIds(RedMist db, int teamId)
         {
             // Keep deleted devices in the results to make sure the old data does not get retained after deletion
-            return (from d in db.DeviceAppConfig
+            return (from d in db.DeviceAppConfigs
                     join c in db.Cars on d.CarId equals c.Id
                     where c.TenantId == teamId
                     select d.Id).ToArray();
         }
 
-        private DateTime? LoadOldestChannelLog(int deviceId, SqlConnection conn)
+        private static DateTime? LoadOldestChannelLog(int deviceId, SqlConnection conn)
         {
             var c = $"SELECT TOP 1 [Timestamp] FROM [ChannelLog] WHERE [DeviceAppId]={deviceId}";
             using var cmd = new SqlCommand(c, conn);
@@ -217,9 +215,9 @@ namespace BigMission.LogArchivePurge
             return null;
         }
 
-        private ChannelLog[] LoadChannelLogs(BigMissionDbContext db, int device, DateTime start, DateTime end)
+        private static ChannelLog[] LoadChannelLogs(RedMist db, int device, DateTime start, DateTime end)
         {
-            return db.ChannelLog
+            return db.ChannelLogs
                 .Where(l => l.DeviceAppId == device && l.Timestamp >= start && l.Timestamp < end)
                 .ToArray();
         }
@@ -319,8 +317,8 @@ namespace BigMission.LogArchivePurge
 
         private static bool IsInTimeWindow(DateTime now, DateTime start, DateTime end)
         {
-            TimeSpan startts = new TimeSpan(start.Hour, start.Minute, 0);
-            TimeSpan endts = new TimeSpan(end.Hour, end.Minute, 0);
+            TimeSpan startts = new(start.Hour, start.Minute, 0);
+            TimeSpan endts = new(end.Hour, end.Minute, 0);
             TimeSpan nowts = now.TimeOfDay;
             // see if start comes before end
             if (startts < endts)

@@ -1,5 +1,5 @@
-﻿using BigMission.DeviceApp.Shared;
-using BigMission.RaceManagement;
+﻿using BigMission.Database.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
 using System;
 using System.Collections.Generic;
@@ -31,7 +31,7 @@ namespace BigMission.FuelStatistics.FuelRange
             }
         }
 
-        private readonly List<Tuple<float, DateTime>> speedWindow = new List<Tuple<float, DateTime>>();
+        private readonly List<Tuple<float, DateTime>> speedWindow = new();
         private readonly TimeSpan speedTimeThreshold = TimeSpan.FromSeconds(6);
         private readonly int speedTriggerMinSamples = 3;
         private readonly float speedTriggerThreshold = 35f;
@@ -52,7 +52,7 @@ namespace BigMission.FuelStatistics.FuelRange
         /// <param name="telem">latest updates from the car</param>
         /// <param name="currentStint">used to determine whether to check for stint stopping or starting</param>
         /// <returns>Start or End updates with notes, or null if not available</returns>
-        public FuelRangeStint ProcessCarTelemetry(ChannelDataSetDto telem, FuelRangeStint currentStint)
+        public Cache.Models.FuelRange.Stint ProcessCarTelemetry(ChannelDataSetDto telem, Cache.Models.FuelRange.Stint currentStint)
         {
             // If we dont have speed and fuel channels defined, we can't use telemetry
             if (SpeedChannel == null || FuelLevelChannel == null)
@@ -63,7 +63,7 @@ namespace BigMission.FuelStatistics.FuelRange
             var speedCh = telem.Data?.FirstOrDefault(d => d.ChannelId == SpeedChannel.Id);
             var flCh = telem.Data?.FirstOrDefault(d => d.ChannelId == FuelLevelChannel.Id);
 
-            var stintUpdates = new FuelRangeStint();
+            var stintUpdates = new Cache.Models.FuelRange.Stint();
 
             if (speedCh == null || flCh == null)
             {

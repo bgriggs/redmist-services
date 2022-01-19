@@ -1,8 +1,8 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.FuelRange;
-using BigMission.EntityFrameworkCore;
+﻿using BigMission.Cache.Models;
+using BigMission.Cache.Models.Flags;
+using BigMission.Cache.Models.FuelRange;
+using BigMission.Database;
 using BigMission.FuelStatistics.FuelRange;
-using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
@@ -45,12 +45,11 @@ namespace BigMission.FuelStatistics
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
                 serviceStatus.Update(ServiceState.STARTING, string.Empty);
 
-                var cf = new BigMissionDbContextFactory();
-                var db = cf.CreateDbContext(new[] { config["ConnectionString"] });
+                var db = new RedMist(config["ConnectionString"]);
                 var cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
 
 
-                var fuelRangeContext = new FuelRangeContext(cacheMuxer, db);
+                var fuelRangeContext = new FuelRangeContext(db, cacheMuxer);
                 var dataContext = new DataContext(cacheMuxer, config["ConnectionString"]);
                 var flagContext = new FlagContext(cacheMuxer);
 

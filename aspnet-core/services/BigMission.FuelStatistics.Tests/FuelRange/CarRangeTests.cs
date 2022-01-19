@@ -1,8 +1,7 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.FuelRange;
+﻿using BigMission.Cache.Models.FuelRange;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
-using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -34,11 +33,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
-            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
             var loggerMock = new Mock<ILogger>();
 
-            var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = false };
+            var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = false };
 
             var laps = new[]
             {
@@ -63,11 +62,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
-            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
             var loggerMock = new Mock<ILogger>();
 
-            var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
+            var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
             var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object)
             {
                 SpeedChannel = GetSpeedChannel(),
@@ -145,11 +144,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
-            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
             var loggerMock = new Mock<ILogger>();
 
-            var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
+            var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
 
             var telemTimestamps = new[]
             {
@@ -203,11 +202,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
-            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
             var loggerMock = new Mock<ILogger>();
 
-            var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
+            var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
 
             var telemTimestamps = new[]
             {
@@ -261,11 +260,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             dtMock.Setup(p => p.UtcNow).Returns(DateTime.Parse("7/4/2021 8:00:00.0 am"));
 
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
-            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<FuelRangeStint>())).Returns(Task.FromResult(new FuelRangeStint { Id = -1 }));
+            fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
             var loggerMock = new Mock<ILogger>();
 
-            var settings = new FuelRangeSettings { UseRaceHeroTrigger = true, UseTelemetry = true };
+            var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
             var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object);
             carRange.ResetForNewRace(123, 4444);
             var laps = new[]

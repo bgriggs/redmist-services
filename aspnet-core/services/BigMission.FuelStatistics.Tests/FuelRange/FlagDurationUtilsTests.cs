@@ -1,5 +1,5 @@
+using BigMission.Cache.Models.Flags;
 using BigMission.FuelStatistics.FuelRange;
-using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -171,14 +171,14 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             Assert.AreEqual(0, s[3].RedDurationMins);
         }
 
-        private static List<FuelRangeStint> GetStints()
+        private static List<Cache.Models.FuelRange.Stint> GetStints()
         {
-            return new List<FuelRangeStint>
+            return new List<Cache.Models.FuelRange.Stint>
             {
-                new FuelRangeStint{ Start = DateTime.Parse("7/4/2021 8:00am"), End = DateTime.Parse("7/4/2021 9:30am") },
-                new FuelRangeStint{ Start = DateTime.Parse("7/4/2021 9:33am"), End = DateTime.Parse("7/4/2021 10:19am") },
-                new FuelRangeStint{ Start = DateTime.Parse("7/4/2021 10:23am"), End = DateTime.Parse("7/4/2021 12:30pm") },
-                new FuelRangeStint{ Start = DateTime.Parse("7/4/2021 12:31pm"),  },
+                new Cache.Models.FuelRange.Stint{ Start = DateTime.Parse("7/4/2021 8:00am"), End = DateTime.Parse("7/4/2021 9:30am") },
+                new Cache.Models.FuelRange.Stint{ Start = DateTime.Parse("7/4/2021 9:33am"), End = DateTime.Parse("7/4/2021 10:19am") },
+                new Cache.Models.FuelRange.Stint{ Start = DateTime.Parse("7/4/2021 10:23am"), End = DateTime.Parse("7/4/2021 12:30pm") },
+                new Cache.Models.FuelRange.Stint{ Start = DateTime.Parse("7/4/2021 12:31pm"),  },
             };
         }
     }

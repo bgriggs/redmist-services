@@ -1,8 +1,8 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.FuelRange;
+﻿using BigMission.Cache.Models.Flags;
+using BigMission.Cache.Models.FuelRange;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
-using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using NLog;
 using System;
@@ -18,7 +18,9 @@ namespace BigMission.FuelStatistics
     /// </summary>
     public class Event
     {
-        private readonly RaceEventSettings settings;
+        public const string SPEED = "Speed";
+        public const string FUEL_LEVEL = "FuelLevel";
+        private readonly RaceEventSetting settings;
         private readonly IDateTimeHelper dateTimeHelper;
         private ILogger Logger { get; }
         public int RhEventId { get; private set; }
@@ -31,7 +33,7 @@ namespace BigMission.FuelStatistics
         private readonly IFuelRangeContext fuelRangeContext;
         private readonly IFlagContext flagContext;
 
-        public Event(RaceEventSettings settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, 
+        public Event(RaceEventSetting settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, 
             IFuelRangeContext fuelRangeContext, IFlagContext flagContext)
         {
             this.settings = settings;
@@ -92,7 +94,7 @@ namespace BigMission.FuelStatistics
 
                 // Load car's telemetry channel definitions
                 var deviceAppIds = deviceAppCarMappings.Keys.ToArray();
-                var channelNames = new[] { ReservedChannel.SPEED, ReservedChannel.FUEL_LEVEL };
+                var channelNames = new[] { SPEED, FUEL_LEVEL };
                 var channels = await dataContext.GetChannelMappings(deviceAppIds, channelNames);
                 foreach (var chMap in channels)
                 {
@@ -100,11 +102,11 @@ namespace BigMission.FuelStatistics
                     {
                         if (carRanges.TryGetValue(carId, out CarRange cr))
                         {
-                            if (chMap.ReservedName == ReservedChannel.SPEED)
+                            if (chMap.ReservedName == SPEED)
                             {
                                 cr.SpeedChannel = chMap;
                             }
-                            else if (chMap.ReservedName == ReservedChannel.FUEL_LEVEL)
+                            else if (chMap.ReservedName == FUEL_LEVEL)
                             {
                                 cr.FuelLevelChannel = chMap;
                             }
@@ -189,7 +191,7 @@ namespace BigMission.FuelStatistics
             }
         }
 
-        public async Task OverrideStint(FuelRangeUpdate stint)
+        public async Task OverrideStint(RangeUpdate stint)
         {
             foreach (var car in carRanges.Values)
             {
@@ -235,7 +237,7 @@ namespace BigMission.FuelStatistics
                 }
 
                 // Get updated cars
-                var eventStints = new List<FuelRangeStint>();
+                var eventStints = new List<Cache.Models.FuelRange.Stint>();
                 var carIdsToUpdate = FlushDirtyCarRanges();
                 if (carIdsToUpdate.Any())
                 {

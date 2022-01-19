@@ -1,9 +1,7 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.Models;
+﻿using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
-using BigMission.EntityFrameworkCore;
-using BigMission.ServiceData;
+using BigMission.Database;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
@@ -29,7 +27,6 @@ namespace BigMission.DeviceAppServiceStatusProcessor
         private IDateTimeHelper DateTime { get; }
         private AppCommands Commands { get; }
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly DeviceAppContext deviceAppContext;
 
 
         public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDateTimeHelper dateTime)
@@ -41,17 +38,12 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             var serviceId = new Guid(Config["ServiceId"]);
             Commands = new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], logger);
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
-            deviceAppContext = new DeviceAppContext(cacheMuxer);
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
-
-            var cf = new BigMissionDbContextFactory();
-            using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-            deviceAppContext.WarmUpDeviceConfigIds(db);
 
             var sub = cacheMuxer.GetSubscriber();
             await sub.SubscribeAsync(Consts.HEARTBEAT_CH, async (channel, message) =>
@@ -67,12 +59,11 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             var heartbeatData = JsonConvert.DeserializeObject<DeviceApp.Shared.DeviceAppHeartbeat>(value);
             Logger.Debug($"Received HB from: '{heartbeatData.DeviceAppId}'");
 
-            var cf = new BigMissionDbContextFactory();
-            using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+            using var db = new RedMist(Config["ConnectionString"]);
 
             if (heartbeatData.DeviceAppId == 0)
             {
-                var deviceApp = db.DeviceAppConfig.FirstOrDefault(d => d.DeviceAppKey == heartbeatData.DeviceKey);
+                var deviceApp = db.DeviceAppConfigs.FirstOrDefault(d => d.DeviceAppKey == heartbeatData.DeviceKey);
                 if (deviceApp != null)
                 {
                     heartbeatData.DeviceAppId = deviceApp.Id;

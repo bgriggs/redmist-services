@@ -1,11 +1,9 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.Models;
+﻿using BigMission.Cache.Models;
 using BigMission.CommandTools;
 using BigMission.CommandTools.Models;
 using BigMission.Database;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
@@ -145,13 +143,29 @@ namespace BigMission.VirtualChannelAggregator
                 var cache = cacheMuxer.GetDatabase();
                 var rks = channelIds.Select(i => new RedisKey(string.Format(Consts.CHANNEL_KEY, i))).ToArray();
                 var channelStatusStrs = await cache.StringGetAsync(rks);
-                var channelStatus = ChannelContext.ConvertToDeviceChStatus(channelIds, channelStatusStrs);
+                var channelStatus = ConvertToDeviceChStatus(channelIds, channelStatusStrs);
                 await SendChannelStaus(channelStatus.ToArray());
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Error sending full updates to devices.");
             }
+        }
+
+        private static List<ChannelStatusDto> ConvertToDeviceChStatus(int[] channelIds, RedisValue[] values)
+        {
+            var css = new List<ChannelStatusDto>();
+            for (int i = 0; i < channelIds.Length; i++)
+            {
+                var chstr = values[i];
+                if (!chstr.IsNullOrEmpty)
+                {
+                    var chmod = JsonConvert.DeserializeObject<ChannelStatusDto>(chstr);
+                    css.Add(chmod);
+                }
+            }
+
+            return css;
         }
 
         private async Task SendChannelStaus(ChannelStatusDto[] status)

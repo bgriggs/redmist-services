@@ -1,11 +1,11 @@
 ﻿using BigMission.Cache.Models;
-using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
+using BigMission.Cache.Models.Flags;
+using BigMission.Database;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,28 +17,29 @@ namespace BigMission.RaceHeroAggregator
     {
         private ILogger Logger { get; }
         private IConfiguration Config { get; }
+        private IDateTimeHelper DateTime { get; }
+
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly List<EventFlag> eventFlags = new List<EventFlag>();
+        private readonly List<EventFlag> eventFlags = new();
         private readonly int eventId;
 
-        public FlagStatus(int eventId, ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer)
+        public FlagStatus(int eventId, ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime)
         {
             this.eventId = eventId;
             Logger = logger;
             Config = config;
             this.cacheMuxer = cacheMuxer;
+            DateTime = dateTime;
         }
 
         public async Task ProcessFlagStatus(Flag flag, int runId)
         {
+            using var db = new RedMist(Config["ConnectionString"]);
             if (eventFlags.Count == 0)
             {
                 var ef = AddNewFlag(flag, runId);
-
-                var cacheTask = UpdateCache();
-                var cf = new BigMissionDbContextFactory();
-                using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-                db.EventFlags.Add(ef);
+                var cacheTask = UpdateCache();                
+                db.EventFlags.Add(ConvertFlag(ef));
                 await db.SaveChangesAsync();
                 await cacheTask;
                 Logger.Trace($"Saved event flag update {flag}");
@@ -54,10 +55,8 @@ namespace BigMission.RaceHeroAggregator
 
                     // Save changes
                     var cacheTask = UpdateCache();
-                    var cf = new BigMissionDbContextFactory();
-                    using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
                     db.Update(currentFlag);
-                    db.EventFlags.Add(ef);
+                    db.EventFlags.Add(ConvertFlag(ef));
                     await db.SaveChangesAsync();
                     await cacheTask;
                     Logger.Trace($"Saved flag change from {currentFlag.Flag} to {flag}");
@@ -74,8 +73,7 @@ namespace BigMission.RaceHeroAggregator
 
                 // Save changes
                 var cacheTask = UpdateCache();
-                var cf = new BigMissionDbContextFactory();
-                using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
+                using var db = new RedMist(Config["ConnectionString"]);
                 db.Update(currentFlag);
                 await db.SaveChangesAsync();
                 await cacheTask;
@@ -96,6 +94,19 @@ namespace BigMission.RaceHeroAggregator
             var json = JsonConvert.SerializeObject(eventFlags);
             var cache = cacheMuxer.GetDatabase();
             await cache.StringSetAsync(key, json);
+        }
+
+        private static Database.Models.EventFlag ConvertFlag(EventFlag cf)
+        {
+            return new Database.Models.EventFlag
+            {
+                Id = cf.Id,
+                EventId = cf.EventId,
+                RunId = cf.RunId,
+                Start = cf.Start,
+                End = cf.End,
+                Flag = cf.Flag,
+            };
         }
     }
 }

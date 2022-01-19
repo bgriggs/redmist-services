@@ -1,6 +1,6 @@
 ﻿using BigMission.Cache.Models;
-using BigMission.EntityFrameworkCore;
-using BigMission.RaceManagement;
+using BigMission.Database;
+using BigMission.Database.Models;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using StackExchange.Redis;
@@ -15,7 +15,7 @@ namespace BigMission.FuelStatistics
     {
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly string dbConnStr;
-        private BigMissionDbContext batchDbContext;
+        private RedMist batchDbContext;
 
 
         public DataContext(ConnectionMultiplexer cacheMuxer, string dbConnStr)
@@ -35,8 +35,7 @@ namespace BigMission.FuelStatistics
             {
                 throw new InvalidOperationException("Batch already open");
             }
-            var cf = new BigMissionDbContextFactory();
-            batchDbContext = cf.CreateDbContext(new[] { dbConnStr });
+            batchDbContext = new RedMist(dbConnStr);
         }
 
         /// <summary>
@@ -52,15 +51,14 @@ namespace BigMission.FuelStatistics
             }
         }
 
-        private BigMissionDbContext GetDb()
+        private RedMist GetDb()
         {
             if (batchDbContext != null)
             {
                 return batchDbContext;
             }
 
-            var cf = new BigMissionDbContextFactory();
-            return cf.CreateDbContext(new[] { dbConnStr });
+            return new RedMist(dbConnStr);
         }
 
         public async Task<List<Lap>> GetSavedLaps(int eventId)
@@ -69,13 +67,13 @@ namespace BigMission.FuelStatistics
             try
             {
                 int latestRunId = 0;
-                var runIds = await db.CarRacerLaps.Where(l => l.EventId == eventId).Select(p => p.RunId).ToListAsync();
+                var runIds = await db.CarRaceLaps.Where(l => l.EventId == eventId).Select(p => p.RunId).ToListAsync();
                 if (runIds.Any())
                 {
                     latestRunId = runIds.Max();
                 }
 
-                return await db.CarRacerLaps
+                return await db.CarRaceLaps
                     .Where(l => l.EventId == eventId && l.RunId == latestRunId)
                     .Select(l => new Lap
                     {
@@ -102,7 +100,7 @@ namespace BigMission.FuelStatistics
             }
         }
 
-        public async Task<List<FuelRangeSettings>> GetFuelRangeSettings(int[] carIds)
+        public async Task<List<FuelRangeSetting>> GetFuelRangeSettings(int[] carIds)
         {
             var db = GetDb();
             try
@@ -123,7 +121,7 @@ namespace BigMission.FuelStatistics
             var db = GetDb();
             try
             {
-                return await db.DeviceAppConfig.Where(d => d.CarId.HasValue && carIds.Contains(d.CarId.Value)).ToListAsync();
+                return await db.DeviceAppConfigs.Where(d => d.CarId.HasValue && carIds.Contains(d.CarId.Value)).ToListAsync();
             }
             finally
             {
@@ -134,7 +132,7 @@ namespace BigMission.FuelStatistics
             }
         }
 
-        public async Task<List<Teams.Car>> GetCars(int[] carIds)
+        public async Task<List<Database.Models.Car>> GetCars(int[] carIds)
         {
             var db = GetDb();
             try
@@ -183,7 +181,7 @@ namespace BigMission.FuelStatistics
             }
         }
 
-        public async Task<List<RaceEventSettings>> GetEventSettings()
+        public async Task<List<RaceEventSetting>> GetEventSettings()
         {
             var db = GetDb();
             try

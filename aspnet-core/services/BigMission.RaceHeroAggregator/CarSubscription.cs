@@ -1,9 +1,10 @@
 ﻿using BigMission.Cache.Models;
+using BigMission.Database;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.EntityFrameworkCore;
 using BigMission.RaceHeroSdk.Models;
-using BigMission.RaceManagement;
-using Microsoft.EntityFrameworkCore.Internal;
+using BigMission.TestHelpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using NLog;
@@ -11,59 +12,65 @@ using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace BigMission.RaceHeroAggregator
 {
     class CarSubscription
     {
+        public const string LAST_LAP = "LastLap";
+        public const string BEST_LAP = "BestLap";
+        public const string POS_OVERALL = "PositionOverall";
+        public const string POS_IN_CLASS = "PositionInClass";
+        public const string GAP_FRONT = "GapFront";
+        public const string GAP_BEHIND = "GapBehind";
+
         public static readonly string[] RaceHeroChannelNames = new[]
         {
-            ReservedChannel.POS_OVERALL,
-            ReservedChannel.POS_IN_CLASS,
-            ReservedChannel.GAP_FRONT,
-            ReservedChannel.GAP_BEHIND,
-            ReservedChannel.LAST_LAP,
-            ReservedChannel.BEST_LAP
+            POS_OVERALL,
+            POS_IN_CLASS,
+            GAP_FRONT,
+            GAP_BEHIND,
+            LAST_LAP,
+            BEST_LAP
         };
 
         private ILogger Logger { get; }
         private IConfiguration Config { get; }
+        private IDateTimeHelper DateTime { get; }
         public int CarId { get; set; }
         public string CarNumber { get; set; }
         public ChannelMapping[] VirtualChannels { get; private set; }
         private readonly ConnectionMultiplexer cacheMuxer;
 
-
-        public CarSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer)
+        public CarSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime)
         {
             Logger = logger;
             Config = config;
             this.cacheMuxer = cacheMuxer;
+            DateTime = dateTime;
         }
 
 
         /// <summary>
         /// Loads virtual channels which include race hero channels.
         /// </summary>
-        public void InitializeChannels()
+        public async Task InitializeChannels()
         {
-            var cf = new BigMissionDbContextFactory();
-            using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-            var channels = (from d in db.DeviceAppConfig
-                            join m in db.ChannelMappings on d.Id equals m.DeviceAppId
-                            where d.CarId == CarId && m.IsVirtual && !d.IsDeleted && RaceHeroChannelNames.Contains(m.ReservedName)
-                            select m).ToArray();
-
-            VirtualChannels = channels;
+            using var db = new RedMist(Config["ConnectionString"]);
+            VirtualChannels = await (from d in db.DeviceAppConfigs
+                                  join m in db.ChannelMappings on d.Id equals m.DeviceAppId
+                                  where d.CarId == CarId && m.IsVirtual && !d.IsDeleted && RaceHeroChannelNames.Contains(m.ReservedName)
+                                  select m).ToArrayAsync();
         }
 
-        public void ProcessUpdate(Racer[] racers)
+        public async Task ProcessUpdate(Racer[] racers)
         {
             var lap = racers.FirstOrDefault(r => r.RacerNumber.ToLower() == CarNumber.ToLower());
             if (lap != null && VirtualChannels != null && VirtualChannels.Length > 0)
             {
                 var channelStatusUpdates = new List<ChannelStatusDto>();
-                var posOverallCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == ReservedChannel.POS_OVERALL);
+                var posOverallCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == POS_OVERALL);
                 if (posOverallCh != null)
                 {
                     var s = new ChannelStatusDto
@@ -76,7 +83,7 @@ namespace BigMission.RaceHeroAggregator
                     channelStatusUpdates.Add(s);
                 }
 
-                var posInClassCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == ReservedChannel.POS_IN_CLASS);
+                var posInClassCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == POS_IN_CLASS);
                 if (posInClassCh != null)
                 {
                     var s = new ChannelStatusDto
@@ -89,7 +96,7 @@ namespace BigMission.RaceHeroAggregator
                     channelStatusUpdates.Add(s);
                 }
 
-                var gapFrontCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == ReservedChannel.GAP_FRONT);
+                var gapFrontCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == GAP_FRONT);
                 if (gapFrontCh != null)
                 {
                     float.TryParse(lap.GapToAheadInRun, out float aheadTime);
@@ -103,7 +110,7 @@ namespace BigMission.RaceHeroAggregator
                     channelStatusUpdates.Add(s);
                 }
 
-                var gapBehindCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == ReservedChannel.GAP_BEHIND);
+                var gapBehindCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == GAP_BEHIND);
                 if (gapBehindCh != null)
                 {
                     var behind = GetCarBehindOverall(lap, racers);
@@ -121,7 +128,7 @@ namespace BigMission.RaceHeroAggregator
                     }
                 }
 
-                var lastTimeCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == ReservedChannel.LAST_LAP);
+                var lastTimeCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == LAST_LAP);
                 if (lastTimeCh != null)
                 {
                     var s = new ChannelStatusDto
@@ -134,7 +141,7 @@ namespace BigMission.RaceHeroAggregator
                     channelStatusUpdates.Add(s);
                 }
 
-                var bestTimeCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == ReservedChannel.BEST_LAP);
+                var bestTimeCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == BEST_LAP);
                 if (bestTimeCh != null)
                 {
                     var s = new ChannelStatusDto
@@ -150,13 +157,13 @@ namespace BigMission.RaceHeroAggregator
                 var channelDs = new ChannelDataSetDto { IsVirtual = true, Timestamp = DateTime.UtcNow, Data = channelStatusUpdates.ToArray() };
                 var json = JsonConvert.SerializeObject(channelDs);
                 var pub = cacheMuxer.GetSubscriber();
-                pub.PublishAsync(Consts.CAR_TELEM_SUB, json).Wait();
+                await pub.PublishAsync(Consts.CAR_TELEM_SUB, json);
             }
 
             //lastLap = lap;
         }
 
-        private Racer GetCarBehindOverall(Racer car, Racer[] field)
+        private static Racer GetCarBehindOverall(Racer car, Racer[] field)
         {
             var orderedField = field.OrderBy(r => r.PositionInRun).ToArray();
             var index = Array.IndexOf(orderedField, car);

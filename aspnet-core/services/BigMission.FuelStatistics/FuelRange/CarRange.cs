@@ -1,6 +1,7 @@
-﻿using BigMission.Cache.FuelRange;
+﻿using BigMission.Cache.Models.Flags;
+using BigMission.Cache.Models.FuelRange;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using NLog;
 using System;
@@ -19,7 +20,7 @@ namespace BigMission.FuelStatistics.FuelRange
         public int CarId { get; private set; }
         private int EventId { get; set; }
         private int RunId { get; set; }
-        private readonly FuelRangeSettings settings;
+        private readonly FuelRangeSetting settings;
 
         public ChannelMapping SpeedChannel
         {
@@ -34,15 +35,15 @@ namespace BigMission.FuelStatistics.FuelRange
 
         public ILogger Logger { get; }
 
-        private List<FuelRangeStint> stints = new List<FuelRangeStint>();
-        private readonly HashSet<Lap> laps = new HashSet<Lap>();
+        private List<Cache.Models.FuelRange.Stint> stints = new();
+        private readonly HashSet<Lap> laps = new();
         private readonly LapDataTriggers lapDataTriggers;
         private readonly TelemetryTriggers telemetryTriggers;
         private readonly FlagDurationUtils flagUtils;
         private readonly IFuelRangeContext fuelRangeContext;
 
 
-        public CarRange(FuelRangeSettings settings, IDateTimeHelper dateTimeHelper, IFuelRangeContext fuelRangeContext, ILogger logger)
+        public CarRange(FuelRangeSetting settings, IDateTimeHelper dateTimeHelper, IFuelRangeContext fuelRangeContext, ILogger logger)
         {
             this.settings = settings;
             CarId = settings.CarId;
@@ -54,7 +55,7 @@ namespace BigMission.FuelStatistics.FuelRange
         }
 
 
-        public FuelRangeStint[] GetStints()
+        public Cache.Models.FuelRange.Stint[] GetStints()
         {
             return stints.ToArray();
         }
@@ -148,7 +149,7 @@ namespace BigMission.FuelStatistics.FuelRange
             return changed;
         }
 
-        private async Task<bool> ProcessUpdatedStint(FuelRangeStint updatedStint, FuelRangeStint currentStint)
+        private async Task<bool> ProcessUpdatedStint(Cache.Models.FuelRange.Stint updatedStint, Cache.Models.FuelRange.Stint currentStint)
         {
             bool changed = false;
             if (updatedStint.End.HasValue && currentStint != null)
@@ -180,7 +181,7 @@ namespace BigMission.FuelStatistics.FuelRange
             return changed;
         }
 
-        public bool ApplyEventFlags(List<EventFlag> flags)
+        public bool ApplyEventFlags(List<Cache.Models.Flags.EventFlag> flags)
         {
             return flagUtils.UpdateStintFlagDurations(flags, ref stints);
         }
@@ -190,10 +191,10 @@ namespace BigMission.FuelStatistics.FuelRange
         /// </summary>
         /// <param name="update"></param>
         /// <returns>true if something was udpated</returns>
-        public Task<bool> OverrideStint(FuelRangeUpdate update)
+        public Task<bool> OverrideStint(RangeUpdate update)
         {
             bool changed = false;
-            if (update.Action == FuelRangeUpdate.DELETE)
+            if (update.Action == RangeUpdate.DELETE)
             {
                 var count = stints.RemoveAll(st => st.Id == update.Stint.Id);
                 if (count > 0)
@@ -205,7 +206,7 @@ namespace BigMission.FuelStatistics.FuelRange
 
             if (update.Stint.CarId == CarId)
             {
-                if (update.Action == FuelRangeUpdate.OVERRIDE)
+                if (update.Action == RangeUpdate.OVERRIDE)
                 {
                     var st = stints.FirstOrDefault(s => s.Id == update.Stint.Id);
                     if (st != null)
@@ -252,7 +253,7 @@ namespace BigMission.FuelStatistics.FuelRange
                     }
                     changed = true;
                 }
-                else if (update.Action == FuelRangeUpdate.ADD)
+                else if (update.Action == RangeUpdate.ADD)
                 {
                     stints.Add(update.Stint);
                     UpdateCalculatedValues(update.Stint);
@@ -269,7 +270,7 @@ namespace BigMission.FuelStatistics.FuelRange
         /// </summary>
         /// <param name="stint"></param>
         /// <returns>true if changed</returns>
-        private bool UpdateCalculatedValues(FuelRangeStint stint)
+        private bool UpdateCalculatedValues(Cache.Models.FuelRange.Stint stint)
         {
             var changed = false;
             var start = stint.StartOverride ?? stint.Start;

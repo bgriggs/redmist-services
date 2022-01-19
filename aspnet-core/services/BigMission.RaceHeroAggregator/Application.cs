@@ -1,43 +1,44 @@
-﻿using BigMission.EntityFrameworkCore;
+﻿using BigMission.Cache.Models;
+using BigMission.Database;
+using BigMission.Database.Models;
 using BigMission.RaceHeroSdk;
 using BigMission.RaceHeroTestHelpers;
-using BigMission.RaceManagement;
-using BigMission.ServiceData;
 using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using NLog;
-using NUglify.Helpers;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BigMission.RaceHeroAggregator
 {
     /// <summary>
     /// Connect to race hero API and get event and race status for events that users have subscribed to.
     /// </summary>
-    class Application
+    class Application : BackgroundService
     {
         private ILogger Logger { get; }
         private IConfiguration Config { get; }
         private ServiceTracking ServiceTracking { get; }
-
-        private readonly Dictionary<string, EventSubscription> eventSubscriptions = new Dictionary<string, EventSubscription>();
-
-        private Timer eventSubscriptionTimer;
-        private readonly object eventSubscriptionCheckLock = new object();
-        private readonly ManualResetEvent serviceBlock = new ManualResetEvent(false);
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private IDateTimeHelper DateTime { get; }
         private IRaceHeroClient RhClient { get; set; }
 
+        private readonly Dictionary<string, EventSubscription> eventSubscriptions = new();
+        private readonly ConnectionMultiplexer cacheMuxer;
 
-        public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking)
+
+        public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking, IDateTimeHelper dateTime)
         {
             Logger = logger;
             Config = config;
             ServiceTracking = serviceTracking;
+            DateTime = dateTime;
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
             var readTestFiles = bool.Parse(Config["ReadTestFiles"]);
 
@@ -52,30 +53,59 @@ namespace BigMission.RaceHeroAggregator
         }
 
 
-        public void Run()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             ServiceTracking.Update(ServiceState.STARTING, string.Empty);
+            var eventSubInterval = TimeSpan.FromMilliseconds(int.Parse(Config["EventSubscriptionCheckMs"]));
+            var waitForStartInterval = TimeSpan.FromMilliseconds(int.Parse(Config["WaitForStartTimer"]));
+            var eventPollInterval = TimeSpan.FromMilliseconds(int.Parse(Config["EventPollTimer"]));
+            var minInterval = new[] { eventSubInterval, waitForStartInterval, eventPollInterval }.Min();
 
-            // Load event subscriptions
-            eventSubscriptionTimer = new Timer(RunSubscriptionCheck, null, 0, int.Parse(Config["EventSubscriptionCheckMs"]));
+            var lastEventSubCheck = System.DateTime.MinValue;
 
-            //string eventId = "3134";
-            ////var client = new RestClient("https://api.racehero.io/v1/");
-            ////client.Authenticator = new HttpBasicAuthenticator(Config["RaceHeroApiKey"], "");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var eventSubCheckDiff = DateTime.UtcNow - lastEventSubCheck;
+                if (eventSubCheckDiff >= eventSubInterval)
+                {
+                    await RunSubscriptionCheck();
+                    lastEventSubCheck = DateTime.UtcNow;
+                }
 
-            //var task = RhClient.GetEvent(eventId);
-            //task.Wait();
-            //Console.WriteLine($"{task.Result.Name} IsLive={task.Result.IsLive}");
+                var updateEventTasks = new List<Task>();
+                foreach(var eventSub in eventSubscriptions.Values)
+                {
+                    var et = eventSub.UpdateEvent();
+                    updateEventTasks.Add(et);
+                }
 
-            //var lt = RhClient.GetLeaderboard(eventId);
-            //lt.Wait();
-            //Console.WriteLine($"{lt.Result.Name}");
-
-            // Start updating service status
-            ServiceTracking.Start();
-            Logger.Info("Started");
-            serviceBlock.WaitOne();
+                await Task.WhenAll(updateEventTasks);
+                await Task.Delay(minInterval, stoppingToken);
+            }
         }
+
+        //public void Run()
+        //{
+        //    // Load event subscriptions
+        //    eventSubscriptionTimer = new Timer(RunSubscriptionCheck, null, 0, int.Parse(Config["EventSubscriptionCheckMs"]));
+
+        //    //string eventId = "3134";
+        //    ////var client = new RestClient("https://api.racehero.io/v1/");
+        //    ////client.Authenticator = new HttpBasicAuthenticator(Config["RaceHeroApiKey"], "");
+
+        //    //var task = RhClient.GetEvent(eventId);
+        //    //task.Wait();
+        //    //Console.WriteLine($"{task.Result.Name} IsLive={task.Result.IsLive}");
+
+        //    //var lt = RhClient.GetLeaderboard(eventId);
+        //    //lt.Wait();
+        //    //Console.WriteLine($"{lt.Result.Name}");
+
+        //    // Start updating service status
+        //    ServiceTracking.Start();
+        //    Logger.Info("Started");
+        //    serviceBlock.WaitOne();
+        //}
 
         #region Event Subscription Management
 
@@ -83,80 +113,53 @@ namespace BigMission.RaceHeroAggregator
         // unconditionally poll the events for the users because the API will cut us off.  The
         // user have to time box the events in single day or two chuncks.  Once we have that, we
         // can check for Live status to start getting car and driver data.
-
-        private void RunSubscriptionCheck(object obj)
-        {
-            if (Monitor.TryEnter(eventSubscriptionCheckLock))
-            {
-                try
-                {
-                    var settings = LoadEventSettings();
-                    Logger.Info($"Loaded {settings.Length} event subscriptions.");
-                    var settingEventGrps = settings.GroupBy(s => s.RaceHeroEventId);
-                    var eventIds = settings.Select(s => s.RaceHeroEventId).Distinct();
-
-                    lock (eventSubscriptions)
-                    {
-                        // Add and update
-                        foreach (var settingGrg in settingEventGrps)
-                        {
-                            if (!eventSubscriptions.TryGetValue(settingGrg.Key, out EventSubscription subscription))
-                            {
-                                subscription = new EventSubscription(Logger, Config, cacheMuxer, RhClient);
-                                eventSubscriptions[settingGrg.Key] = subscription;
-                                subscription.Start();
-                                Logger.Info($"Adding event subscription for event ID '{settingGrg.Key}' and starting polling.");
-                            }
-                            subscription.UpdateSetting(settingGrg.ToArray());
-                        }
-
-                        // Remove deleted
-                        var expiredEvents = eventSubscriptions.Keys.Except(eventIds);
-                        expiredEvents.ForEach(e => 
-                        {
-                            Logger.Info($"Removing event subscription {e}");
-                            if (eventSubscriptions.Remove(e, out EventSubscription sub))
-                            {
-                                try
-                                {
-                                    sub.Dispose();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Logger.Error(ex, $"Error stopping event subscription {sub.EventId}.");
-                                }
-                            }
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Error polling subscriptions");
-                }
-                finally
-                {
-                    Monitor.Exit(eventSubscriptionCheckLock);
-                }
-            }
-            else
-            {
-                Logger.Info("Skipping RunSubscriptionCheck");
-            }
-        }
-
-        private RaceEventSettings[] LoadEventSettings()
+        private async Task RunSubscriptionCheck()
         {
             try
             {
-                var cf = new BigMissionDbContextFactory();
-                using var db = cf.CreateDbContext(new[] { Config["ConnectionString"] });
-                
-                var events = db.RaceEventSettings
+                var settings = await LoadEventSettings();
+                Logger.Info($"Loaded {settings.Length} event subscriptions.");
+                var settingEventGrps = settings.GroupBy(s => s.RaceHeroEventId);
+                var eventIds = settings.Select(s => s.RaceHeroEventId).Distinct();
+
+                // Add and update
+                foreach (var settingGrg in settingEventGrps)
+                {
+                    if (!eventSubscriptions.TryGetValue(settingGrg.Key, out EventSubscription subscription))
+                    {
+                        subscription = new EventSubscription(Logger, Config, cacheMuxer, RhClient, DateTime);
+                        eventSubscriptions[settingGrg.Key] = subscription;
+                        Logger.Info($"Adding event subscription for event ID '{settingGrg.Key}' and starting polling.");
+                    }
+                    await subscription.UpdateSetting(settingGrg.ToArray());
+                }
+
+                // Remove deleted
+                var expiredEvents = eventSubscriptions.Keys.Except(eventIds);
+                foreach (var e in expiredEvents)
+                {
+                    Logger.Info($"Removing event subscription {e}");
+                    eventSubscriptions.Remove(e, out EventSubscription sub);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error polling subscriptions");
+            }
+        }
+
+        private async Task<RaceEventSetting[]> LoadEventSettings()
+        {
+            try
+            {
+                using var db = new RedMist(Config["ConnectionString"]);
+
+                var events = await db.RaceEventSettings
                     .Where(s => !s.IsDeleted && s.IsEnabled)
-                    .ToArray();
+                    .ToArrayAsync();
 
                 // Filter by subscription time
-                var activeSubscriptions = new List<RaceEventSettings>();
+                var activeSubscriptions = new List<RaceEventSetting>();
 
                 foreach (var evt in events)
                 {
@@ -192,9 +195,10 @@ namespace BigMission.RaceHeroAggregator
             {
                 Logger.Error(ex, "Unable to save logs");
             }
-            return new RaceEventSettings[0];
+            return Array.Empty<RaceEventSetting>();
         }
 
         #endregion
+
     }
 }

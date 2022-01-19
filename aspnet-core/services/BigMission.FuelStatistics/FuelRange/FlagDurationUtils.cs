@@ -1,4 +1,4 @@
-﻿using BigMission.RaceManagement;
+﻿using BigMission.Cache.Models.Flags;
 using BigMission.TestHelpers;
 using System.Collections.Generic;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
@@ -20,7 +20,7 @@ namespace BigMission.FuelStatistics.FuelRange
         /// <param name="eventFlags">List of flags for an event</param>
         /// <param name="carStints">A car's current stints for an event</param>
         /// <returns>true if there was a time that changed, otherwise false</returns>
-        public bool UpdateStintFlagDurations(List<EventFlag> eventFlags, ref List<FuelRangeStint> carStints)
+        public bool UpdateStintFlagDurations(List<EventFlag> eventFlags, ref List<Cache.Models.FuelRange.Stint> carStints)
         {
             bool changed = false;
             foreach (var stint in carStints)
@@ -55,7 +55,7 @@ namespace BigMission.FuelStatistics.FuelRange
             return changed;
         }
 
-        private double CalcFlagDuration(EventFlag flag, FuelRangeStint stint)
+        private double CalcFlagDuration(EventFlag flag, Cache.Models.FuelRange.Stint stint)
         {
             double duration = 0;
 

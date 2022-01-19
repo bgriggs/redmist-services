@@ -1,11 +1,7 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.FuelRange;
-using BigMission.RaceManagement;
+﻿using BigMission.Cache.Models.FuelRange;
 using Microsoft.Extensions.Hosting;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,7 +28,7 @@ namespace BigMission.FuelStatistics
             await dataContext.SubscribeToFuelStintOverrides(ProcessStintOverride);
         }
 
-        private async Task ProcessStintOverride(FuelRangeUpdate stint)
+        private async Task ProcessStintOverride(RangeUpdate stint)
         {
             var overrideTasks = overrideConsumers.Select(async (oc) => {
                 await oc.ProcessStintOverride(stint);

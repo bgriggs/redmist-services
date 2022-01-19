@@ -1,5 +1,4 @@
 ﻿using BigMission.Cache.Models;
-using BigMission.ServiceData;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;

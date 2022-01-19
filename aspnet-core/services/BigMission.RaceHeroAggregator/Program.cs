@@ -1,10 +1,13 @@
 ﻿using BigMission.ServiceStatusTools;
+using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using NLog;
 using NLog.Config;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace BigMission.RaceHeroAggregator
 {
@@ -12,7 +15,7 @@ namespace BigMission.RaceHeroAggregator
     {
         private static Logger logger;
 
-        static void Main()
+        static async Task Main()
         {
             try
             {
@@ -32,16 +35,26 @@ namespace BigMission.RaceHeroAggregator
 
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "RaceHeroConnector", config["RedisConn"], logger);
 
-                var services = new ServiceCollection();
-                services.AddSingleton<NLog.ILogger>(logger);
-                services.AddSingleton<IConfiguration>(config);
-                services.AddSingleton(serviceStatus);
-                services.AddTransient<Application>();
+                var host = new HostBuilder()
+                   .ConfigureServices((builderContext, services) =>
+                   {
+                       services.AddSingleton<ILogger>(logger);
+                       services.AddSingleton<IConfiguration>(config);
+                       services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+                       services.AddSingleton(serviceStatus);
+                       services.AddHostedService<Application>();
+                   })
+                   .Build();
 
-                var provider = services.BuildServiceProvider();
-
-                var application = provider.GetService<Application>();
-                application.Run();
+                try
+                {
+                    serviceStatus.Start();
+                    await host.RunAsync();
+                }
+                catch (OperationCanceledException)
+                {
+                    // suppress
+                }
             }
             catch (Exception ex)
             {

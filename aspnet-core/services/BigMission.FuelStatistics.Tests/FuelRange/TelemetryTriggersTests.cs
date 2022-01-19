@@ -1,6 +1,6 @@
-﻿using BigMission.DeviceApp.Shared;
+﻿using BigMission.Database.Models;
+using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
-using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -11,11 +11,11 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
     [TestClass]
     public class TelemetryTriggersTests
     {
-        private ChannelMapping GetFuelLevelChannel()
+        private static ChannelMapping GetFuelLevelChannel()
         {
             return new ChannelMapping { Id = 12, DeviceAppId = 1, CanId = 251711489, ChannelName = "FuelLevel", ReservedName = "FuelLevel" };
         }
-        private ChannelMapping GetSpeedChannel()
+        private static ChannelMapping GetSpeedChannel()
         {
             return new ChannelMapping { Id = 78, DeviceAppId = 1, CanId = 251711493, ChannelName = "Speed", ReservedName = "Speed" };
         }
@@ -55,7 +55,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
                 Tuple.Create(DateTime.Parse("7/4/2021 1:00:19.0 pm"), new ChannelStatusDto { ChannelId = 78, Value = 60 }, default(DateTime)),
             };
 
-            FuelRangeStint startStint = null;
+            Cache.Models.FuelRange.Stint startStint = null;
             var fuelCh = new ChannelStatusDto { ChannelId = 12, Value = 15f };
             foreach (var t in tuples)
             {
@@ -105,7 +105,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
                 Tuple.Create(DateTime.Parse("7/4/2021 2:00:19.0 pm"), new ChannelStatusDto { ChannelId = 78, Value = 60 }, default(DateTime)),
             };
 
-            var currentStint = new FuelRangeStint { Start = DateTime.Parse("7/4/2021 1:00:00.0 pm"), End = DateTime.Parse("7/4/2021 2:00:00.0 pm") };
+            var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 1:00:00.0 pm"), End = DateTime.Parse("7/4/2021 2:00:00.0 pm") };
             var fuelCh = new ChannelStatusDto { ChannelId = 12, Value = 15f };
             foreach (var t in tuples)
             {
@@ -158,7 +158,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
                 Tuple.Create<DateTime, ChannelStatusDto, ChannelStatusDto, DateTime?>(DateTime.Parse("7/4/2021 3:00:21.0 pm"), new ChannelStatusDto { ChannelId = 78, Value = 0 }, new ChannelStatusDto { ChannelId = 12, Value = 14.4f }, null),                Tuple.Create<DateTime, ChannelStatusDto, ChannelStatusDto, DateTime?>(DateTime.Parse("7/4/2021 3:00:22.0 pm"), new ChannelStatusDto { ChannelId = 78, Value = 1 }, new ChannelStatusDto { ChannelId = 12, Value = 18.8f }, null),
             };
 
-            var currentStint = new FuelRangeStint { Start = DateTime.Parse("7/4/2021 2:00:00.0 pm"), End = null };
+            var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 2:00:00.0 pm"), End = null };
             foreach (var t in tuples)
             {
                 dtMock.Setup(p => p.UtcNow).Returns(t.Item1);
@@ -199,7 +199,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
                 Tuple.Create(DateTime.Parse("7/4/2021 2:03:49.0 pm"), new ChannelStatusDto { ChannelId = 78, Value = 60 }, false),
             };
 
-            var currentStint = new FuelRangeStint { Start = DateTime.Parse("7/4/2021 1:00:00.0 pm"), End = DateTime.Parse("7/4/2021 2:00:00.0 pm") };
+            var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 1:00:00.0 pm"), End = DateTime.Parse("7/4/2021 2:00:00.0 pm") };
             var fuelCh = new ChannelStatusDto { ChannelId = 12, Value = 15f };
             foreach (var t in tuples)
             {

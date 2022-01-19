@@ -1,13 +1,12 @@
-﻿using BigMission.Cache;
-using BigMission.Cache.FuelRange;
+﻿using BigMission.Cache.Models.Flags;
+using BigMission.Cache.Models.FuelRange;
+using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
-using BigMission.RaceManagement;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using NLog;
-using NUglify.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -77,11 +76,11 @@ namespace BigMission.FuelStatistics
 
                         // Remove deleted
                         var expiredEvents = eventSubscriptions.Keys.Except(eventIds);
-                        expiredEvents.ForEach(e =>
+                        foreach(var ee in expiredEvents)
                         {
-                            Logger.Info($"Removing event subscription {e}");
-                            eventSubscriptions.Remove(e);
-                        });
+                            Logger.Info($"Removing event subscription {ee}");
+                            eventSubscriptions.Remove(ee);
+                        }
 
                         lastSubCheck = dateTimeHelper.UtcNow;
                     }
@@ -99,18 +98,18 @@ namespace BigMission.FuelStatistics
                     Logger.Error(ex, "Error polling subscriptions");
                 }
 
-                await Task.Delay(commitInterval);
+                await Task.Delay(commitInterval, stoppingToken);
             }
         }
 
-        private async Task<RaceEventSettings[]> LoadEventSettings()
+        private async Task<RaceEventSetting[]> LoadEventSettings()
         {
             try
             {
                 var events = await dataContext.GetEventSettings();
 
                 // Filter by subscription time
-                var activeSubscriptions = new List<RaceEventSettings>();
+                var activeSubscriptions = new List<RaceEventSetting>();
                 foreach (var evt in events)
                 {
                     // Get the local time zone info if available
@@ -145,7 +144,7 @@ namespace BigMission.FuelStatistics
             {
                 Logger.Error(ex, "Unable to load events");
             }
-            return new RaceEventSettings[0];
+            return new RaceEventSetting[0];
         }
 
         public async Task UpdateLaps(int eventId, List<Lap> laps)
@@ -173,7 +172,7 @@ namespace BigMission.FuelStatistics
             await Task.WhenAll(eventTasks);
         }
 
-        public async Task ProcessStintOverride(FuelRangeUpdate stint)
+        public async Task ProcessStintOverride(RangeUpdate stint)
         {
             var eventTasks = eventSubscriptions.Values.Select(async (evt) =>
             {

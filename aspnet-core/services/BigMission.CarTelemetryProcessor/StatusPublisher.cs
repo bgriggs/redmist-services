@@ -1,7 +1,8 @@
-﻿using BigMission.Cache;
+﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
 
@@ -33,7 +34,9 @@ namespace BigMission.CarTelemetryProcessor
             {
                 // Reset time to server time to prevent timeouts when data is being updated.
                 ch.Timestamp = DateTime.UtcNow;
-                kvps.Add(ChannelContext.CreateChannelStatusCacheEntry(ch));
+                var v = JsonConvert.SerializeObject(ch);
+                var p = new KeyValuePair<RedisKey, RedisValue>(string.Format(Consts.CHANNEL_KEY, ch.ChannelId), v);
+                kvps.Add(p);
             }
 
             var db = cacheMuxer.GetDatabase();

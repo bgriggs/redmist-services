@@ -35,7 +35,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\common\BigMission.Cache\BigMission.Cache.csproj" />
+		<ProjectReference Include="..\..\common\BigMission.Cache.Models\BigMission.Cache.Models.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.CommandTools\BigMission.CommandTools.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.Database\BigMission.Database.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.TestHelpers\BigMission.TestHelpers.csproj" />

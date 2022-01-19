@@ -1,7 +1,6 @@
-﻿using BigMission.RaceManagement;
+﻿using BigMission.Database.Models;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics
@@ -22,12 +21,12 @@ namespace BigMission.FuelStatistics
         Task EndBatch();
 
         Task<List<Lap>> GetSavedLaps(int eventId);
-        Task<List<FuelRangeSettings>> GetFuelRangeSettings(int[] carIds);
+        Task<List<FuelRangeSetting>> GetFuelRangeSettings(int[] carIds);
         Task<List<DeviceAppConfig>> GetDeviceAppConfig(int[] carIds);
-        Task<List<Teams.Car>> GetCars(int[] carIds);
+        Task<List<BigMission.Database.Models.Car>> GetCars(int[] carIds);
         Task<List<ChannelMapping>> GetChannelMappings(int[] deviceAppIds, string[] channelNames);
         Task<List<FuelRangeStint>> GetTeamStints(int teamId, int eventId);
-        Task<List<RaceEventSettings>> GetEventSettings();
+        Task<List<RaceEventSetting>> GetEventSettings();
 
         Task UpdateCarStatus(Car car, int eventId);
         Task<DateTime?> CheckReload(int teamId);

@@ -1,11 +1,6 @@
 ﻿using BigMission.FuelStatistics.FuelRange;
-using BigMission.RaceManagement;
-using BigMission.TestHelpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Moq;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
 namespace BigMission.FuelStatistics.Tests.FuelRange
@@ -24,7 +19,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var lapTriggers = new LapDataTriggers();
-            FuelRangeStint startStint = null;
+            Cache.Models.FuelRange.Stint startStint = null;
             foreach(var d in data)
             {
                 var result = lapTriggers.ProcessLap(d.Item1, startStint);
@@ -48,7 +43,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var lapTriggers = new LapDataTriggers();
-            var currentStint = new FuelRangeStint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = DateTime.Parse("7/4/2021 8:00:00.0 am") };
+            var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = DateTime.Parse("7/4/2021 8:00:00.0 am") };
             foreach (var d in data)
             {
                 var result = lapTriggers.ProcessLap(d.Item1, currentStint);
@@ -71,7 +66,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var lapTriggers = new LapDataTriggers();
-            var currentStint = new FuelRangeStint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = null };
+            var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = null };
             foreach (var d in data)
             {
                 var result = lapTriggers.ProcessLap(d.Item1, currentStint);
@@ -89,7 +84,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             };
 
             var lapTriggers = new LapDataTriggers();
-            var currentStint = new FuelRangeStint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = null };
+            var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = null };
             foreach (var d in data)
             {
                 var result = lapTriggers.ProcessLap(d.Item1, currentStint);
