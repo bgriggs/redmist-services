@@ -35,7 +35,6 @@ namespace BigMission.RaceHeroAggregator
             BEST_LAP
         };
 
-        private ILogger Logger { get; }
         private IConfiguration Config { get; }
         private IDateTimeHelper DateTime { get; }
         public int CarId { get; set; }
@@ -43,9 +42,8 @@ namespace BigMission.RaceHeroAggregator
         public ChannelMapping[] VirtualChannels { get; private set; }
         private readonly ConnectionMultiplexer cacheMuxer;
 
-        public CarSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime)
+        public CarSubscription(IConfiguration config, ConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime)
         {
-            Logger = logger;
             Config = config;
             this.cacheMuxer = cacheMuxer;
             DateTime = dateTime;
@@ -59,9 +57,9 @@ namespace BigMission.RaceHeroAggregator
         {
             using var db = new RedMist(Config["ConnectionString"]);
             VirtualChannels = await (from d in db.DeviceAppConfigs
-                                  join m in db.ChannelMappings on d.Id equals m.DeviceAppId
-                                  where d.CarId == CarId && m.IsVirtual && !d.IsDeleted && RaceHeroChannelNames.Contains(m.ReservedName)
-                                  select m).ToArrayAsync();
+                                     join m in db.ChannelMappings on d.Id equals m.DeviceAppId
+                                     where d.CarId == CarId && m.IsVirtual && !d.IsDeleted && RaceHeroChannelNames.Contains(m.ReservedName)
+                                     select m).ToArrayAsync();
         }
 
         public async Task ProcessUpdate(Racer[] racers)

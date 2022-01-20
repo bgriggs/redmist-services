@@ -1,5 +1,4 @@
-﻿using BigMission.Cache.Models.Flags;
-using BigMission.Cache.Models.FuelRange;
+﻿using BigMission.Cache.Models.FuelRange;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;

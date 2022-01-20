@@ -111,7 +111,7 @@ namespace BigMission.RaceHeroAggregator
 
             foreach (var c in newCars)
             {
-                var cs = new CarSubscription(Logger, Config, cacheMuxer, DateTime) { CarId = c.Id, CarNumber = c.Number };
+                var cs = new CarSubscription(Config, cacheMuxer, DateTime) { CarId = c.Id, CarNumber = c.Number };
                 subscriberCars.Add(cs);
                 await cs.InitializeChannels();
             }
