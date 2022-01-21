@@ -15,11 +15,11 @@ namespace BigMission.AlarmProcessor
     {
         public CarAlarm Alarm { get; }
         public string ConnectionString { get; }
-        private readonly List<ConditionStatus> conditionStatus = new List<ConditionStatus>();
+        private readonly List<ConditionStatus> conditionStatus = new();
         private ILogger Logger { get; }
         private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly RedMist context;
-        private readonly Dictionary<int, int[]> deviceToChannelMappings;
+        private readonly Func<int, Task<int>> getDeviceId;
+        //private readonly Dictionary<int, int[]> deviceToChannelMappings;
         public const string HIGHLIGHT_COLOR = "HighlightColor";
 
         public string AlarmGroup
@@ -36,15 +36,14 @@ namespace BigMission.AlarmProcessor
         private const string ANY = "Any";
 
 
-        public AlarmStatus(CarAlarm alarm, string connectionString, ILogger logger, ConnectionMultiplexer cacheMuxer, Dictionary<int, int[]> deviceToChannelMappings)
+        public AlarmStatus(CarAlarm alarm, string connectionString, ILogger logger, ConnectionMultiplexer cacheMuxer, Func<int, Task<int>> getDeviceId)
         {
             Alarm = alarm ?? throw new ArgumentNullException();
             ConnectionString = connectionString ?? throw new ArgumentNullException();
             Logger = logger ?? throw new ArgumentNullException();
             this.cacheMuxer = cacheMuxer ?? throw new ArgumentNullException();
-            this.deviceToChannelMappings = deviceToChannelMappings;
-
-            context = new RedMist(connectionString);
+            this.getDeviceId = getDeviceId;
+            //this.deviceToChannelMappings = deviceToChannelMappings;
 
             InitializeConditions(alarm.AlarmConditions.ToArray());
         }
@@ -115,6 +114,7 @@ namespace BigMission.AlarmProcessor
             var rv = await cache.StringGetAsync(alarmKey);
 
             // Turn alarm off if it's active
+            using var context = new RedMist(ConnectionString);
             if (rv.HasValue && !alarmOn)
             {
                 Logger.Trace($"Alarm {Alarm.Name} turning off");
@@ -167,7 +167,7 @@ namespace BigMission.AlarmProcessor
                         // At the moment, use the first condition's channel
                         var ch = Alarm.AlarmConditions.First();
                         var cache = cacheMuxer.GetDatabase();
-                        var deviceAppId = GetDeviceAppId(ch.ChannelId);
+                        var deviceAppId = await getDeviceId(ch.ChannelId);
                         await cache.HashSetAsync(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString(), trigger.Color);
                         Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
                     }
@@ -199,7 +199,7 @@ namespace BigMission.AlarmProcessor
                         // At the moment, use the first condition's channel
                         var ch = Alarm.AlarmConditions.First();
                         var cache = cacheMuxer.GetDatabase();
-                        var deviceAppId = GetDeviceAppId(ch.ChannelId);
+                        var deviceAppId = await getDeviceId(ch.ChannelId);
                         await cache.HashDeleteAsync(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString());
                         Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
                     }
@@ -217,16 +217,16 @@ namespace BigMission.AlarmProcessor
             await UpdateStatus(alarmOn: false, applyTriggers: false);
         }
 
-        private int GetDeviceAppId(int channelId)
-        {
-            foreach(var kvp in deviceToChannelMappings)
-            {
-                if (kvp.Value.Contains(channelId))
-                {
-                    return kvp.Key;
-                }
-            }
-            return 0;
-        }
+        //private int GetDeviceAppId(int channelId)
+        //{
+        //    foreach (var kvp in deviceToChannelMappings)
+        //    {
+        //        if (kvp.Value.Contains(channelId))
+        //        {
+        //            return kvp.Key;
+        //        }
+        //    }
+        //    return 0;
+        //}
     }
 }

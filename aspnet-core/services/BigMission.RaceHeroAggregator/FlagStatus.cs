@@ -55,7 +55,7 @@ namespace BigMission.RaceHeroAggregator
 
                     // Save changes
                     var cacheTask = UpdateCache();
-                    db.Update(currentFlag);
+                    db.Update(ConvertFlag(currentFlag));
                     db.EventFlags.Add(ConvertFlag(ef));
                     await db.SaveChangesAsync();
                     await cacheTask;
@@ -74,7 +74,7 @@ namespace BigMission.RaceHeroAggregator
                 // Save changes
                 var cacheTask = UpdateCache();
                 using var db = new RedMist(Config["ConnectionString"]);
-                db.Update(currentFlag);
+                db.Update(ConvertFlag(currentFlag));
                 await db.SaveChangesAsync();
                 await cacheTask;
                 Logger.Trace($"Saved event {eventId} end");

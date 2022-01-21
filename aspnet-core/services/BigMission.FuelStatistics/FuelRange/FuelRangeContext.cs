@@ -14,13 +14,13 @@ namespace BigMission.FuelStatistics.FuelRange
 {
     internal class FuelRangeContext : IFuelRangeContext
     {
-        private RedMist Database { get; }
+        private string ConnectionString { get; }
         private ConnectionMultiplexer CacheMuxer { get; }
         private readonly IMapper objectMapper;
 
-        public FuelRangeContext(RedMist database, ConnectionMultiplexer cacheMuxer)
+        public FuelRangeContext(string connectionString, ConnectionMultiplexer cacheMuxer)
         {
-            Database = database;
+            ConnectionString = connectionString;
             CacheMuxer = cacheMuxer;
             var mapperConfiguration = new MapperConfiguration(cfg => 
             {
@@ -55,8 +55,9 @@ namespace BigMission.FuelStatistics.FuelRange
         public async Task<Cache.Models.FuelRange.Stint> SaveTeamStint(Cache.Models.FuelRange.Stint stint)
         {
             var dbstint = objectMapper.Map<FuelRangeStint>(stint);
-            Database.FuelRangeStints.Add(dbstint);
-            await Database.SaveChangesAsync();
+            using var db = new RedMist(ConnectionString);
+            db.FuelRangeStints.Add(dbstint);
+            await db.SaveChangesAsync();
             return stint;
         }
 
@@ -86,8 +87,10 @@ namespace BigMission.FuelStatistics.FuelRange
                 if (stints.Count > 0)
                 {
                     // Save to DB
-                    Database.UpdateRange(stints);
-                    await Database.SaveChangesAsync();
+                    var dbstints = objectMapper.Map<List<FuelRangeStint>>(stints);
+                    using var db = new RedMist(ConnectionString);
+                    db.UpdateRange(dbstints);
+                    await db.SaveChangesAsync();
                 }
             }
         }
