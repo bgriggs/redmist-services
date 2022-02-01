@@ -5,6 +5,7 @@
 		<TargetFramework>net6.0</TargetFramework>
 		<AssemblyName>BigMission.DeviceAppServiceStatusProcessor</AssemblyName>
 		<RootNamespace>BigMission.DeviceAppServiceStatusProcessor</RootNamespace>
+		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
 	</PropertyGroup>
 
 	<ItemGroup>
