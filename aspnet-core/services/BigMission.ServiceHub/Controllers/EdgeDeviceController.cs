@@ -3,6 +3,8 @@ using BigMission.Database;
 using BigMission.Database.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace BigMission.ServiceHub.Controllers
@@ -23,7 +25,7 @@ namespace BigMission.ServiceHub.Controllers
 
 
         [HttpGet(Name = nameof(DeviceCanAppConfiguration))]
-        public MasterConfiguration DeviceCanAppConfiguration()
+        public async Task<MasterConfiguration> DeviceCanAppConfiguration()
         {
             var nameClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
             if (nameClaim == null)
@@ -37,17 +39,65 @@ namespace BigMission.ServiceHub.Controllers
 
             using var db = new RedMist(Config["ConnectionString"]);
 
-            var deviceAppConfig = db.DeviceAppConfigs.FirstOrDefault(d => d.DeviceAppKey == authData.appId);
+            var deviceAppConfig = await db.DeviceAppConfigs.FirstOrDefaultAsync(d => d.DeviceAppKey == authData.appId);
             if (deviceAppConfig != null)
             {
-                master.BaseConfig = db.CanAppConfigs.FirstOrDefault(c => c.DeviceAppId == deviceAppConfig.Id);
-                master.ChannelMappings = db.ChannelMappings.Where(c => c.DeviceAppId == deviceAppConfig.Id)?.ToArray();
-                master.FuelSettings = db.FuelCarAppSettings.FirstOrDefault(f => f.DeviceAppId == deviceAppConfig.Id) ?? new FuelCarAppSetting();
-                master.KeypadSettings = db.KeypadCarAppConfigs.FirstOrDefault(k => k.DeviceAppId == deviceAppConfig.Id);
+                master.BaseConfig = await db.CanAppConfigs.FirstOrDefaultAsync(c => c.DeviceAppId == deviceAppConfig.Id);
+                master.ChannelMappings = await db.ChannelMappings.Where(c => c.DeviceAppId == deviceAppConfig.Id).ToArrayAsync();
+                master.FuelSettings = await db.FuelCarAppSettings.FirstOrDefaultAsync(f => f.DeviceAppId == deviceAppConfig.Id) ?? new FuelCarAppSetting();
+                master.KeypadSettings = await db.KeypadCarAppConfigs.FirstOrDefaultAsync(k => k.DeviceAppId == deviceAppConfig.Id);
+
+                //var kps = await (from k in db.KeypadCarAppConfigs
+                //                 join mr in db.KeypadCarAppMomentaryButtonRules on k.Id equals mr.KeypadId
+                //                 join cr in db.KeypadCarAppCanStateRules on k.Id equals cr.KeypadId
+                //                 select new { k, mr, cr }).ToArrayAsync();
+
                 if (master.KeypadSettings != null)
                 {
-                    master.KeypadSettings.MomentaryButtonRules = db.KeypadCarAppMomentaryButtonRules.Where(k => k.KeypadId == master.KeypadSettings.Id)?.ToArray();
-                    master.KeypadSettings.CanStateRules = db.KeypadCarAppCanStateRules.Where(k => master.KeypadSettings.Id == k.KeypadId)?.ToArray();
+                    var kpId = master.KeypadSettings.Id;
+
+                    // Load with manual SQL since EF is failing on an error on column that is non-existant
+                    using var conn = new SqlConnection(Config["ConnectionString"]);
+                    await conn.OpenAsync();
+                    var cmd = new SqlCommand($"SELECT CanId,Offset,Length,Value,ButtonNumber,LedNumber,Blink FROM KeypadCarAppCanStateRules WHERE KeypadId={kpId}", conn);
+                    var crs = new List<KeypadCarAppCanStateRule>();
+                    using var creader = await cmd.ExecuteReaderAsync();
+                    while (creader.Read())
+                    {
+                        crs.Add(new KeypadCarAppCanStateRule
+                        {
+                            KeypadId = kpId,
+                            CanId = creader.GetInt32(0),
+                            Offset = creader.GetInt32(1),
+                            Length = creader.GetInt32(2),
+                            Value = creader.GetInt32(3),
+                            ButtonNumber = creader.GetInt32(4),
+                            LedNumber = creader.GetInt32(5),
+                            Blink = creader.GetInt32(6),
+                        });
+                    }
+                    await creader.CloseAsync();
+
+                    master.KeypadSettings.CanStateRules = crs.ToArray();
+
+                    cmd = new SqlCommand($"SELECT ButtonNumber,LedNumber,Blink FROM KeypadCarAppMomentaryButtonRules WHERE KeypadId={kpId}", conn);
+                    var mrs = new List<KeypadCarAppMomentaryButtonRule>();
+                    using var mreader = await cmd.ExecuteReaderAsync();
+                    while (mreader.Read())
+                    {
+                        mrs.Add(new KeypadCarAppMomentaryButtonRule
+                        {
+                            KeypadId = kpId,
+                            ButtonNumber = mreader.GetInt32(0),
+                            LedNumber = mreader.GetInt32(1),
+                            Blink = mreader.GetInt32(2),
+                        });
+                    }
+                    await mreader.CloseAsync();
+                    master.KeypadSettings.MomentaryButtonRules = mrs.ToArray();
+
+                    //master.KeypadSettings.MomentaryButtonRules = await db2.KeypadCarAppMomentaryButtonRules.Where(k => k.KeypadId == kpId).ToArrayAsync();
+                    //master.KeypadSettings.CanStateRules = await db2.KeypadCarAppCanStateRules.Where(k => k.KeypadId == kpId).ToArrayAsync();
                 }
                 else
                 {
