@@ -8,6 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Content Remove="nlog - Copy.Production.config" />
 	  <Content Remove="nlog.config" />
 	  <Content Remove="nlog.Production.config" />
 	</ItemGroup>
@@ -17,10 +18,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Include="nlog.config">
+	  <None Include="NLog.config">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
-	  <None Include="nlog.Production.config">
+	  <None Include="NLog.Production.config">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
 	</ItemGroup>
