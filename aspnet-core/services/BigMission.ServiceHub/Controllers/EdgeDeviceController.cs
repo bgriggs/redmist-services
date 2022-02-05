@@ -47,11 +47,6 @@ namespace BigMission.ServiceHub.Controllers
                 master.FuelSettings = await db.FuelCarAppSettings.FirstOrDefaultAsync(f => f.DeviceAppId == deviceAppConfig.Id) ?? new FuelCarAppSetting();
                 master.KeypadSettings = await db.KeypadCarAppConfigs.FirstOrDefaultAsync(k => k.DeviceAppId == deviceAppConfig.Id);
 
-                //var kps = await (from k in db.KeypadCarAppConfigs
-                //                 join mr in db.KeypadCarAppMomentaryButtonRules on k.Id equals mr.KeypadId
-                //                 join cr in db.KeypadCarAppCanStateRules on k.Id equals cr.KeypadId
-                //                 select new { k, mr, cr }).ToArrayAsync();
-
                 if (master.KeypadSettings != null)
                 {
                     var kpId = master.KeypadSettings.Id;
