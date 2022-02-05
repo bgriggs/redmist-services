@@ -33,6 +33,7 @@ namespace BigMission.FuelStatistics
         private readonly IFuelRangeContext fuelRangeContext;
         private readonly IFlagContext flagContext;
 
+
         public Event(RaceEventSetting settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, 
             IFuelRangeContext fuelRangeContext, IFlagContext flagContext)
         {

@@ -22,7 +22,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             Cache.Models.FuelRange.Stint startStint = null;
             foreach(var d in data)
             {
-                var result = lapTriggers.ProcessLap(d.Item1, startStint);
+                var result = LapDataTriggers.ProcessLap(d.Item1, startStint);
                 Assert.AreEqual(d.Item2, result.Start);
 
                 if (result.Start > default(DateTime))
@@ -46,7 +46,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = DateTime.Parse("7/4/2021 8:00:00.0 am") };
             foreach (var d in data)
             {
-                var result = lapTriggers.ProcessLap(d.Item1, currentStint);
+                var result = LapDataTriggers.ProcessLap(d.Item1, currentStint);
                 Assert.AreEqual(d.Item2, result.Start);
 
                 if (result.Start > default(DateTime))
@@ -69,7 +69,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = null };
             foreach (var d in data)
             {
-                var result = lapTriggers.ProcessLap(d.Item1, currentStint);
+                var result = LapDataTriggers.ProcessLap(d.Item1, currentStint);
                 Assert.AreEqual(d.Item2, result.End);
             }
         }
@@ -87,7 +87,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var currentStint = new Cache.Models.FuelRange.Stint { Start = DateTime.Parse("7/4/2021 7:00:00.0 am"), End = null };
             foreach (var d in data)
             {
-                var result = lapTriggers.ProcessLap(d.Item1, currentStint);
+                var result = LapDataTriggers.ProcessLap(d.Item1, currentStint);
                 Assert.AreEqual(d.Item2, result.End);
             }
         }

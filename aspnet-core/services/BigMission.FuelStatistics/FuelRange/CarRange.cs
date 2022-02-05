@@ -106,7 +106,7 @@ namespace BigMission.FuelStatistics.FuelRange
                     }
 
                     var currentStint = stints.LastOrDefault();
-                    var updatedStint = lapDataTriggers.ProcessLap(lap, currentStint);
+                    var updatedStint = LapDataTriggers.ProcessLap(lap, currentStint);
                     if (updatedStint != null)
                     {
                         // Apply changes from laps when telemetry is not in use or not available

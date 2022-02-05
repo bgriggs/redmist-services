@@ -18,6 +18,7 @@ namespace BigMission.FuelStatistics.FuelRange
         private ConnectionMultiplexer CacheMuxer { get; }
         private readonly IMapper objectMapper;
 
+
         public FuelRangeContext(string connectionString, ConnectionMultiplexer cacheMuxer)
         {
             ConnectionString = connectionString;
@@ -29,7 +30,6 @@ namespace BigMission.FuelStatistics.FuelRange
             });
             objectMapper = mapperConfiguration.CreateMapper();
         }
-
 
 
         public Task<List<Cache.Models.FuelRange.Stint>> GetTeamStints(int teamId, int eventId)

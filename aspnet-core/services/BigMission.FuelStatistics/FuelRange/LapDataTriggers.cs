@@ -9,7 +9,7 @@ namespace BigMission.FuelStatistics.FuelRange
     /// </summary>
     public class LapDataTriggers
     {
-        public Cache.Models.FuelRange.Stint ProcessLap(Lap lap, Cache.Models.FuelRange.Stint currentStint)
+        public static Cache.Models.FuelRange.Stint ProcessLap(Lap lap, Cache.Models.FuelRange.Stint currentStint)
         {
             var stintUpdates = new Cache.Models.FuelRange.Stint();
 

@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -67,7 +66,7 @@ namespace BigMission.FuelStatistics
                     Logger.Error(ex, "Error checking for laps to process");
                 }
 
-                await Task.Delay(lapCheckInterval);
+                await Task.Delay(lapCheckInterval, stoppingToken);
             }
         }
 
