@@ -46,6 +46,10 @@ namespace BigMission.ServiceHub.Controllers
                 master.ChannelMappings = await db.ChannelMappings.Where(c => c.DeviceAppId == deviceAppConfig.Id).ToArrayAsync();
                 master.FuelSettings = await db.FuelCarAppSettings.FirstOrDefaultAsync(f => f.DeviceAppId == deviceAppConfig.Id) ?? new FuelCarAppSetting();
                 master.KeypadSettings = await db.KeypadCarAppConfigs.FirstOrDefaultAsync(k => k.DeviceAppId == deviceAppConfig.Id);
+                if (deviceAppConfig.CarId.HasValue)
+                {
+                    master.TpmsSettings = await db.TpmsConfigs.FirstOrDefaultAsync(k => k.CarId == deviceAppConfig.CarId);
+                }
 
                 if (master.KeypadSettings != null)
                 {

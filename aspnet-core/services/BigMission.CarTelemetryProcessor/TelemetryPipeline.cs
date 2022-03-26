@@ -58,7 +58,14 @@ namespace BigMission.CarTelemetryProcessor
             if (telemetryData != null)
             {
                 Logger.Debug($"Received telemetry from: '{telemetryData.DeviceAppId}'");
-                await producer.SendAsync(telemetryData);
+                if (telemetryData.Data != null)
+                {
+                    await producer.SendAsync(telemetryData);
+                }
+                else
+                {
+                    Logger.Debug($"Skipping empty data from: '{telemetryData.DeviceAppId}'");
+                }
             }
         }
     }

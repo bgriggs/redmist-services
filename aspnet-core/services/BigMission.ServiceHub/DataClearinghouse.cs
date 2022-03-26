@@ -18,7 +18,7 @@ namespace BigMission.ServiceHub
         private readonly ConnectionMultiplexer cacheMuxer;
         private readonly int maxLogListLength = 100;
         private readonly TimeSpan logLengthTrim = TimeSpan.FromSeconds(30);
-        private readonly Dictionary<Guid, DateTime> logLastTrims = new Dictionary<Guid, DateTime>();
+        private readonly Dictionary<Guid, DateTime> logLastTrims = new();
 
 
         public DataClearinghouse(IConfiguration config, NLog.ILogger logger, IDateTimeHelper dateTime)
