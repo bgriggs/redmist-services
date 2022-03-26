@@ -65,12 +65,6 @@ namespace BigMission.AlarmProcessor
                 await LoadDeviceChannels(stoppingToken);
             });
 
-            await sub.SubscribeAsync(Consts.CAR_CHANNEL_CONFIG_CHANGED_SUB, async (channel, message) =>
-            {
-                Logger.Info("Channel configuration notification received");
-                await LoadDeviceChannels(stoppingToken);
-            });
-
             await sub.SubscribeAsync(Consts.CAR_ALARM_CONFIG_CHANGED_SUB, async (channel, message) =>
             {
                 Logger.Info("Alarm configuration notification received");

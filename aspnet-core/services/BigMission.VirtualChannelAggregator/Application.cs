@@ -62,11 +62,6 @@ namespace BigMission.VirtualChannelAggregator
                 Logger.Info("Car device app configuration notification received");
                 await InitDeviceClients();
             });
-            await sub.SubscribeAsync(Consts.CAR_CHANNEL_CONFIG_CHANGED_SUB, async (channel, message) =>
-            {
-                Logger.Info("Channel configuration notification received");
-                await InitDeviceClients();
-            });
 
             // Process changes from stream and cache them here in the service
             await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>

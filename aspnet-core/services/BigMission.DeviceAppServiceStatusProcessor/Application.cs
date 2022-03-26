@@ -51,6 +51,35 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                 await HandleHeartbeat(message);
             });
 
+            // Watch for changes in device app configuraiton such as channels
+            await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
+            {
+                if (int.TryParse(message, out int deviceId))
+                {
+                    Logger.Info("Car device app configuration notification received.  Sending command to restart car device application.");
+                    using var db = new RedMist(Config["ConnectionString"]);
+                    var deviceApp = db.DeviceAppConfigs.FirstOrDefault(d => d.Id == deviceId);
+                    if (deviceApp != null)
+                    {
+                        var cmd = new Command
+                        {
+                            CommandType = CommandTypes.RESTART,
+                            DestinationId = deviceApp.DeviceAppKey.ToString(),
+                            Timestamp = DateTime.UtcNow
+                        };
+                        await Commands.SendCommandAsync(cmd, new Guid(cmd.DestinationId));
+                    }
+                    else
+                    {
+                        Logger.Warn($"Unable to prompt device app configuration because of missing device ID for {deviceId}");
+                    }
+                }
+                else
+                {
+                    Logger.Warn($"Unable to prompt device app configuration because of missing device ID: {message}");
+                }
+            });
+
             Logger.Info("Started");
         }
 
