@@ -61,10 +61,20 @@ namespace BigMission.FuelStatistics.FuelRange
 
             // Set end times to simplify logic
             var stintEnd = stint.End ?? dateTimeHelper.UtcNow;
+            if (stint.EndOverride.HasValue)
+            {
+                stintEnd = stint.EndOverride.Value;
+            }
             var flagEnd = flag.End ?? dateTimeHelper.UtcNow;
 
+            var stintStart = stint.Start;
+            if (stint.StartOverride.HasValue)
+            {
+                stintStart = stint.StartOverride.Value;
+            }
+
             // Flag starts during the stint
-            if (flag.Start >= stint.Start && flag.Start < stintEnd)
+            if (flag.Start >= stintStart && flag.Start < stintEnd)
             {
                 // STINT |--------------------------------|
                 // FLAG          |------------|
@@ -80,19 +90,19 @@ namespace BigMission.FuelStatistics.FuelRange
                 }
             }
             // Flag started before the stint
-            else if (flag.Start < stint.Start && flagEnd > stint.Start)
+            else if (flag.Start < stintStart && flagEnd > stintStart)
             {
                 // STINT    |--------------|
                 // FLAG  |-------------|
                 if (flagEnd < stintEnd)
                 {
-                    duration += (flagEnd - stint.Start).TotalMinutes;
+                    duration += (flagEnd - stintStart).TotalMinutes;
                 }
                 // STINT    |--------------|
                 // FLAG  |--------------------|
                 else
                 {
-                    duration += (stintEnd - stint.Start).TotalMinutes;
+                    duration += (stintEnd - stintStart).TotalMinutes;
                 }
             }
 

@@ -95,5 +95,12 @@ namespace BigMission.FuelStatistics.FuelRange
                 }
             }
         }
+
+        public async Task ClearCachedTeamStints(int teamId)
+        {
+            var cache = CacheMuxer.GetDatabase();
+            var key = string.Format(Consts.FUEL_RANGE_STATUS, teamId);
+            await cache.KeyDeleteAsync(key, CommandFlags.FireAndForget);
+        }
     }
 }

@@ -43,6 +43,7 @@ namespace BigMission.FuelStatistics
                         {
                             try
                             {
+                                // This is a bug if there is ever more than one consumer looking for laps for the same event.. Convert to Data Flow?
                                 var laps = await dataContext.PopEventLaps(evt);
                                 if (laps.Any())
                                 {

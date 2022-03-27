@@ -18,6 +18,7 @@ namespace BigMission.FuelStatistics
     public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsumer, IStintOverrideConsumer
     {
         private ILogger Logger { get; set; }
+        public IDateTimeHelper DateTime { get; }
 
         public int[] EventIds
         {
@@ -28,19 +29,18 @@ namespace BigMission.FuelStatistics
         private readonly TimeSpan commitInterval;
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
-        private readonly IDateTimeHelper dateTimeHelper;
         private readonly IFlagContext flagContext;
-        private readonly Dictionary<int, Event> eventSubscriptions = new Dictionary<int, Event>();
+        private readonly Dictionary<int, Event> eventSubscriptions = new();
 
 
         public EventService(IConfiguration configuration, ILogger logger, IDataContext dataContext, IFuelRangeContext fuelRangeContext, 
-            IDateTimeHelper dateTimeHelper, IFlagContext flagContext)
+            IFlagContext flagContext, IDateTimeHelper dateTime)
         {
             Logger = logger;
             this.dataContext = dataContext;
             this.fuelRangeContext = fuelRangeContext;
-            this.dateTimeHelper = dateTimeHelper;
             this.flagContext = flagContext;
+            DateTime = dateTime;
             subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EventSubscriptionCheckMs"]));
             commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EventCommitMs"]));
         }
@@ -53,7 +53,7 @@ namespace BigMission.FuelStatistics
             {
                 try
                 {
-                    if ((dateTimeHelper.UtcNow - lastSubCheck) >= subCheckInterval)
+                    if ((DateTime.UtcNow - lastSubCheck) >= subCheckInterval)
                     {
                         var eventSettings = await LoadEventSettings();
                         Logger.Info($"Loaded {eventSettings.Length} event subscriptions.");
@@ -65,12 +65,13 @@ namespace BigMission.FuelStatistics
                             var eventId = int.Parse(settings.RaceHeroEventId);
                             if (!eventSubscriptions.TryGetValue(eventId, out Event e))
                             {
-                                e = new Event(settings, Logger, new DateTimeHelper(), dataContext, fuelRangeContext, flagContext);
+                                e = new Event(settings, Logger, DateTime, dataContext, fuelRangeContext, flagContext);
                                 await e.Initialize();
                                 eventSubscriptions[eventId] = e;
-
-                                // Clear event in cache
+                                
+                                // Clear event in cache since an event can have multiple runs
                                 await dataContext.ClearCachedEvent(e.RhEventId);
+                                await fuelRangeContext.ClearCachedTeamStints(settings.TenantId);
                             }
                         }
 
@@ -82,7 +83,7 @@ namespace BigMission.FuelStatistics
                             eventSubscriptions.Remove(ee);
                         }
 
-                        lastSubCheck = dateTimeHelper.UtcNow;
+                        lastSubCheck = DateTime.UtcNow;
                     }
 
                     // Process event stint changes
@@ -144,7 +145,7 @@ namespace BigMission.FuelStatistics
             {
                 Logger.Error(ex, "Unable to load events");
             }
-            return new RaceEventSetting[0];
+            return Array.Empty<RaceEventSetting>();
         }
 
         public async Task UpdateLaps(int eventId, List<Lap> laps)
@@ -182,7 +183,7 @@ namespace BigMission.FuelStatistics
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error processing car telemetry.");
+                    Logger.Error(ex, "Error processing stint override.");
                 }
             });
 

@@ -36,9 +36,9 @@ namespace BigMission.FuelStatistics.FuelRange
 
         private List<Cache.Models.FuelRange.Stint> stints = new();
         private readonly HashSet<Lap> laps = new();
-        private readonly LapDataTriggers lapDataTriggers;
         private readonly TelemetryTriggers telemetryTriggers;
         private readonly FlagDurationUtils flagUtils;
+        private List<Cache.Models.Flags.EventFlag> currentFlags;
         private readonly IFuelRangeContext fuelRangeContext;
 
 
@@ -46,7 +46,6 @@ namespace BigMission.FuelStatistics.FuelRange
         {
             this.settings = settings;
             CarId = settings.CarId;
-            lapDataTriggers = new LapDataTriggers();
             telemetryTriggers = new TelemetryTriggers(dateTimeHelper);
             flagUtils = new FlagDurationUtils(dateTimeHelper);
             this.fuelRangeContext = fuelRangeContext;
@@ -182,6 +181,7 @@ namespace BigMission.FuelStatistics.FuelRange
 
         public bool ApplyEventFlags(List<Cache.Models.Flags.EventFlag> flags)
         {
+            currentFlags = flags;
             return flagUtils.UpdateStintFlagDurations(flags, ref stints);
         }
 
@@ -261,6 +261,12 @@ namespace BigMission.FuelStatistics.FuelRange
                 }
             }
 
+            // Realign flag states since user can override the timeframe of stints
+            if (changed)
+            {
+                flagUtils.UpdateStintFlagDurations(currentFlags, ref stints);
+            }
+
             return Task.FromResult(changed);
         }
 
@@ -300,7 +306,7 @@ namespace BigMission.FuelStatistics.FuelRange
                 }
             }
 
-            // Calc fule range
+            // Calc fuel range
             if (end.HasValue && stint.RefuelAmountGal.HasValue)
             {
                 var duration = end.Value - start;

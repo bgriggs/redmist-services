@@ -150,7 +150,7 @@ namespace BigMission.RaceHeroAggregator
                 // When the event starts, transition to poll for leaderboard data
                 if (isLive)
                 {
-  ///////////                  lastFlagChange = DateTime.Now;
+                    lastFlagChange = DateTime.Now;
                     Logger.Info($"Event {eventId} is live, starting to poll for race status");
 
                     if (int.TryParse(EventId, out int eid))
@@ -178,10 +178,10 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        //DateTime lastFlagChange;
-        //RaceHeroClient.Flag? overrideFlag;
-        //DateTime lastPitStop;
-        //int lastPitLap = 0;
+        DateTime lastFlagChange;
+        RaceHeroClient.Flag? overrideFlag;
+        DateTime lastPitStop;
+        int lastPitLap = 0;
 
         private async Task PollLeaderboard()
         {
@@ -198,59 +198,45 @@ namespace BigMission.RaceHeroAggregator
                 {
                     Logger.Info($"Event {EventId} has ended");
                     await flagStatus?.EndEvent();
-
-                    //try
-                    //{
-                    //    pollLeaderboardTimer.Dispose();
-                    //}
-                    //catch (Exception ex)
-                    //{
-                    //    Logger.Error(ex, "Error ending poll for race data timer");
-                    //}
-                    //finally
-                    //{
-                    //    Logger.Info("Restart event check for possible event restart.");
-                    //    Start();
-                    //}
                     state = EventStates.WaitingForStart;
                 }
                 else // Process lap updates
                 {
                     var cf = leaderboard.CurrentFlag;
 
+                    // Test yellow flags
                     var flag = RaceHeroClient.ParseFlag(cf);
-                    //// Test yellow flags
-                    //if ((DateTime.Now - lastFlagChange) > TimeSpan.FromMinutes(1))
-                    //{
-                    //    if (overrideFlag == null || overrideFlag == RaceHeroClient.Flag.Green)
-                    //    {
-                    //        overrideFlag = RaceHeroClient.Flag.Yellow;
-                    //        lastFlagChange = DateTime.Now;
-                    //    }
-                    //    else if(overrideFlag == RaceHeroClient.Flag.Yellow)
-                    //    {
-                    //        overrideFlag = RaceHeroClient.Flag.Green;
-                    //        lastFlagChange = DateTime.Now;
-                    //    }
-                    //}
+                    if ((DateTime.Now - lastFlagChange) > TimeSpan.FromMinutes(1))
+                    {
+                        if (overrideFlag == null || overrideFlag == RaceHeroClient.Flag.Green)
+                        {
+                            overrideFlag = RaceHeroClient.Flag.Yellow;
+                            lastFlagChange = DateTime.Now;
+                        }
+                        else if(overrideFlag == RaceHeroClient.Flag.Yellow)
+                        {
+                            overrideFlag = RaceHeroClient.Flag.Green;
+                            lastFlagChange = DateTime.Now;
+                        }
+                    }
 
-                    await flagStatus?.ProcessFlagStatus(/*overrideFlag ?? */flag, leaderboard.RunId);
+                    await flagStatus?.ProcessFlagStatus(overrideFlag ?? flag, leaderboard.RunId);
 
                     var logs = new List<Racer>();
                     foreach (var newRacer in leaderboard.Racers)
                     {
                         if (racerStatus.TryGetValue(newRacer.RacerNumber, out var racer))
                         {
-                            //// Test code for pit stops
-                            //if (newRacer.RacerNumber.Contains("777"))
-                            //{
-                            //    if ((DateTime.Now - lastPitStop) > TimeSpan.FromMinutes(4))
-                            //    {
-                            //        lastPitLap = newRacer.CurrentLap;
-                            //        lastPitStop = DateTime.Now;
-                            //    }
-                            //    newRacer.LastPitLap = lastPitLap;
-                            //}
+                            // Test code for pit stops
+                            if (newRacer.RacerNumber.Contains("777"))
+                            {
+                                if ((DateTime.Now - lastPitStop) > TimeSpan.FromMinutes(4))
+                                {
+                                    lastPitLap = newRacer.CurrentLap;
+                                    lastPitStop = DateTime.Now;
+                                }
+                                newRacer.LastPitLap = lastPitLap;
+                            }
 
                             // Process changes
                             if (racer.CurrentLap != newRacer.CurrentLap)

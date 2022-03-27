@@ -25,10 +25,10 @@ namespace BigMission.FuelStatistics
         private ILogger Logger { get; }
         public int RhEventId { get; private set; }
         private Dictionary<string, Car> Cars { get; } = new Dictionary<string, Car>();
-        private readonly Dictionary<int, CarRange> carRanges = new Dictionary<int, CarRange>();
-        private readonly HashSet<int> dirtyCarRanges = new HashSet<int>();
-        private readonly Dictionary<int, int> deviceAppCarMappings = new Dictionary<int, int>();
-        private readonly Dictionary<string, int> carNumberToIdMappings = new Dictionary<string, int>();
+        private readonly Dictionary<int, CarRange> carRanges = new();
+        private readonly HashSet<int> dirtyCarRanges = new();
+        private readonly Dictionary<int, int> deviceAppCarMappings = new();
+        private readonly Dictionary<string, int> carNumberToIdMappings = new();
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
         private readonly IFlagContext flagContext;
@@ -68,7 +68,7 @@ namespace BigMission.FuelStatistics
                 Logger.Info("Loading Fuel Range Settings...");
                 var carIds = settings.GetCarIds();
                 var carSettings = await dataContext.GetFuelRangeSettings(carIds);
-                Logger.Info($"Loaded {carSettings.Count()} fuel range settings");
+                Logger.Info($"Loaded {carSettings.Count} fuel range settings");
                 foreach (var cs in carSettings)
                 {
                     var carRange = new CarRange(cs, dateTimeHelper, fuelRangeContext, Logger);
@@ -78,7 +78,7 @@ namespace BigMission.FuelStatistics
                 // Load mappings to associate telemetry from device ID to Car ID
                 Logger.Info("Loading device apps...");
                 var deviceApps = await dataContext.GetDeviceAppConfig(carIds);
-                Logger.Info($"Loaded {deviceApps.Count()} device apps");
+                Logger.Info($"Loaded {deviceApps.Count} device apps");
                 foreach (var da in deviceApps)
                 {
                     deviceAppCarMappings[da.Id] = da.CarId.Value;
@@ -87,7 +87,7 @@ namespace BigMission.FuelStatistics
                 // Load Cars to be able to go from RH car number to a car ID
                 Logger.Info("Loading cars...");
                 var cars = await dataContext.GetCars(carIds);
-                Logger.Info($"Loaded {cars.Count()} cars");
+                Logger.Info($"Loaded {cars.Count} cars");
                 foreach (var c in cars)
                 {
                     carNumberToIdMappings[c.Number.ToUpper()] = c.Id;
