@@ -38,10 +38,9 @@ namespace BigMission.RaceHeroAggregator
             if (eventFlags.Count == 0)
             {
                 var ef = AddNewFlag(flag, runId);
-                var cacheTask = UpdateCache();                
-                db.EventFlags.Add(ConvertFlag(ef));
-                await db.SaveChangesAsync();
-                await cacheTask;
+                var flagId = await SaveFlagChange(db, null, ef);
+                ef.Id = flagId;
+                await UpdateCache();                
                 Logger.Trace($"Saved event flag update {flag}");
             }
             else
@@ -54,11 +53,10 @@ namespace BigMission.RaceHeroAggregator
                     var ef = AddNewFlag(flag, runId);
 
                     // Save changes
-                    var cacheTask = UpdateCache();
-                    db.Update(ConvertFlag(currentFlag));
-                    db.EventFlags.Add(ConvertFlag(ef));
-                    await db.SaveChangesAsync();
-                    await cacheTask;
+                    var flagId = await SaveFlagChange(db, currentFlag, ef);
+                    ef.Id = flagId;
+
+                    await UpdateCache();
                     Logger.Trace($"Saved flag change from {currentFlag.Flag} to {flag}");
                 }
             }
@@ -72,13 +70,24 @@ namespace BigMission.RaceHeroAggregator
                 currentFlag.End = DateTime.UtcNow;
 
                 // Save changes
-                var cacheTask = UpdateCache();
+                await UpdateCache();
                 using var db = new RedMist(Config["ConnectionString"]);
                 db.Update(ConvertFlag(currentFlag));
                 await db.SaveChangesAsync();
-                await cacheTask;
                 Logger.Trace($"Saved event {eventId} end");
             }
+        }
+
+        private static async Task<int> SaveFlagChange(RedMist db, EventFlag currentFlag, EventFlag nextFlag)
+        {
+            if (currentFlag != null)
+            {
+                db.Update(ConvertFlag(currentFlag));
+            }
+            var dbFlag = ConvertFlag(nextFlag);
+            db.EventFlags.Add(dbFlag);
+            await db.SaveChangesAsync();
+            return dbFlag.Id;
         }
 
         private EventFlag AddNewFlag(Flag flag, int runId)

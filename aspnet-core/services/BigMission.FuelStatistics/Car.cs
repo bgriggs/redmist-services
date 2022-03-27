@@ -97,7 +97,7 @@ namespace BigMission.FuelStatistics
                 if ((lap.Value.LastPitLap + 1) == lap.Value.CurrentLap && Laps.ContainsKey(lap.Value.LastPitLap))
                 {
                     var lastPitLapTime = Laps[lap.Value.LastPitLap].LastLapTimeSeconds;
-                    if (lap.Value.LastLapTimeSeconds > lastPitLapTime)
+                    if (lap.Value.LastLapTimeSeconds > lastPitLapTime && Pits.Any())
                     {
                         var lps = (PitStop)Pits.Last();
                         // Todo: Consider transering misclassified pit laps to the previous stint before clearing
