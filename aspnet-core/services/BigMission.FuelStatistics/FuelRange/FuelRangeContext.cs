@@ -58,6 +58,7 @@ namespace BigMission.FuelStatistics.FuelRange
             using var db = new RedMist(ConnectionString);
             db.FuelRangeStints.Add(dbstint);
             await db.SaveChangesAsync();
+            stint.Id = dbstint.Id;
             return stint;
         }
 
