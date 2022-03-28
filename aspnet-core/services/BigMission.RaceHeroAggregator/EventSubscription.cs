@@ -47,6 +47,7 @@ namespace BigMission.RaceHeroAggregator
         /// Latest Car status
         /// </summary>
         private readonly Dictionary<string, Racer> racerStatus = new();
+        private readonly RaceHeroEventStatus currentEventStatus = new();
 
         private readonly TimeSpan waitForStartInterval;
         private DateTime lastCheckWaitForStart = System.DateTime.MinValue;
@@ -141,6 +142,7 @@ namespace BigMission.RaceHeroAggregator
                 Logger.Debug($"Checking for event {eventId} to start");
                 var evt = await RhClient.GetEvent(eventId);
                 await LogEventPoll(evt);
+                await PublishEventStatus(currentEventStatus, evt, null);
 
                 lastEvent = evt;
                 var isLive = lastEvent.IsLive;
@@ -190,7 +192,7 @@ namespace BigMission.RaceHeroAggregator
                 var sw = Stopwatch.StartNew();
                 Logger.Trace($"Polling leaderboard for event {EventId}");
                 var leaderboard = await RhClient.GetLeaderboard(EventId);
-
+                await PublishEventStatus(currentEventStatus, null, leaderboard);
                 await LogLeaderboardPoll(EventId, leaderboard);
 
                 // Stop polling when the event is over
@@ -354,6 +356,42 @@ namespace BigMission.RaceHeroAggregator
 
                 var lbStr = JsonConvert.SerializeObject(leaderboard);
                 await File.WriteAllTextAsync($"{dir}\\lb-{DateTime.UtcNow.ToFileTimeUtc()}.json", lbStr);
+            }
+        }
+
+        private async Task PublishEventStatus(RaceHeroEventStatus status, Event rhEvent, Leaderboard leaderboard)
+        {
+            if (rhEvent != null)
+            {
+                status.Id = rhEvent.Id;
+                status.Name = rhEvent.Name;
+                status.StartedAt = rhEvent.StartedAt;
+                status.EndedAt = rhEvent.EndedAt;
+                status.IsLive = rhEvent.IsLive;
+                status.Notes = rhEvent.Notes;
+                status.Timezone = rhEvent.Timezone;
+                status.Meta = rhEvent.Meta;
+                status.EventUrl = rhEvent.EventUrl;
+                status.CreatedAt = rhEvent.CreatedAt;
+                status.UpdatedAt = rhEvent.UpdatedAt;
+            }
+            if (leaderboard != null)
+            {
+                status.RunId = leaderboard.RunId;
+                status.RunType = leaderboard.RunType;
+                status.CurrentLap = leaderboard.CurrentLap;
+                status.CurrentFlag = leaderboard.CurrentFlag;
+                status.LapsRemaining = leaderboard.LapsRemaining;
+                status.TimeRemaining = leaderboard.TimeRemaining;
+                status.CurrentTime = leaderboard.CurrentTime;
+            }
+
+            if (status.Id > 0)
+            {
+                var statusJson = JsonConvert.SerializeObject(status);
+                var cache = cacheMuxer.GetDatabase();
+                var key = string.Format(Consts.EVENT_STATUS, status.Id);
+                await cache.StringSetAsync(key, statusJson);
             }
         }
     }
