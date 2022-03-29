@@ -31,14 +31,17 @@ namespace BigMission.RaceHeroAggregator
 
         private readonly Dictionary<string, EventSubscription> eventSubscriptions = new();
         private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly ISimulateSettingsService simulateSettingsService;
 
 
-        public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking, IDateTimeHelper dateTime)
+        public Application(ILogger logger, IConfiguration config, ServiceTracking serviceTracking, IDateTimeHelper dateTime, ISimulateSettingsService simulateSettingsService)
         {
             Logger = logger;
             Config = config;
             ServiceTracking = serviceTracking;
             DateTime = dateTime;
+            this.simulateSettingsService = simulateSettingsService;
+
             cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
             var readTestFiles = bool.Parse(Config["ReadTestFiles"]);
 
@@ -127,7 +130,7 @@ namespace BigMission.RaceHeroAggregator
                 {
                     if (!eventSubscriptions.TryGetValue(settingGrg.Key, out EventSubscription subscription))
                     {
-                        subscription = new EventSubscription(Logger, Config, cacheMuxer, RhClient, DateTime);
+                        subscription = new EventSubscription(Logger, Config, cacheMuxer, RhClient, DateTime, simulateSettingsService);
                         eventSubscriptions[settingGrg.Key] = subscription;
                         Logger.Info($"Adding event subscription for event ID '{settingGrg.Key}' and starting polling.");
                     }

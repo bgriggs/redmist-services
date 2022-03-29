@@ -41,6 +41,7 @@ namespace BigMission.RaceHeroAggregator
                        services.AddSingleton<ILogger>(logger);
                        services.AddSingleton<IConfiguration>(config);
                        services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+                       services.AddSingleton<ISimulateSettingsService, SimulateSettingsService>();
                        services.AddSingleton(serviceStatus);
                        services.AddHostedService<Application>();
                    })

@@ -54,13 +54,25 @@ namespace BigMission.RaceHeroAggregator
         private readonly TimeSpan eventPollInterval;
         private DateTime lastEventPoll = System.DateTime.MinValue;
 
-        public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IRaceHeroClient raceHeroClient, IDateTimeHelper dateTime)
+        #region Simulation
+        private ISimulateSettingsService simulateSettingsService;
+        private DateTime lastFlagChange;
+        private RaceHeroClient.Flag? overrideFlag;
+        private DateTime lastPitStop;
+        private int lastPitLap = 0;
+        #endregion
+
+
+        public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IRaceHeroClient raceHeroClient,
+            IDateTimeHelper dateTime, ISimulateSettingsService simulateSettingsService)
         {
             Logger = logger;
             Config = config;
             this.cacheMuxer = cacheMuxer;
             RhClient = raceHeroClient;
             DateTime = dateTime;
+            this.simulateSettingsService = simulateSettingsService;
+
             waitForStartInterval = TimeSpan.FromMilliseconds(int.Parse(Config["WaitForStartTimer"]));
             eventPollInterval = TimeSpan.FromMilliseconds(int.Parse(Config["EventPollTimer"]));
             logRHToFile = bool.Parse(Config["LogRHToFile"]);
@@ -146,7 +158,6 @@ namespace BigMission.RaceHeroAggregator
 
                 lastEvent = evt;
                 var isLive = lastEvent.IsLive;
-                //isEnded = lastEvent.EndedAt
                 var isEnded = false;
 
                 // When the event starts, transition to poll for leaderboard data
@@ -160,11 +171,6 @@ namespace BigMission.RaceHeroAggregator
                         flagStatus = new FlagStatus(eid, Logger, Config, cacheMuxer, DateTime);
                     }
 
-                    // Start polling for race status
-                    //var interval = int.Parse(Config["EventPollTimer"]);
-                    //pollLeaderboardTimer = new Timer(PollLeaderboard, null, 0, interval);
-
-                    //StopEventPolling();
                     state = EventStates.Started;
                 }
                 // Check for ended
@@ -180,10 +186,6 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        DateTime lastFlagChange;
-        RaceHeroClient.Flag? overrideFlag;
-        DateTime lastPitStop;
-        int lastPitLap = 0;
 
         private async Task PollLeaderboard()
         {
@@ -205,20 +207,23 @@ namespace BigMission.RaceHeroAggregator
                 else // Process lap updates
                 {
                     var cf = leaderboard.CurrentFlag;
-
-                    // Test yellow flags
                     var flag = RaceHeroClient.ParseFlag(cf);
-                    if ((DateTime.Now - lastFlagChange) > TimeSpan.FromMinutes(1))
+
+                    // Simulate yellow flags
+                    if (simulateSettingsService.Settings.YellowFlags)
                     {
-                        if (overrideFlag == null || overrideFlag == RaceHeroClient.Flag.Green)
+                        if ((DateTime.Now - lastFlagChange) > TimeSpan.FromMinutes(1))
                         {
-                            overrideFlag = RaceHeroClient.Flag.Yellow;
-                            lastFlagChange = DateTime.Now;
-                        }
-                        else if(overrideFlag == RaceHeroClient.Flag.Yellow)
-                        {
-                            overrideFlag = RaceHeroClient.Flag.Green;
-                            lastFlagChange = DateTime.Now;
+                            if (overrideFlag == null || overrideFlag == RaceHeroClient.Flag.Green)
+                            {
+                                overrideFlag = RaceHeroClient.Flag.Yellow;
+                                lastFlagChange = DateTime.Now;
+                            }
+                            else if (overrideFlag == RaceHeroClient.Flag.Yellow)
+                            {
+                                overrideFlag = RaceHeroClient.Flag.Green;
+                                lastFlagChange = DateTime.Now;
+                            }
                         }
                     }
 
@@ -229,15 +234,18 @@ namespace BigMission.RaceHeroAggregator
                     {
                         if (racerStatus.TryGetValue(newRacer.RacerNumber, out var racer))
                         {
-                            // Test code for pit stops
-                            if (newRacer.RacerNumber.Contains("777"))
+                            // Simulate code for pit stops
+                            if (simulateSettingsService.Settings.PitStops)
                             {
-                                if ((DateTime.Now - lastPitStop) > TimeSpan.FromMinutes(4))
+                                if (newRacer.RacerNumber.Contains("777"))
                                 {
-                                    lastPitLap = newRacer.CurrentLap;
-                                    lastPitStop = DateTime.Now;
+                                    if ((DateTime.Now - lastPitStop) > TimeSpan.FromMinutes(4))
+                                    {
+                                        lastPitLap = newRacer.CurrentLap;
+                                        lastPitStop = DateTime.Now;
+                                    }
+                                    newRacer.LastPitLap = lastPitLap;
                                 }
-                                newRacer.LastPitLap = lastPitLap;
                             }
 
                             // Process changes
