@@ -50,6 +50,10 @@ namespace BigMission.ServiceHub.Controllers
                 {
                     master.TpmsSettings = await db.TpmsConfigs.FirstOrDefaultAsync(k => k.CarId == deviceAppConfig.CarId);
                 }
+                if (master.TpmsSettings == null)
+                {
+                    master.TpmsSettings = new TpmsConfig { Id = -1 };
+                }
 
                 if (master.KeypadSettings != null)
                 {
