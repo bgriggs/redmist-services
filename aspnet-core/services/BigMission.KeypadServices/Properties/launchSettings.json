@@ -1,13 +1,10 @@
 {
   "profiles": {
-    "BigMission.VirtualChannelAggregator": {
+    "BigMission.KeypadServices": {
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
-    },
-    "Docker": {
-      "commandName": "Docker"
     }
   }
 }
