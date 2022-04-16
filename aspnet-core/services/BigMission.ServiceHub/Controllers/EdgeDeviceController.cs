@@ -11,7 +11,7 @@ namespace BigMission.ServiceHub.Controllers
 {
     [Authorize(AuthenticationSchemes = "ApiKey")]
     [ApiController]
-    [Route("[controller]")]
+    [Route("[controller]/[action]")]
     public class EdgeDeviceController : ControllerBase
     {
         public NLog.ILogger Logger { get; }
@@ -25,6 +25,7 @@ namespace BigMission.ServiceHub.Controllers
 
 
         [HttpGet(Name = nameof(DeviceCanAppConfiguration))]
+        //[Route("[controller]/[action]")]
         public async Task<MasterConfiguration> DeviceCanAppConfiguration()
         {
             var nameClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
@@ -111,6 +112,16 @@ namespace BigMission.ServiceHub.Controllers
             return master;
         }
 
-
+        //[HttpGet]
+        //public async Task<Guid> LatestDeviceCanAppCongifurationId(int deviceId)
+        //{
+        //    using var db = new RedMist(Config["ConnectionString"]);
+        //    var carConfig = await db.CanAppConfigs.FirstOrDefaultAsync(c => c.DeviceAppId == deviceId);
+        //    if (carConfig != null)
+        //    {
+        //        return carConfig.ConfigurationId;
+        //    }
+        //    return Guid.Empty;
+        //}
     }
 }
