@@ -112,16 +112,16 @@ namespace BigMission.ServiceHub.Controllers
             return master;
         }
 
-        //[HttpGet]
-        //public async Task<Guid> LatestDeviceCanAppCongifurationId(int deviceId)
-        //{
-        //    using var db = new RedMist(Config["ConnectionString"]);
-        //    var carConfig = await db.CanAppConfigs.FirstOrDefaultAsync(c => c.DeviceAppId == deviceId);
-        //    if (carConfig != null)
-        //    {
-        //        return carConfig.ConfigurationId;
-        //    }
-        //    return Guid.Empty;
-        //}
+        [HttpGet]
+        public async Task<Guid> LatestDeviceCanAppCongifurationId(int deviceId)
+        {
+            using var db = new RedMist(Config["ConnectionString"]);
+            var carConfig = await db.CanAppConfigs.FirstOrDefaultAsync(c => c.DeviceAppId == deviceId);
+            if (carConfig != null)
+            {
+                return carConfig.ConfigurationId;
+            }
+            return Guid.Empty;
+        }
     }
 }
