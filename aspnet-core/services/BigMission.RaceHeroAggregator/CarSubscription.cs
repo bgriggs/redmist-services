@@ -56,10 +56,19 @@ namespace BigMission.RaceHeroAggregator
         public async Task InitializeChannels()
         {
             using var db = new RedMist(Config["ConnectionString"]);
-            VirtualChannels = await (from d in db.DeviceAppConfigs
-                                     join m in db.ChannelMappings on d.Id equals m.DeviceAppId
-                                     where d.CarId == CarId && m.IsVirtual && !d.IsDeleted && RaceHeroChannelNames.Contains(m.ReservedName)
-                                     select m).ToArrayAsync();
+
+            // Check for race hero processing in the car.  Skip it here if it is enabled.
+            var canAppConfig = await (from d in db.DeviceAppConfigs
+                                      join c in db.CanAppConfigs on d.Id equals c.DeviceAppId
+                                      where d.CarId == CarId && !d.IsDeleted && c.EnableLocalRaceHeroStatus == true
+                                      select c).ToArrayAsync();
+            if (!canAppConfig.Any())
+            {
+                VirtualChannels = await (from d in db.DeviceAppConfigs
+                                         join m in db.ChannelMappings on d.Id equals m.DeviceAppId
+                                         where d.CarId == CarId && m.IsVirtual && !d.IsDeleted && RaceHeroChannelNames.Contains(m.ReservedName)
+                                         select m).ToArrayAsync();
+            }
         }
 
         public async Task ProcessUpdate(Racer[] racers)

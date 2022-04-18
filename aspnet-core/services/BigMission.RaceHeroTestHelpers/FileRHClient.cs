@@ -113,6 +113,11 @@ namespace BigMission.RaceHeroTestHelpers
             return Task.FromResult(new Leaderboard());
         }
 
+        public Task<LiveTransponder> GetLiveTransponder(string transponderId)
+        {
+            throw new NotImplementedException();
+        }
+
         public List<Lap> GetNextLaps()
         {
             var lbtask = GetLeaderboard(null);

@@ -25,7 +25,6 @@ namespace BigMission.ServiceHub.Controllers
 
 
         [HttpGet(Name = nameof(DeviceCanAppConfiguration))]
-        //[Route("[controller]/[action]")]
         public async Task<MasterConfiguration> DeviceCanAppConfiguration()
         {
             var nameClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
@@ -49,7 +48,9 @@ namespace BigMission.ServiceHub.Controllers
                 master.KeypadSettings = await db.KeypadCarAppConfigs.FirstOrDefaultAsync(k => k.DeviceAppId == deviceAppConfig.Id);
                 if (deviceAppConfig.CarId.HasValue)
                 {
+                    master.Car = await db.Cars.FirstOrDefaultAsync(c => c.Id == deviceAppConfig.CarId);
                     master.TpmsSettings = await db.TpmsConfigs.FirstOrDefaultAsync(k => k.CarId == deviceAppConfig.CarId);
+                    master.RaceHeroSetting = await db.RaceHeroSettings.FirstOrDefaultAsync();
                 }
                 if (master.TpmsSettings == null)
                 {
