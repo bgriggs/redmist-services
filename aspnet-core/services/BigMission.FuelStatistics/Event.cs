@@ -158,7 +158,7 @@ namespace BigMission.FuelStatistics
                 //var c = JsonConvert.DeserializeObject<CarBase>(carJson, jss);
                 //Console.WriteLine(traceWriter);
 
-                // Udpate Fuel Range stats
+                // Update Fuel Range stats
                 if (carNumberToIdMappings.TryGetValue(cl.Key.ToUpper(), out int carId))
                 {
                     if (carRanges.TryGetValue(carId, out CarRange cr))
