@@ -170,6 +170,7 @@ namespace BigMission.FuelStatistics.FuelRange
                 updatedStint.RunId = RunId;
                 updatedStint.StartingFuelGals = settings.CapacityGals;
                 updatedStint.DefaultRangeMins = settings.RangeMins;
+                updatedStint.DefaultPitTimeSecs = settings.PitStopSecs;
                 stints.Add(updatedStint);
 
                 var savedStint = await fuelRangeContext.SaveTeamStint(updatedStint);
