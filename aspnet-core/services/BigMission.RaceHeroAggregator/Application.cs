@@ -1,5 +1,6 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.Database;
+using BigMission.Database.Helpers;
 using BigMission.Database.Models;
 using BigMission.RaceHeroSdk;
 using BigMission.RaceHeroTestHelpers;
@@ -120,7 +121,7 @@ namespace BigMission.RaceHeroAggregator
         {
             try
             {
-                var settings = await LoadEventSettings();
+                var settings = await RaceEventSettings.LoadCurrentEventSettings(Config["ConnectionString"], DateTime.UtcNow);
                 Logger.Info($"Loaded {settings.Length} event subscriptions.");
                 var settingEventGrps = settings.GroupBy(s => s.RaceHeroEventId);
                 var eventIds = settings.Select(s => s.RaceHeroEventId).Distinct();
@@ -151,57 +152,6 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private async Task<RaceEventSetting[]> LoadEventSettings()
-        {
-            try
-            {
-                using var db = new RedMist(Config["ConnectionString"]);
-
-                var events = await db.RaceEventSettings
-                    .Where(s => !s.IsDeleted && s.IsEnabled)
-                    .ToArrayAsync();
-
-                // Filter by subscription time
-                var activeSubscriptions = new List<RaceEventSetting>();
-
-                foreach (var evt in events)
-                {
-                    // Get the local time zone info if available
-                    TimeZoneInfo tz = null;
-                    if (!string.IsNullOrWhiteSpace(evt.EventTimeZoneId))
-                    {
-                        try
-                        {
-                            tz = TimeZoneInfo.FindSystemTimeZoneById(evt.EventTimeZoneId);
-                        }
-                        catch { }
-                    }
-
-                    // Attempt to use local time, otherwise use UTC
-                    var now = DateTime.UtcNow;
-                    if (tz != null)
-                    {
-                        now = TimeZoneInfo.ConvertTimeFromUtc(now, tz);
-                    }
-
-                    // The end date should go to the end of the day the that the user specified
-                    var end = new DateTime(evt.EventEnd.Year, evt.EventEnd.Month, evt.EventEnd.Day, 23, 59, 59);
-                    if (evt.EventStart <= now && end >= now)
-                    {
-                        activeSubscriptions.Add(evt);
-                    }
-                }
-
-                return activeSubscriptions.ToArray();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Unable to save logs");
-            }
-            return Array.Empty<RaceEventSetting>();
-        }
-
         #endregion
-
     }
 }
