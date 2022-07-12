@@ -67,10 +67,10 @@ namespace BigMission.RaceControlLog.LogProcessing
             if (isFirstUpdate) { return; }
 
             var time = logEntry.Timestamp.ToString("h:mm tt");
-            var message = "NEW Penality: ";
+            var message = "NEW Infraction: ";
             if (isUpdate)
             {
-                message = "Penality Update: ";
+                message = "Infraction Update: ";
             }
             message += $"{time} #{logEntry.Car1}";
             if (!string.IsNullOrEmpty(logEntry.Car2))
