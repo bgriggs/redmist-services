@@ -11,7 +11,7 @@ namespace BigMission.GenerateDeployment
         const string VM_IP = "142.93.123.108";
         const string VM_USER = "root";
         const string VM_PASS = "5@2f2*Xz67kADgr";
-        const string CMD = "Invoke-SSHCommand -Index $sessionid.sessionid -Command \"{0}\"";
+        const string CMD = "Invoke-SshCommand -Command \"{0}\" -SessionId $sid.SessionId";
 
         static void Main(string[] args)
         {
@@ -55,7 +55,7 @@ namespace BigMission.GenerateDeployment
             sb.AppendLine();
             sb.AppendLine("$secpasswd = ConvertTo-SecureString $Password -AsPlainText -Force");
             sb.AppendLine("$Credentials = New-Object System.Management.Automation.PSCredential($User, $secpasswd)");
-            sb.AppendLine("$SessionID = New-SSHSession -ComputerName $ComputerName -Credential $Credentials");
+            sb.AppendLine("$sid = New-SSHSession -ComputerName $ComputerName -Credential $Credentials");
             sb.AppendLine();
 
         }
