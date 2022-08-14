@@ -3,11 +3,11 @@ using BigMission.Database;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.RaceHeroSdk.Models;
+using BigMission.RaceHeroSdk.Status;
 using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -120,7 +120,7 @@ namespace BigMission.RaceHeroAggregator
                 var gapBehindCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == GAP_BEHIND);
                 if (gapBehindCh != null)
                 {
-                    var behind = GetCarBehindOverall(lap, racers);
+                    var behind = PositionHelper.GetCarBehindOverall(lap, racers);
                     if (behind != null)
                     {
                         float.TryParse(behind.GapToAheadInRun, out float aheadTime);
@@ -168,18 +168,6 @@ namespace BigMission.RaceHeroAggregator
             }
 
             //lastLap = lap;
-        }
-
-        private static Racer GetCarBehindOverall(Racer car, Racer[] field)
-        {
-            var orderedField = field.OrderBy(r => r.PositionInRun).ToArray();
-            var index = Array.IndexOf(orderedField, car);
-
-            if ((index + 1) < orderedField.Length)
-            {
-                return orderedField[index + 1];
-            }
-            return null;
         }
     }
 }

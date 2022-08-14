@@ -51,11 +51,9 @@ namespace BigMission.ServiceHub.Controllers
                     master.Car = await db.Cars.FirstOrDefaultAsync(c => c.Id == deviceAppConfig.CarId);
                     master.TpmsSettings = await db.TpmsConfigs.FirstOrDefaultAsync(k => k.CarId == deviceAppConfig.CarId);
                     master.RaceHeroSetting = await db.RaceHeroSettings.FirstOrDefaultAsync();
+                    master.RaceEventSetting = await db.RaceEventSettings.FirstOrDefaultAsync();
                 }
-                if (master.TpmsSettings == null)
-                {
-                    master.TpmsSettings = new TpmsConfig { Id = -1 };
-                }
+                master.TpmsSettings ??= new TpmsConfig { Id = -1 };
 
                 if (master.KeypadSettings != null)
                 {

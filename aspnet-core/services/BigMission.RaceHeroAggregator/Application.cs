@@ -79,7 +79,7 @@ namespace BigMission.RaceHeroAggregator
                 var updateEventTasks = new List<Task>();
                 foreach(var eventSub in eventSubscriptions.Values)
                 {
-                    var et = eventSub.UpdateEvent();
+                    var et = eventSub.UpdateEventAsync();
                     updateEventTasks.Add(et);
                 }
 
@@ -135,7 +135,7 @@ namespace BigMission.RaceHeroAggregator
                         eventSubscriptions[settingGrg.Key] = subscription;
                         Logger.Info($"Adding event subscription for event ID '{settingGrg.Key}' and starting polling.");
                     }
-                    await subscription.UpdateSetting(settingGrg.ToArray());
+                    await subscription.UpdateSettingAsync(settingGrg.ToArray());
                 }
 
                 // Remove deleted

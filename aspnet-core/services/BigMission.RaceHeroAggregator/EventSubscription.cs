@@ -3,6 +3,7 @@ using BigMission.Database;
 using BigMission.Database.Models;
 using BigMission.RaceHeroSdk;
 using BigMission.RaceHeroSdk.Models;
+using BigMission.RaceHeroSdk.Status;
 using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -27,6 +28,7 @@ namespace BigMission.RaceHeroAggregator
             get { return settings.Values.FirstOrDefault()?.RaceHeroEventId; }
         }
 
+        private EventPollRequest eventPoll;
         private readonly List<CarSubscription> subscriberCars = new();
         private readonly Dictionary<int, RaceEventSetting> settings = new();
         private IRaceHeroClient RhClient { get; set; }
@@ -40,9 +42,7 @@ namespace BigMission.RaceHeroAggregator
         private readonly bool logRHToFile;
         private readonly bool readTestFiles;
 
-        private Event lastEvent;
         private enum EventStates { WaitingForStart, Started }
-        private EventStates state;
         /// <summary>
         /// Latest Car status
         /// </summary>
@@ -50,9 +50,9 @@ namespace BigMission.RaceHeroAggregator
         private readonly RaceHeroEventStatus currentEventStatus = new();
 
         private readonly TimeSpan waitForStartInterval;
-        private DateTime lastCheckWaitForStart = System.DateTime.MinValue;
         private readonly TimeSpan eventPollInterval;
-        private DateTime lastEventPoll = System.DateTime.MinValue;
+        private TimeSpan pollInterval;
+        private DateTime lastPoll = System.DateTime.MinValue;
 
         #region Simulation
         private ISimulateSettingsService simulateSettingsService;
@@ -80,31 +80,62 @@ namespace BigMission.RaceHeroAggregator
         }
 
 
-        public async Task UpdateEvent()
+        public async Task UpdateEventAsync()
         {
             var sw = Stopwatch.StartNew();
-
-            var waitForStartDiff = DateTime.UtcNow - lastCheckWaitForStart;
-            var pollEventDiff = DateTime.UtcNow - lastEventPoll;
-
-            if (state == EventStates.WaitingForStart && waitForStartDiff >= waitForStartInterval)
+            if (EventId == null) { return; }
+            if (eventPoll == null)
             {
-                await CheckWaitForStart();
-                lastCheckWaitForStart = DateTime.UtcNow;
-            }
-            else if (state == EventStates.Started && pollEventDiff >= eventPollInterval)
-            {
-                await PollLeaderboard();
-                lastEventPoll = DateTime.UtcNow;
+                eventPoll = new EventPollRequest(EventId, Logger, RhClient);
             }
 
-            Logger.Debug($"Updated event in {sw.ElapsedMilliseconds}ms state={state}");
+            var pollDiff = DateTime.UtcNow - lastPoll;
+            if (pollDiff >= pollInterval)
+            {
+                var pollResponse = await eventPoll.PollEventAsync();
+
+                await LogEventPollAsync(pollResponse.evt);
+                await PublishEventStatusAsync(currentEventStatus, pollResponse.evt, pollResponse.leaderboard);
+
+                if (pollResponse.state == RaceHeroSdk.Status.EventStates.WaitingForStart)
+                {
+                    flagStatus = null;
+                }
+                else if (pollResponse.state == RaceHeroSdk.Status.EventStates.Started && pollResponse.leaderboard != null)
+                {
+                    if (flagStatus == null && int.TryParse(EventId, out int eid))
+                    {
+                        lastFlagChange = DateTime.Now;
+                        flagStatus = new FlagStatus(eid, Logger, Config, cacheMuxer, DateTime);
+                    }
+
+                    await ProcessLeaderboardAsync(pollResponse.leaderboard);
+                }
+
+                // Adjust poll rate
+                if (pollResponse.state == RaceHeroSdk.Status.EventStates.WaitingForStart)
+                {
+                    pollInterval = waitForStartInterval;
+                }
+                else if (pollResponse.state == RaceHeroSdk.Status.EventStates.Started)
+                {
+                    pollInterval = eventPollInterval;
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
+
+                lastPoll = DateTime.UtcNow;
+            }
+
+            Logger.Debug($"Updated event in {sw.ElapsedMilliseconds}ms");
         }
 
 
         #region Subscription Settings
 
-        public async Task UpdateSetting(RaceEventSetting[] setting)
+        public async Task UpdateSettingAsync(RaceEventSetting[] setting)
         {
             var carSubIds = new List<int>();
 
@@ -119,7 +150,7 @@ namespace BigMission.RaceHeroAggregator
 
             var existingCarIds = subscriberCars.Select(c => c.CarId).ToArray();
             var newCarIds = carSubIds.Except(existingCarIds).ToArray();
-            var newCars = await LoadCars(newCarIds);
+            var newCars = await LoadCarsAsync(newCarIds);
             var oldCarIds = existingCarIds.Except(carSubIds).ToArray();
 
             foreach (var c in newCars)
@@ -133,7 +164,7 @@ namespace BigMission.RaceHeroAggregator
             subscriberCars.RemoveAll(c => oldCarIds.Contains(c.CarId));
         }
 
-        private async Task<Car[]> LoadCars(int[] carIds)
+        private async Task<Car[]> LoadCarsAsync(int[] carIds)
         {
             using var db = new RedMist(Config["ConnectionString"]);
             return await db.Cars
@@ -143,66 +174,19 @@ namespace BigMission.RaceHeroAggregator
 
         #endregion
 
-        /// <summary>
-        /// Checks on status of the event waiting for it to start.
-        /// </summary>
-        private async Task CheckWaitForStart()
-        {
-            try
-            {
-                var eventId = EventId;
-                Logger.Debug($"Checking for event {eventId} to start");
-                var evt = await RhClient.GetEvent(eventId);
-                await LogEventPoll(evt);
-                await PublishEventStatus(currentEventStatus, evt, null);
 
-                lastEvent = evt;
-                var isLive = lastEvent.IsLive;
-                var isEnded = false;
-
-                // When the event starts, transition to poll for leaderboard data
-                if (isLive)
-                {
-                    lastFlagChange = DateTime.Now;
-                    Logger.Info($"Event {eventId} is live, starting to poll for race status");
-
-                    if (int.TryParse(EventId, out int eid))
-                    {
-                        flagStatus = new FlagStatus(eid, Logger, Config, cacheMuxer, DateTime);
-                    }
-
-                    state = EventStates.Started;
-                }
-                // Check for ended
-                else if (isEnded)
-                {
-                    Logger.Info($"Event {eventId} has ended, terminating subscription polling, waiting for event to restart.");
-                    state = EventStates.WaitingForStart;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error polling event");
-            }
-        }
-
-
-        private async Task PollLeaderboard()
+        private async Task ProcessLeaderboardAsync(Leaderboard leaderboard)
         {
             try
             {
                 var sw = Stopwatch.StartNew();
-                Logger.Trace($"Polling leaderboard for event {EventId}");
-                var leaderboard = await RhClient.GetLeaderboard(EventId);
-                await PublishEventStatus(currentEventStatus, null, leaderboard);
-                await LogLeaderboardPoll(EventId, leaderboard);
+                await LogLeaderboardPollAsync(EventId, leaderboard);
 
                 // Stop polling when the event is over
                 if (leaderboard == null || leaderboard.Racers == null)
                 {
                     Logger.Info($"Event {EventId} has ended");
                     await flagStatus?.EndEvent();
-                    state = EventStates.WaitingForStart;
                 }
                 else // Process lap updates
                 {
@@ -263,7 +247,7 @@ namespace BigMission.RaceHeroAggregator
 
                     // Update car data with full current field
                     subscriberCars.ForEach(async c => { await c.ProcessUpdate(latestStatusCopy); });
-                    Logger.Trace($"latestStatusCopy {sw.ElapsedMilliseconds}ms");
+                    //Logger.Trace($"latestStatusCopy {sw.ElapsedMilliseconds}ms");
 
                     if (logs.Any())
                     {
@@ -289,12 +273,12 @@ namespace BigMission.RaceHeroAggregator
                             carRaceLaps.Add(log);
                         }
 
-                        await CacheToFuelStatistics(carRaceLaps);
+                        await CacheToFuelStatisticsAsync(carRaceLaps);
                         Logger.Trace($"CacheToFuelStatistics {sw.ElapsedMilliseconds}ms");
 
                         if (!readTestFiles)
                         {
-                            await LogLapChanges(carRaceLaps);
+                            await LogLapChangesAsync(carRaceLaps);
                         }
                     }
                 }
@@ -305,7 +289,7 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private async Task LogLapChanges(List<CarRaceLap> laps)
+        private async Task LogLapChangesAsync(List<CarRaceLap> laps)
         {
             Logger.Trace($"Logging leaderboard laps count={laps.Count}");
             using var db = new RedMist(Config["ConnectionString"]);
@@ -317,7 +301,7 @@ namespace BigMission.RaceHeroAggregator
         /// Publish lap data for the fuel statistics service to consume.
         /// </summary>
         /// <param name="laps"></param>
-        private async Task CacheToFuelStatistics(List<CarRaceLap> laps)
+        private async Task CacheToFuelStatisticsAsync(List<CarRaceLap> laps)
         {
             Logger.Trace($"Caching leaderboard for fuel statistics laps count={laps.Count}");
             var cache = cacheMuxer.GetDatabase();
@@ -335,7 +319,7 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private async Task LogEventPoll(Event @event)
+        private async Task LogEventPollAsync(Event @event)
         {
             if (logRHToFile)
             {
@@ -351,7 +335,7 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private async Task LogLeaderboardPoll(string eventId, Leaderboard leaderboard)
+        private async Task LogLeaderboardPollAsync(string eventId, Leaderboard leaderboard)
         {
             if (logRHToFile)
             {
@@ -367,7 +351,7 @@ namespace BigMission.RaceHeroAggregator
             }
         }
 
-        private async Task PublishEventStatus(RaceHeroEventStatus status, Event rhEvent, Leaderboard leaderboard)
+        private async Task PublishEventStatusAsync(RaceHeroEventStatus status, Event rhEvent, Leaderboard leaderboard)
         {
             if (rhEvent != null)
             {
