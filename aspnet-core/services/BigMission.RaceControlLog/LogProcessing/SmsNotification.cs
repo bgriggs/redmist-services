@@ -1,6 +1,7 @@
 ﻿using BigMission.Cache.Models.ControlLog;
 using BigMission.Database.Models;
 using BigMission.RaceControlLog.Configuration;
+using BigMission.RaceControlLog.EventStatus;
 using Microsoft.Extensions.Configuration;
 using NLog;
 using Twilio;
@@ -15,35 +16,49 @@ namespace BigMission.RaceControlLog.LogProcessing
     {
         private readonly IConfiguration config;
         private ILogger Logger { get; }
+        private IEventStatus EventStatus { get; }
 
         private readonly Dictionary<(int sysEvent, string car, int order), RaceControlLogEntry> last = new();
         private bool isFirstUpdate = true;
 
-        public SmsNotification(IConfiguration config, ILogger logger)
+        public SmsNotification(IConfiguration config, ILogger logger, IEventStatus eventStatus)
         {
             TwilioClient.Init(config["Twilio:AccountSid"], config["Twilio:AuthToken"]);
             this.config = config;
             Logger = logger;
+            EventStatus = eventStatus;
         }
 
 
-        public async Task Process(int eventId, IEnumerable<RaceControlLogEntry> log, ConfigurationEventData configurationEventData)
+        public async Task Process(RaceEventSetting evt, IEnumerable<RaceControlLogEntry> log, ConfigurationEventData configurationEventData)
         {
             var carSubs = configurationEventData.GetCarSmsSubscriptions();
             foreach (var entry in log)
             {
-                await ProcessCarLogEntry(eventId, entry.Car1.ToUpper(), entry, carSubs);
-                await ProcessCarLogEntry(eventId, entry.Car2.ToUpper(), entry, carSubs);
+                await ProcessCarLogEntry(evt, entry.Car1.ToUpper(), entry, carSubs);
+                await ProcessCarLogEntry(evt, entry.Car2.ToUpper(), entry, carSubs);
             }
             isFirstUpdate = false;
         }
 
-        private async Task ProcessCarLogEntry(int sysEvent, string car, RaceControlLogEntry logEntry, Dictionary<(int sysEvent, string car), AbpUser[]> carSubscriptions)
+        private async Task ProcessCarLogEntry(RaceEventSetting evt, string car, RaceControlLogEntry logEntry, Dictionary<(int sysEvent, string car), AbpUser[]> carSubscriptions)
         {
             // See if this car has a user subscription
-            if (!string.IsNullOrWhiteSpace(car) && carSubscriptions.TryGetValue((sysEvent, car), out var subs))
+            if (!string.IsNullOrWhiteSpace(car) && carSubscriptions.TryGetValue((evt.Id, car), out var subs))
             {
-                var key = (sysEvent, car, logEntry.OrderId);
+                // When there is a race hero event availalbe, use it to further gate SMS sending to when the event is live
+                if (int.TryParse(evt.RaceHeroEventId, out int rhId))
+                {
+                    var rhevt = await EventStatus.GetEventStatusAsync(rhId);
+                    // If there is no status available, send the SMS
+                    if (!(rhevt?.IsLive ?? true))
+                    {
+                        Logger.Debug("Skipping SMS messges-Event is not live");
+                        return;
+                    }
+                }
+                
+                var key = (evt.Id, car, logEntry.OrderId);
                 if (last.TryGetValue(key, out var lastEntry))
                 {
                     // See if existing entry has changed

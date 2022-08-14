@@ -1,10 +1,8 @@
 ﻿using BigMission.Cache.Models;
-using BigMission.Cache.Models.ControlLog;
 using BigMission.RaceControlLog.Configuration;
 using BigMission.RaceControlLog.LogConnections;
 using BigMission.RaceControlLog.LogProcessing;
 using BigMission.ServiceStatusTools;
-using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using NLog;
@@ -61,7 +59,7 @@ namespace BigMission.RaceControlLog
                             // Process the log update on a per event basis
                             foreach (var evt in eventTarget)
                             {
-                                var tasks = LogProcessors.Select(p => p.Process(evt.Id, controlLog, config));
+                                var tasks = LogProcessors.Select(p => p.Process(evt, controlLog, config));
                                 processingTasks.AddRange(tasks);
                             }
                         }

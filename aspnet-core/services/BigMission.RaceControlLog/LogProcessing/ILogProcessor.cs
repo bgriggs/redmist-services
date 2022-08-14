@@ -1,4 +1,5 @@
 ﻿using BigMission.Cache.Models.ControlLog;
+using BigMission.Database.Models;
 using BigMission.RaceControlLog.Configuration;
 
 namespace BigMission.RaceControlLog.LogProcessing
@@ -8,6 +9,6 @@ namespace BigMission.RaceControlLog.LogProcessing
     /// </summary>
     internal interface ILogProcessor
     {
-        public Task Process(int eventId, IEnumerable<RaceControlLogEntry> log, ConfigurationEventData configurationEventData);
+        public Task Process(RaceEventSetting evt, IEnumerable<RaceControlLogEntry> log, ConfigurationEventData configurationEventData);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.Cache.Models.ControlLog;
+using BigMission.Database.Models;
 using BigMission.RaceControlLog.Configuration;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
@@ -24,7 +25,7 @@ namespace BigMission.RaceControlLog.LogProcessing
         }
 
 
-        public async Task Process(int eventId, IEnumerable<RaceControlLogEntry> log, ConfigurationEventData configurationEventData)
+        public async Task Process(RaceEventSetting evt, IEnumerable<RaceControlLogEntry> log, ConfigurationEventData configurationEventData)
         {
             var logList = log.ToList();
             var changed = HasChanges(last, logList);
@@ -34,7 +35,7 @@ namespace BigMission.RaceControlLog.LogProcessing
                 var cache = cacheMuxer.GetDatabase();
                 var rcl = new Cache.Models.ControlLog.RaceControlLog { Timestamp = DateTime.UtcNow };
                 rcl.Log.AddRange(log);
-                var key = string.Format(Consts.CONTROL_LOG, eventId);
+                var key = string.Format(Consts.CONTROL_LOG, evt.Id);
                 var json = JsonConvert.SerializeObject(rcl);
                 await cache.StringSetAsync(key, json);
             }

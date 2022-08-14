@@ -1,4 +1,5 @@
 ﻿using BigMission.RaceControlLog.Configuration;
+using BigMission.RaceControlLog.EventStatus;
 using BigMission.RaceControlLog.LogConnections;
 using BigMission.RaceControlLog.LogProcessing;
 using BigMission.ServiceStatusTools;
@@ -79,6 +80,7 @@ namespace BigMission.RaceControlLog
                        services.AddSingleton<ILogProcessor, CacheControlLog>();
                        services.AddSingleton<ILogProcessor, SmsNotification>();
                        services.AddSingleton<ConfigurationContext>();
+                       services.AddSingleton<IEventStatus, EventRedisStatus>();
                        services.AddHostedService<ConfigurationService>();
                        services.AddHostedService<LogPollService>();
                    })
