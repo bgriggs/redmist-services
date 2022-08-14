@@ -106,7 +106,7 @@ namespace BigMission.RaceHeroAggregator
                 var gapFrontCh = VirtualChannels.FirstOrDefault(c => c.ReservedName == GAP_FRONT);
                 if (gapFrontCh != null)
                 {
-                    float.TryParse(lap.GapToAheadInRun, out float aheadTime);
+                    _ = float.TryParse(lap.GapToAheadInRun, out float aheadTime);
                     var s = new ChannelStatusDto
                     {
                         ChannelId = gapFrontCh.Id,
@@ -123,7 +123,7 @@ namespace BigMission.RaceHeroAggregator
                     var behind = PositionHelper.GetCarBehindOverall(lap, racers);
                     if (behind != null)
                     {
-                        float.TryParse(behind.GapToAheadInRun, out float aheadTime);
+                        _ = float.TryParse(behind.GapToAheadInRun, out float aheadTime);
                         var s = new ChannelStatusDto
                         {
                             ChannelId = gapBehindCh.Id,
