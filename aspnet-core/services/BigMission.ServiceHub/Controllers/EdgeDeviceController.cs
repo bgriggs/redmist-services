@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
+using System.Reflection;
 using System.Security.Claims;
 
 namespace BigMission.ServiceHub.Controllers
@@ -121,6 +123,15 @@ namespace BigMission.ServiceHub.Controllers
                 return carConfig.ConfigurationId;
             }
             return Guid.Empty;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetCarServiceUpdate(string filename)
+        {
+            var currentDir = Directory.GetParent(Assembly.GetExecutingAssembly().Location);
+            var path = $"{currentDir}{Path.DirectorySeparatorChar}CarServiceVersions{Path.DirectorySeparatorChar}{filename}";
+            var dataBytes = await System.IO.File.ReadAllBytesAsync(path);
+            return File(dataBytes, "application/zip", filename);
         }
     }
 }
