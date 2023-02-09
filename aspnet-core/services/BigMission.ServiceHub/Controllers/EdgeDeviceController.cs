@@ -1,3 +1,5 @@
+using Amazon.S3;
+using Amazon.S3.Model;
 using BigMission.CommandTools;
 using BigMission.Database;
 using BigMission.Database.Models;
@@ -129,8 +131,27 @@ namespace BigMission.ServiceHub.Controllers
         public async Task<IActionResult> GetCarServiceUpdate(string filename)
         {
             var currentDir = Directory.GetParent(Assembly.GetExecutingAssembly().Location);
-            var path = $"{currentDir}{Path.DirectorySeparatorChar}CarServiceVersions{Path.DirectorySeparatorChar}{filename}";
-            var dataBytes = await System.IO.File.ReadAllBytesAsync(path);
+            var releaseCache = $"{currentDir}{Path.DirectorySeparatorChar}CarServiceVersions";
+            var localFilePath = $"{releaseCache}{Path.DirectorySeparatorChar}{filename}";
+
+            // See if file is available on local disk already
+            if (!System.IO.File.Exists(localFilePath))
+            {
+                // Pull from digital ocean S3 bucket
+                var endpointUrl = Config["DigitalOcean:EndpointUrl"];
+                var releaseBucket = Config["DigitalOcean:ReleaseBucket"];
+                var keyId = Config["DigitalOcean:KeyId"];
+                var keySecret = Config["DigitalOcean:KeySecret"];
+
+                using IAmazonS3 client = new AmazonS3Client(keyId, keySecret, new AmazonS3Config { ServiceURL = endpointUrl });
+
+                var doObj = await client.GetObjectAsync(releaseBucket, filename);
+                using var fs = new FileStream(localFilePath, FileMode.Create);
+                await doObj.ResponseStream.CopyToAsync(fs);
+                fs.Close();
+            }
+
+            var dataBytes = await System.IO.File.ReadAllBytesAsync(localFilePath);
             return File(dataBytes, "application/zip", filename);
         }
     }

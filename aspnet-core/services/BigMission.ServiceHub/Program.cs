@@ -35,12 +35,16 @@ builder.Services.AddAuthentication(
 
 builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
 builder.Services.AddSingleton<DataClearinghouse>();
-
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseCors(builder => builder
+       .AllowAnyHeader()
+       .AllowAnyMethod()
+       .AllowAnyOrigin()
+    );
     app.UseSwagger();
     app.UseSwaggerUI();
 }
