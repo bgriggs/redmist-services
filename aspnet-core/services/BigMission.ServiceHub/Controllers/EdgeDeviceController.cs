@@ -1,5 +1,4 @@
 using Amazon.S3;
-using Amazon.S3.Model;
 using BigMission.CommandTools;
 using BigMission.Database;
 using BigMission.Database.Models;
@@ -7,7 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 
@@ -63,7 +61,7 @@ namespace BigMission.ServiceHub.Controllers
                 {
                     var kpId = master.KeypadSettings.Id;
 
-                    // Load with manual SQL since EF is failing on an error on column that is non-existant
+                    // Load with manual SQL since EF is failing on an error on column that is non-existent
                     using var conn = new SqlConnection(Config["ConnectionString"]);
                     await conn.OpenAsync();
                     var cmd = new SqlCommand($"SELECT CanId,Offset,Length,Value,ButtonNumber,LedNumber,Blink FROM KeypadCarAppCanStateRules WHERE KeypadId={kpId}", conn);
