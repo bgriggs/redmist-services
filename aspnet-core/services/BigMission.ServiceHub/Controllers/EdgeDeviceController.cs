@@ -144,6 +144,12 @@ namespace BigMission.ServiceHub.Controllers
                 using IAmazonS3 client = new AmazonS3Client(keyId, keySecret, new AmazonS3Config { ServiceURL = endpointUrl });
 
                 var doObj = await client.GetObjectAsync(releaseBucket, filename);
+
+                if (!Directory.Exists(releaseCache))
+                {
+                    Directory.CreateDirectory(releaseCache);
+                }
+
                 using var fs = new FileStream(localFilePath, FileMode.Create);
                 await doObj.ResponseStream.CopyToAsync(fs);
                 fs.Close();
