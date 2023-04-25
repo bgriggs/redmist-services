@@ -34,7 +34,7 @@
 		<None Update="appsettings.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="KeypadServices.service">
+		<None Update="RedMist-KeypadServices.service">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="NLog.config">

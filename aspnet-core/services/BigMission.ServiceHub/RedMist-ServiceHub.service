@@ -1,0 +1,16 @@
+﻿[Unit]
+Description=Red Mist Service Hub API for backend services
+
+[Service]
+WorkingDirectory=/home/bgriggs/ServiceHub/
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/ServiceHub/BigMission.ServiceHub.dll
+Restart=always
+RestartSec=10
+SyslogIdentifier=RedMist.ServiceHub
+User=root
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://+:5001
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+[Install]
+WantedBy=multi-user.target

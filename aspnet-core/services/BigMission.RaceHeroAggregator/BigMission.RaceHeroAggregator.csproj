@@ -38,7 +38,7 @@
 		<None Update="NLog.Production.config">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="RaceHeroAggregator.service">
+		<None Update="RedMist-RaceHeroAggregator.service">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="NLog.config">

@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.DeviceAppServiceStatusProcessor
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.DeviceAppServiceStatusProcessor/BigMission.DeviceAppServiceStatusProcessor.dll
+WorkingDirectory=/home/bgriggs/DeviceAppServiceStatusProcessor
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/DeviceAppServiceStatusProcessor/BigMission.DeviceAppServiceStatusProcessor.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]

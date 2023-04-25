@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace BigMission.GenerateDeployment
@@ -8,10 +9,11 @@ namespace BigMission.GenerateDeployment
     class Program
     {
         const string SERVICE_ROOT_DIR = "services";
-        const string VM_IP = "142.93.123.108";
-        const string VM_USER = "root";
-        const string VM_PASS = "5@2f2*Xz67kADgr";
+        const string VM_IP = "sunnywood.redmist.racing";
+        const string VM_USER = "bgriggs";
+        const string VM_PASS = "";
         const string CMD = "Invoke-SshCommand -Command \"{0}\" -SessionId $sid.SessionId";
+        readonly static string[] serviceExclusions = new string[] { "ServiceHub" };
 
         static void Main(string[] args)
         {
@@ -25,7 +27,14 @@ namespace BigMission.GenerateDeployment
             foreach (var d in serviceDirs)
             {
                 var serviceFiles = Directory.GetFiles(d, "*.service");
-                systemdFiles.AddRange(serviceFiles);
+                foreach (var file in serviceFiles)
+                {
+                    if (!serviceExclusions.Any(file.Contains))
+                    {
+                        systemdFiles.Add(file);
+                    }
+                }
+                //systemdFiles.AddRange(serviceFiles);
             }
 
             var sb = new StringBuilder();
@@ -36,9 +45,16 @@ namespace BigMission.GenerateDeployment
                 var fi = new FileInfo(sf);
                 var serviceText = File.ReadAllText(sf);
                 serviceText = serviceText.Replace("\r\n", "\\n");
-                serviceText = $"printf \"\"{serviceText}\"\" > /lib/systemd/system/{fi.Name}";
+
+                var fileName = fi.Name;
+                if (!fileName.StartsWith("RedMist-"))
+                {
+                    fileName = "RedMist-" + fileName;
+                }
+
+                serviceText = $"printf \"\"{serviceText}\"\" > /lib/systemd/system/{fileName}";
                 sb.AppendLine(string.Format(CMD, serviceText));
-                sb.AppendLine(string.Format(CMD, $"sudo systemctl enable /lib/systemd/system/{fi.Name}"));
+                sb.AppendLine(string.Format(CMD, $"sudo systemctl enable /lib/systemd/system/{fileName}"));
             }
             sb.AppendLine(string.Format(CMD, "sudo systemctl daemon-reload"));
 

@@ -41,7 +41,7 @@
 		<None Update="LogConnections\redmist-909d6942af1e.json">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-		<None Update="RaceControlLog.service">
+		<None Update="RedMist-RaceControlLog.service">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

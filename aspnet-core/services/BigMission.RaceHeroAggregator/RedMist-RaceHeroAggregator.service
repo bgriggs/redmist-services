@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.RaceHeroAggregator
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.RaceHeroAggregator/BigMission.RaceHeroAggregator.dll
+WorkingDirectory=/home/bgriggs/RaceHeroAggregator
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/RaceHeroAggregator/BigMission.RaceHeroAggregator.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]

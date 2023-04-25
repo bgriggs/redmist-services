@@ -1,5 +1,5 @@
 ﻿[Unit]
-Description=Log Archive Purge
+Description=Fuel Statistics
 After=multi-user.target
 
 StartLimitIntervalSec=30
@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.LogArchivePurge
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.LogArchivePurge/BigMission.LogArchivePurge.dll
+WorkingDirectory=/home/bgriggs/FuelStatistics
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/FuelStatistics/BigMission.FuelStatistics.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]

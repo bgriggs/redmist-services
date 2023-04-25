@@ -1,5 +1,5 @@
 ﻿[Unit]
-Description=Race Control Log
+Description=Log Archive Purge
 After=multi-user.target
 
 StartLimitIntervalSec=30
@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.RaceControlLog
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.RaceControlLog/BigMission.RaceControlLog.dll
+WorkingDirectory=/home/bgriggs/LogArchivePurge
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/LogArchivePurge/BigMission.LogArchivePurge.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]

@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.VirtualChannelAggregator
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.VirtualChannelAggregator/BigMission.VirtualChannelAggregator.dll
+WorkingDirectory=/home/bgriggs/VirtualChannelAggregator
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/VirtualChannelAggregator/BigMission.VirtualChannelAggregator.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]

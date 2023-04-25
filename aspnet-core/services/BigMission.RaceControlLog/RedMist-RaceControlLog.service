@@ -1,5 +1,5 @@
 ﻿[Unit]
-Description=Fuel Statistics
+Description=Race Control Log
 After=multi-user.target
 
 StartLimitIntervalSec=30
@@ -9,8 +9,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=10s
 
-WorkingDirectory=/home/redmist/BigMission.FuelStatistics
-ExecStart=/usr/bin/dotnet /home/redmist/BigMission.FuelStatistics/BigMission.FuelStatistics.dll
+WorkingDirectory=/home/bgriggs/RaceControlLog
+ExecStart=/home/bgriggs/.dotnet/dotnet /home/bgriggs/RaceControlLog/BigMission.RaceControlLog.dll
 Environment=ASPNETCORE_ENVIRONMENT=Production
 
 [Install]
