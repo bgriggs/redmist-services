@@ -31,6 +31,7 @@ namespace BigMission.VirtualChannelAggregator
                 logger.Info($"Starting env={env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(basePath)
+                    .AddEnvironmentVariables()
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 

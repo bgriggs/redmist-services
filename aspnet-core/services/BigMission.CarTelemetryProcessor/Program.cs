@@ -29,8 +29,8 @@ namespace BigMission.CarTelemetryProcessor
                 logger.Info($"Starting env={env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(basePath)
+                    .AddEnvironmentVariables()
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                    .AddJsonFile($"appsettings.{env}.json", optional: true)
                     .Build();
 
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarTelemetryProcessor", config["RedisConn"], logger);

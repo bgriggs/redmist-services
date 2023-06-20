@@ -34,6 +34,7 @@ namespace BigMission.AlarmProcessor
                 logger.Info($"Starting {env}...");
                 var config = new ConfigurationBuilder()
                     .SetBasePath(basePath)
+                    .AddEnvironmentVariables()
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 

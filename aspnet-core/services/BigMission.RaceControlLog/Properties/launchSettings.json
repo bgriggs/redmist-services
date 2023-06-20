@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.RaceControlLog": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
