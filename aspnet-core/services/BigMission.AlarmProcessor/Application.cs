@@ -58,7 +58,7 @@ namespace BigMission.AlarmProcessor
                 await Task.Run(() => ProcessTelemetryForAlarms(message, stoppingToken));
             });
 
-            // Watch for changes in device app configuraiton such as channels
+            // Watch for changes in device app configuration such as channels
             await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
             {
                 Logger.Info("Car device app configuration notification received");

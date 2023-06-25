@@ -1,12 +1,14 @@
 ﻿using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NLog;
 using NLog.Config;
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BigMission.AlarmProcessor
@@ -19,7 +21,7 @@ namespace BigMission.AlarmProcessor
     {
         private static Logger logger;
 
-        static async Task Main()
+        static async Task Main(string[] args)
         {
             try
             {
@@ -40,21 +42,30 @@ namespace BigMission.AlarmProcessor
 
                 var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "AlarmProcessor", config["RedisConn"], logger);
 
-                var host = new HostBuilder()
-                    .ConfigureServices((builderContext, services) =>
-                    {
-                        services.AddSingleton<ILogger>(logger);
-                        services.AddSingleton<IConfiguration>(config);
-                        services.AddTransient<IDateTimeHelper, DateTimeHelper>();
-                        services.AddSingleton(serviceStatus);
-                        services.AddHostedService<Application>();
-                    })
-                    .Build();
+                var builder = WebApplication.CreateBuilder(args);
+                builder.Services.AddSingleton<ILogger>(logger);
+                builder.Services.AddSingleton<IConfiguration>(config);
+                builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+                builder.Services.AddSingleton(serviceStatus);
+                builder.Services.AddHostedService<Application>();
+                builder.Services.AddHealthChecks().AddCheck<ServiceHealthCheck>("service");
+                builder.Services.AddControllers();
+
+                var app = builder.Build();
+                app.UseStaticFiles();
+                app.UseRouting();
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapHealthChecks("/startup");
+                    endpoints.MapHealthChecks("/liveness");
+                    endpoints.MapHealthChecks("/ready");
+                    endpoints.MapControllers();
+                });
 
                 try
                 {
                     serviceStatus.Start();
-                    await host.RunAsync();
+                    await app.RunAsync();
                 }
                 catch (OperationCanceledException)
                 {
@@ -69,6 +80,20 @@ namespace BigMission.AlarmProcessor
             {
                 LogManager.Shutdown();
             }
+        }
+    }
+    public class ServiceHealthCheck : IHealthCheck
+    {
+        private readonly ServiceTracking serviceTracking;
+
+        public ServiceHealthCheck(ServiceTracking serviceTracking)
+        {
+            this.serviceTracking = serviceTracking;
+        }
+
+        public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(HealthCheckResult.Healthy());
         }
     }
 }

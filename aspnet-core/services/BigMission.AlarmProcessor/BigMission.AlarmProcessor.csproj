@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -6,6 +6,13 @@
 		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<DockerfileContext>..\..</DockerfileContext>
+		<Authors>Brian Griggs</Authors>
+		<Company>Big Mission Motorsports, LLC</Company>
+		<Product>Red Mist</Product>
+		<Version>3.8.4.1</Version>
+		<AssemblyVersion>3.8.4.1</AssemblyVersion>
+		<FileVersion>3.8.4.1</FileVersion>
+		<Copyright>2022-2023</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -13,6 +20,7 @@
 		<PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="6.0.19" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.0" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
