@@ -41,7 +41,8 @@ namespace BigMission.AlarmProcessor
             Config = config;
             Logger = logger;
             ServiceTracking = serviceTracking;
-            cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
+            string redisConn = $"{config["REDIS_MASTER_SERVICE_HOST"]}:{config["REDIS_MASTER_SERVICE_PORT_TCP-REDIS"]},password={config["REDIS_PW"]}";
+            cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
         }
 
 
