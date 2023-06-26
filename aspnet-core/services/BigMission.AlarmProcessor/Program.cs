@@ -7,6 +7,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NLog;
 using NLog.Config;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,7 +27,7 @@ namespace BigMission.AlarmProcessor
             try
             {
                 var basePath = Directory.GetCurrentDirectory();
-                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
                 if (env.ToUpper() == "PRODUCTION")
                 {
                     LogManager.Configuration = new XmlLoggingConfiguration($"{basePath}{Path.DirectorySeparatorChar}nlog.Production.config");
