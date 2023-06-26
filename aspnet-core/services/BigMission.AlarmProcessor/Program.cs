@@ -46,7 +46,8 @@ namespace BigMission.AlarmProcessor
                     .AddEnvironmentVariables()
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "AlarmProcessor", config["RedisConn"], logger);
+                string redisConn = $"{config["REDIS_MASTER_SERVICE_HOST"]}:{config["REDIS_MASTER_SERVICE_PORT_TCP-REDIS"]},password={config["redis"]}";
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "AlarmProcessor", redisConn, logger);
 
                 var builder = WebApplication.CreateBuilder(args);
                 builder.Services.AddSingleton<ILogger>(logger);
