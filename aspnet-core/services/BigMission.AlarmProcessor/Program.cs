@@ -26,6 +26,11 @@ namespace BigMission.AlarmProcessor
         {
             try
             {
+                while (!Debugger.IsAttached)
+                {
+                    Console.WriteLine("Waiting...");
+                    Task.Delay(1000).Wait();
+                }
                 var basePath = Directory.GetCurrentDirectory();
                 var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
                 if (env.ToUpper() == "PRODUCTION")
