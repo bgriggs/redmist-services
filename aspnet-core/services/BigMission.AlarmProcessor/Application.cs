@@ -39,8 +39,8 @@ namespace BigMission.AlarmProcessor
         {
             Config = config;
             Logger = loggerFactory.CreateLogger(GetType().Name);
-            string redisConn = $"{config["REDIS_MASTER_SERVICE_HOST"]}:{config["REDIS_MASTER_SERVICE_PORT_TCP-REDIS"]},password={config["REDIS_PW"]}";
-            Logger.LogInformation($"Connecting to Redis:{config["REDIS_MASTER_SERVICE_HOST"]}:{config["REDIS_MASTER_SERVICE_PORT_TCP-REDIS"]},password={!string.IsNullOrWhiteSpace(config["REDIS_PW"])}");
+            string redisConn = $"{config["REDIS_SVC"]},password={config["REDIS_PW"]}";
+            Logger.LogInformation($"Connecting to Redis:{config["REDIS_SVC"]},password={!string.IsNullOrWhiteSpace(config["REDIS_PW"])}");
             cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
         }
 
