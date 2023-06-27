@@ -15,6 +15,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections;
 
 namespace BigMission.AlarmProcessor
 {
@@ -33,7 +34,10 @@ namespace BigMission.AlarmProcessor
                 {
                     webBuilder.UseStartup<Startup>();
                 }).Build();
-
+            foreach (DictionaryEntry e in System.Environment.GetEnvironmentVariables())
+            {
+                Console.WriteLine(e.Key + ":" + e.Value);
+            }
             //var basePath = Directory.GetCurrentDirectory();
             //var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
             //if (env.ToUpper() == "PRODUCTION")
