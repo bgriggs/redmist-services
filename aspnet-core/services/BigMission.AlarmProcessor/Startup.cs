@@ -36,7 +36,7 @@ namespace BigMission.AlarmProcessor
             app.UseRouting();
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapHealthChecks("/healthz", new HealthCheckOptions()
+                endpoints.MapHealthChecks("/healthz", new HealthCheckOptions
                 {
                     ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
                 });
