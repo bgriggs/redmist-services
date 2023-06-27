@@ -26,18 +26,6 @@ namespace BigMission.AlarmProcessor
     {
         static async Task Main(string[] args)
         {
-            //while (!Debugger.IsAttached)
-            //{
-            //    Console.WriteLine("Waiting...");
-            //    Task.Delay(1000).Wait();
-            //}
-
-            for (int i = 0; i < 1000; i++)
-            {
-                Console.WriteLine($"test = {i}");
-                Task.Delay(TimeSpan.FromSeconds(i)).Wait();
-            }
-
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureLogging(c => c.ClearProviders())
                 .UseNLog()
@@ -56,7 +44,7 @@ namespace BigMission.AlarmProcessor
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
             logger.LogInformation("AlarmProcessor Starting...");
             logger.LogInformation(assembly.ToString());
-            logger.LogError("test");
+
             //logger.Info($"Starting {env}...");
             //var config = new ConfigurationBuilder()
             //    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
