@@ -15,7 +15,7 @@ namespace BigMission.AlarmProcessor
         {
             services.AddTransient<IDateTimeHelper, DateTimeHelper>();
             //services.AddSingleton(serviceStatus);
-            services.AddHostedService<Application>();
+            //services.AddHostedService<Application>();
             services.AddHealthChecks().AddCheck<ServiceHealthCheck>("service");
             services.AddControllers();
             services.AddEndpointsApiExplorer();
@@ -29,10 +29,10 @@ namespace BigMission.AlarmProcessor
                 app.UseDeveloperExceptionPage();
             }
 
-            app.UseCors(builder => builder
-               .AllowAnyHeader()
-               .AllowAnyMethod()
-               .AllowAnyOrigin());
+            //app.UseCors(builder => builder
+            //   .AllowAnyHeader()
+            //   .AllowAnyMethod()
+            //   .AllowAnyOrigin());
             app.UseRouting();
             app.UseEndpoints(endpoints =>
             {
