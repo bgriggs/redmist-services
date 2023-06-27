@@ -2,7 +2,7 @@
 using BigMission.Database;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using NLog;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -70,24 +70,24 @@ namespace BigMission.AlarmProcessor
                     var result = await condStatus.CheckConditions(channelStatus);
                     if (result != null)
                     {
-                        Logger.Trace($"Checking condition {condStatus.ConditionConfig.Id} is {result}");
+                        Logger.LogTrace($"Checking condition {condStatus.ConditionConfig.Id} is {result}");
                     }
                     else
                     {
-                        Logger.Trace($"Checking condition {condStatus.ConditionConfig.Id} is <null>");
+                        Logger.LogTrace($"Checking condition {condStatus.ConditionConfig.Id} is <null>");
                     }
                     results.Add(result);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error updating condition status");
+                    Logger.LogError(ex, "Error updating condition status");
                 }
             });
             await Task.WhenAll(conditionTasks);
 
             if (results.Contains(null))
             {
-                Logger.Trace($"Cannot check {Alarm.AlarmGroup}. Not all conditions can be checked.");
+                Logger.LogTrace($"Cannot check {Alarm.AlarmGroup}. Not all conditions can be checked.");
                 return false;
             }
 
@@ -108,7 +108,7 @@ namespace BigMission.AlarmProcessor
 
         private async Task UpdateStatus(bool alarmOn, bool applyTriggers)
         {
-            Logger.Trace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
+            Logger.LogTrace($"Alarm {Alarm.Name} conditions result: {alarmOn}");
             var cache = cacheMuxer.GetDatabase();
             var alarmKey = string.Format(Consts.ALARM_STATUS, Alarm.Id);
             var rv = await cache.StringGetAsync(alarmKey);
@@ -117,7 +117,7 @@ namespace BigMission.AlarmProcessor
             using var context = new RedMist(ConnectionString);
             if (rv.HasValue && !alarmOn)
             {
-                Logger.Trace($"Alarm {Alarm.Name} turning off");
+                Logger.LogTrace($"Alarm {Alarm.Name} turning off");
                 await cache.KeyDeleteAsync(alarmKey);
 
                 // Log change
@@ -133,7 +133,7 @@ namespace BigMission.AlarmProcessor
             // Turn alarm on if it's off
             else if (!rv.HasValue && alarmOn)
             {
-                Logger.Trace($"Alarm {Alarm.Name} turning on");
+                Logger.LogTrace($"Alarm {Alarm.Name} turning on");
 
                 await cache.StringSetAsync(alarmKey, DateTime.UtcNow.ToString());
 
@@ -148,9 +148,9 @@ namespace BigMission.AlarmProcessor
                 }
             }
 
-            Logger.Trace($"Alarm {Alarm.Name} saving...");
+            Logger.LogTrace($"Alarm {Alarm.Name} saving...");
             await context.SaveChangesAsync();
-            Logger.Trace($"Alarm {Alarm.Name} saving finished");
+            Logger.LogTrace($"Alarm {Alarm.Name} saving finished");
         }
 
         private async Task ProcessTriggers()
@@ -159,7 +159,7 @@ namespace BigMission.AlarmProcessor
             {
                 try
                 {
-                    Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active");
+                    Logger.LogTrace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active");
 
                     // Dashboard highlight
                     if (trigger.TriggerType == HIGHLIGHT_COLOR)
@@ -169,7 +169,7 @@ namespace BigMission.AlarmProcessor
                         var cache = cacheMuxer.GetDatabase();
                         var deviceAppId = await getDeviceId(ch.ChannelId);
                         await cache.HashSetAsync(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString(), trigger.Color);
-                        Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
+                        Logger.LogTrace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to active finished");
                     }
                     else
                     {
@@ -178,7 +178,7 @@ namespace BigMission.AlarmProcessor
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error creating triggers");
+                    Logger.LogError(ex, "Error creating triggers");
                 }
             });
 
@@ -191,7 +191,7 @@ namespace BigMission.AlarmProcessor
             {
                 try
                 {
-                    Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off");
+                    Logger.LogTrace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off");
 
                     // Dashboard highlight
                     if (trigger.TriggerType == HIGHLIGHT_COLOR)
@@ -201,12 +201,12 @@ namespace BigMission.AlarmProcessor
                         var cache = cacheMuxer.GetDatabase();
                         var deviceAppId = await getDeviceId(ch.ChannelId);
                         await cache.HashDeleteAsync(string.Format(Consts.ALARM_CH_CONDS, deviceAppId), ch.ChannelId.ToString());
-                        Logger.Trace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
+                        Logger.LogTrace($"Alarm {Alarm.Name} trigger {trigger.TriggerType} setting to off finished");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error creating triggers");
+                    Logger.LogError(ex, "Error creating triggers");
                 }
             });
             await Task.WhenAll(triggerTasks);

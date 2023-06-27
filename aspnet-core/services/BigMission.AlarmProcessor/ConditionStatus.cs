@@ -77,7 +77,7 @@ namespace BigMission.AlarmProcessor
                 return conditionActive;
             }
 
-            // If there was no update for this channel use the last state when availabe.
+            // If there was no update for this channel use the last state when available.
             if (lastConditionActive.HasValue)
             {
                 return lastConditionActive;

@@ -5,8 +5,8 @@ using BigMission.ServiceStatusTools;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -24,7 +24,6 @@ namespace BigMission.AlarmProcessor
     {
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
-        private ServiceTracking ServiceTracking { get; }
         private readonly ConnectionMultiplexer cacheMuxer;
 
         /// <summary>
@@ -36,11 +35,10 @@ namespace BigMission.AlarmProcessor
         private static readonly SemaphoreSlim deviceToChannelMappingsLock = new(1, 1);
 
 
-        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking)
+        public Application(IConfiguration config, ILoggerFactory loggerFactory)
         {
             Config = config;
-            Logger = logger;
-            ServiceTracking = serviceTracking;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             string redisConn = $"{config["REDIS_MASTER_SERVICE_HOST"]}:{config["REDIS_MASTER_SERVICE_PORT_TCP-REDIS"]},password={config["REDIS_PW"]}";
             cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
         }
@@ -48,8 +46,6 @@ namespace BigMission.AlarmProcessor
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            ServiceTracking.Update(ServiceState.STARTING, string.Empty);
-
             await LoadAlarmConfiguration(stoppingToken);
             await LoadDeviceChannels(stoppingToken);
 
@@ -62,18 +58,18 @@ namespace BigMission.AlarmProcessor
             // Watch for changes in device app configuration such as channels
             await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
             {
-                Logger.Info("Car device app configuration notification received");
+                Logger.LogInformation("Car device app configuration notification received");
                 await LoadDeviceChannels(stoppingToken);
             });
 
             await sub.SubscribeAsync(Consts.CAR_ALARM_CONFIG_CHANGED_SUB, async (channel, message) =>
             {
-                Logger.Info("Alarm configuration notification received");
+                Logger.LogInformation("Alarm configuration notification received");
                 await LoadAlarmConfiguration(stoppingToken);
                 await LoadDeviceChannels(stoppingToken);
             });
 
-            Logger.Info("Started");
+            Logger.LogInformation("Started");
         }
 
         private async Task ProcessTelemetryForAlarms(RedisValue value, CancellationToken stoppingToken)
@@ -86,7 +82,7 @@ namespace BigMission.AlarmProcessor
                 {
                     telemetryData.Data = Array.Empty<ChannelStatusDto>();
                 }
-                Logger.Debug($"Received telemetry from: '{telemetryData.DeviceAppId}'");
+                Logger.LogDebug($"Received telemetry from: '{telemetryData.DeviceAppId}'");
 
                 Dictionary<string, List<AlarmStatus>> alarms;
                 await alarmStatusLock.WaitAsync(stoppingToken);
@@ -108,7 +104,7 @@ namespace BigMission.AlarmProcessor
                         bool channelAlarmActive = false;
                         foreach (var alarm in orderedAlarms)
                         {
-                            Logger.Trace($"Processing alarm: {alarm.Alarm.Name}");
+                            Logger.LogTrace($"Processing alarm: {alarm.Alarm.Name}");
                             // If the an alarm is already active on the channel, skip it
                             if (!channelAlarmActive)
                             {
@@ -118,18 +114,18 @@ namespace BigMission.AlarmProcessor
                             else // Alarm for channel is active, turn off lower priority alarms
                             {
                                 await alarm.Supersede();
-                                Logger.Trace($"Superseded alarm {alarm.Alarm.Name} due to higher priority being active");
+                                Logger.LogTrace($"Superseded alarm {alarm.Alarm.Name} due to higher priority being active");
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error(ex, "Unable to process alarm status update");
+                        Logger.LogError(ex, "Unable to process alarm status update");
                     }
                 });
                 await Task.WhenAll(alarmTasks);
             }
-            Logger.Trace($"Processed channels in {sw.ElapsedMilliseconds}ms");
+            Logger.LogTrace($"Processed channels in {sw.ElapsedMilliseconds}ms");
         }
 
 
@@ -139,13 +135,13 @@ namespace BigMission.AlarmProcessor
         {
             try
             {
-                using var context = new RedMist(Config["ConnectionString"]);
+                using var context = new RedMist(Config["DB_CONN"]);
                 var alarmConfig = await context.CarAlarms
                     .Include(a => a.AlarmConditions)
                     .Include(a => a.AlarmTriggers)
                     .ToListAsync();
 
-                Logger.Info($"Loaded {alarmConfig.Count} Alarms");
+                Logger.LogInformation($"Loaded {alarmConfig.Count} Alarms");
 
                 var delKeys = new List<RedisKey>();
                 foreach (var ac in alarmConfig)
@@ -153,14 +149,14 @@ namespace BigMission.AlarmProcessor
                     var alarmKey = string.Format(Consts.ALARM_STATUS, ac.Id);
                     delKeys.Add(alarmKey);
                 }
-                Logger.Info($"Clearing {delKeys.Count} alarm status");
+                Logger.LogInformation($"Clearing {delKeys.Count} alarm status");
 
                 var deviceAppIds = await context.DeviceAppConfigs.Where(d => !d.IsDeleted).Select(d => d.Id).ToListAsync(stoppingToken);
                 foreach (var dai in deviceAppIds)
                 {
                     delKeys.Add(string.Format(Consts.ALARM_CH_CONDS, dai));
                 }
-                Logger.Info($"Clearing {deviceAppIds.Count} alarm channel status");
+                Logger.LogInformation($"Clearing {deviceAppIds.Count} alarm channel status");
 
                 var cache = cacheMuxer.GetDatabase();
                 await cache.KeyDeleteAsync(delKeys.ToArray(), CommandFlags.FireAndForget);
@@ -168,11 +164,11 @@ namespace BigMission.AlarmProcessor
                 // Filter down to active alarms
                 alarmConfig = alarmConfig.Where(a => !a.IsDeleted && a.IsEnabled).ToList();
 
-                Logger.Debug($"Found {alarmConfig.Count} enabled alarms");
+                Logger.LogDebug($"Found {alarmConfig.Count} enabled alarms");
                 var als = new List<AlarmStatus>();
                 foreach (var ac in alarmConfig)
                 {
-                    var a = new AlarmStatus(ac, Config["ConnectionString"], Logger, cacheMuxer, GetDeviceAppId);
+                    var a = new AlarmStatus(ac, Config["DB_CONN"], Logger, cacheMuxer, GetDeviceAppId);
                     als.Add(a);
                 }
 
@@ -201,7 +197,7 @@ namespace BigMission.AlarmProcessor
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Unable to initialize alarms");
+                Logger.LogError(ex, "Unable to initialize alarms");
             }
         }
 
@@ -209,15 +205,15 @@ namespace BigMission.AlarmProcessor
         {
             try
             {
-                Logger.Info($"Loading device channels...");
-                using var context = new RedMist(Config["ConnectionString"]);
+                Logger.LogInformation($"Loading device channels...");
+                using var context = new RedMist(Config["DB_CONN"]);
                 var chMappings = await (from dev in context.DeviceAppConfigs
                                         join alarm in context.CarAlarms on dev.CarId equals alarm.CarId
                                         join ch in context.ChannelMappings on dev.Id equals ch.DeviceAppId
                                         where !dev.IsDeleted && !alarm.IsDeleted && alarm.IsEnabled
                                         select new { did = dev.Id, chid = ch.Id }).ToListAsync(cancellationToken: stoppingToken);
 
-                Logger.Info($"Loaded {chMappings.Count} channels");
+                Logger.LogInformation($"Loaded {chMappings.Count} channels");
                 var grps = chMappings.GroupBy(g => g.did);
 
                 await deviceToChannelMappingsLock.WaitAsync(stoppingToken);
@@ -236,7 +232,7 @@ namespace BigMission.AlarmProcessor
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Unable to load device channels");
+                Logger.LogError(ex, "Unable to load device channels");
             }
         }
 
