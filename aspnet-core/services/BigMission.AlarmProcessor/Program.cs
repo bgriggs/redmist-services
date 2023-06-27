@@ -50,7 +50,7 @@ namespace BigMission.AlarmProcessor
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
             logger.LogInformation("AlarmProcessor Starting...");
             logger.LogInformation(assembly.ToString());
-
+            logger.LogError("test");
             //logger.Info($"Starting {env}...");
             //var config = new ConfigurationBuilder()
             //    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
