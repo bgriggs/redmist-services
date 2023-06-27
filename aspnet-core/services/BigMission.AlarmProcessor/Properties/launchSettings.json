@@ -9,7 +9,8 @@
         "REDIS_MASTER_SERVICE_HOST": "localhost",
         "REDIS_MASTER_SERVICE_PORT_TCP-REDIS": "6379",
         "REDIS_PW": "***REMOVED***"
-      }
+      },
+      "applicationUrl": "http://+:5000"
     },
     "Docker": {
       "commandName": "Docker"
