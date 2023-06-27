@@ -32,6 +32,12 @@ namespace BigMission.AlarmProcessor
             //    Task.Delay(1000).Wait();
             //}
 
+            for (int i = 0; i < 1000; i++)
+            {
+                Console.WriteLine($"test = {i}");
+                Task.Delay(TimeSpan.FromSeconds(i)).Wait();
+            }
+
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureLogging(c => c.ClearProviders())
                 .UseNLog()
