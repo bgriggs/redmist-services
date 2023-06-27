@@ -16,6 +16,10 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.13\contentFiles\any\any\NLog.config" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="6.0.0" />
@@ -36,12 +40,6 @@
 		<ProjectReference Include="..\..\common\BigMission.DeviceApp.Shared\BigMission.DeviceApp.Shared.csproj" />
 		<ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj" />
 		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Content Update="NLog.config">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </Content>
 	</ItemGroup>
 
 	<ItemGroup>
