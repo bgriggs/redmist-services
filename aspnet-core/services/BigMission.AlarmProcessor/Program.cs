@@ -26,11 +26,11 @@ namespace BigMission.AlarmProcessor
     {
         static async Task Main(string[] args)
         {
-            while (!Debugger.IsAttached)
-            {
-                Console.WriteLine("Waiting...");
-                Task.Delay(1000).Wait();
-            }
+            //while (!Debugger.IsAttached)
+            //{
+            //    Console.WriteLine("Waiting...");
+            //    Task.Delay(1000).Wait();
+            //}
 
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureLogging(c => c.ClearProviders())
