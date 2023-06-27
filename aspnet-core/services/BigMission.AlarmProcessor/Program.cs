@@ -87,11 +87,10 @@ namespace BigMission.AlarmProcessor
     }
     public class ServiceHealthCheck : IHealthCheck
     {
-        private readonly ServiceTracking serviceTracking;
+        //private readonly ServiceTracking serviceTracking;
 
-        public ServiceHealthCheck(ServiceTracking serviceTracking)
+        public ServiceHealthCheck()
         {
-            this.serviceTracking = serviceTracking;
         }
 
         public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
