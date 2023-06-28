@@ -9,6 +9,8 @@ namespace BigMission.ServiceStatusTools
 {
     public class StartupHealthCheck : IHealthCheck
     {
+        private readonly IConnectionMultiplexer cache;
+
         public string ServiceState { get; set; } = Cache.Models.ServiceState.STARTING;
         public ServiceTracking ServiceTracking { get; private set; }
 
@@ -16,8 +18,7 @@ namespace BigMission.ServiceStatusTools
         {
             Guid.TryParse(config["SERVICEID"], out Guid id);
             ServiceTracking = new ServiceTracking(id, cache);
-            ServiceTracking.Start();
-            ServiceTracking.Update(Cache.Models.ServiceState.STARTING, string.Empty);
+            this.cache = cache;
         }
 
         public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
@@ -28,6 +29,20 @@ namespace BigMission.ServiceStatusTools
             }
 
             return Task.FromResult(HealthCheckResult.Healthy("Service started"));
+        }
+
+        public Task<bool> CheckDependencies()
+        {
+            return Task.FromResult(cache.IsConnected);
+            //var db = cache.GetDatabase();
+            //var result = await db.PingAsync();
+            //return result > default(TimeSpan);
+        }
+
+        public void Start()
+        {
+            ServiceTracking.Start();
+            ServiceTracking.Update(Cache.Models.ServiceState.STARTING, string.Empty);
         }
 
         public void SetStarted()

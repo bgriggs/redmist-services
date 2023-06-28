@@ -41,7 +41,6 @@ namespace BigMission.ServiceStatusTools
             cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = assembly.GetName().Name, State = ServiceState.OFFLINE, Note = "Initializing" };
 
             cacheMuxer = cache;
-            Update(cacheStatus.State, cacheStatus.Note);
         }
 
         public void Update(string state, string note)

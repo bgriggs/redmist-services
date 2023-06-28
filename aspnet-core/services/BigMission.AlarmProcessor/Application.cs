@@ -49,6 +49,15 @@ namespace BigMission.AlarmProcessor
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+            startup.Start();
+
             await LoadAlarmConfiguration(stoppingToken);
             await LoadDeviceChannels(stoppingToken);
 
@@ -210,7 +219,7 @@ namespace BigMission.AlarmProcessor
             try
             {
                 Logger.LogInformation($"Loading device channels...");
-                using var context = await dbFactory.CreateDbContextAsync(stoppingToken); 
+                using var context = await dbFactory.CreateDbContextAsync(stoppingToken);
                 var chMappings = await (from dev in context.DeviceAppConfigs
                                         join alarm in context.CarAlarms on dev.CarId equals alarm.CarId
                                         join ch in context.ChannelMappings on dev.Id equals ch.DeviceAppId

@@ -7,12 +7,10 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NLog.Web;
 using StackExchange.Redis;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace BigMission.AlarmProcessor
@@ -31,11 +29,10 @@ namespace BigMission.AlarmProcessor
 
             string redisConn = $"{builder.Configuration["REDIS_SVC"]},password={builder.Configuration["REDIS_PW"]}";
 
-            builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConn));
+            builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConn, c => { c.AbortOnConnectFail = false; c.ConnectRetry = 10; c.ConnectTimeout = 10; }));
             builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["DB_CONN"]));
             builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
             builder.Services.AddSingleton<StartupHealthCheck>();
-            //builder.Services.AddSingleton(serviceStatus);
             builder.Services.AddHostedService<Application>();
             builder.Services.AddHealthChecks()
                 .AddCheck<StartupHealthCheck>("Startup", tags: new[] { "startup" })
@@ -59,7 +56,9 @@ namespace BigMission.AlarmProcessor
                .AllowAnyHeader()
                .AllowAnyMethod()
                .AllowAnyOrigin());
+
             app.UseRouting();
+
             app.MapHealthChecks("/healthz/startup", new HealthCheckOptions
             {
                 Predicate = _ => true, // Run all checks
@@ -76,12 +75,7 @@ namespace BigMission.AlarmProcessor
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
             });
             app.MapControllers();
-            
 
-            //string redisConn = $"{config["REDIS_MASTER_SERVICE_HOST"]}:{config["REDIS_MASTER_SERVICE_PORT_TCP-REDIS"]},password={config["REDIS_PW"]}";
-            //var serviceStatus = new ServiceTracking(new Guid(config["SERVICEID"]), "AlarmProcessor", redisConn, logger);
-
-            //serviceStatus.Start();
             await app.RunAsync();
         }
     }
