@@ -17,7 +17,7 @@ namespace BigMission.AlarmProcessor
         public string ConnectionString { get; }
         private readonly List<ConditionStatus> conditionStatus = new();
         private ILogger Logger { get; }
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
         private readonly Func<int, Task<int>> getDeviceId;
         //private readonly Dictionary<int, int[]> deviceToChannelMappings;
         public const string HIGHLIGHT_COLOR = "HighlightColor";
@@ -36,7 +36,7 @@ namespace BigMission.AlarmProcessor
         private const string ANY = "Any";
 
 
-        public AlarmStatus(CarAlarm alarm, string connectionString, ILogger logger, ConnectionMultiplexer cacheMuxer, Func<int, Task<int>> getDeviceId)
+        public AlarmStatus(CarAlarm alarm, string connectionString, ILogger logger, IConnectionMultiplexer cacheMuxer, Func<int, Task<int>> getDeviceId)
         {
             Alarm = alarm ?? throw new ArgumentNullException();
             ConnectionString = connectionString ?? throw new ArgumentNullException();

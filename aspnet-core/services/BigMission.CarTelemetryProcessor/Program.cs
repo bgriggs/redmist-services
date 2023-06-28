@@ -33,7 +33,7 @@ namespace BigMission.CarTelemetryProcessor
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarTelemetryProcessor", config["RedisConn"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "CarTelemetryProcessor", config["RedisConn"]);
 
                 var host = new HostBuilder()
                     .ConfigureServices((builderContext, services) =>

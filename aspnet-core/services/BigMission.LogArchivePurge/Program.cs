@@ -31,7 +31,7 @@ namespace BigMission.LogArchivePurge
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "LogArchivePurge", config["RedisConn"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "LogArchivePurge", config["RedisConn"]);
 
                 var services = new ServiceCollection();
                 services.AddSingleton<NLog.ILogger>(logger);

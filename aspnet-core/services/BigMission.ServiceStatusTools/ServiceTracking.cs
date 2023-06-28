@@ -1,4 +1,5 @@
 ﻿using BigMission.Cache.Models;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using NLog;
 using StackExchange.Redis;
@@ -13,14 +14,13 @@ namespace BigMission.ServiceStatusTools
         private readonly Guid serviceId;
         private readonly Cache.Models.ServiceStatus cacheStatus;
         private Timer statusTimer;
-        private ILogger Logger { get; }
-        private ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
         private readonly string redisConn;
         private TimeSpan lastCpu;
         private DateTime lastResourceUpdateTimestamp;
 
 
-        public ServiceTracking(Guid id, string name, string redisConn, ILogger logger)
+        public ServiceTracking(Guid id, string name, string redisConn)
         {
             if (name == null || redisConn == null)
             {
@@ -29,27 +29,31 @@ namespace BigMission.ServiceStatusTools
             serviceId = id;
             cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = name, State = ServiceState.OFFLINE, Note = "Initializing" };
             this.redisConn = redisConn;
-            Logger = logger;
+            cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
+            var cache = cacheMuxer.GetDatabase();
+            Update(cacheStatus.State, cacheStatus.Note);
+        }
 
-            var cache = GetCache();
-            Update(cacheStatus.State, cacheStatus.Note, cache);
+        public ServiceTracking(Guid id, IConnectionMultiplexer cache)
+        {
+            serviceId = id;
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = assembly.GetName().Name, State = ServiceState.OFFLINE, Note = "Initializing" };
+
+            cacheMuxer = cache;
+            Update(cacheStatus.State, cacheStatus.Note);
         }
 
         public void Update(string state, string note)
         {
-            var cache = GetCache();
-            Update(state, note, cache);
-        }
-
-        private void Update(string state, string note, IDatabase cache)
-        {
             cacheStatus.State = state;
             cacheStatus.Note = note;
             cacheStatus.Timestamp = DateTime.UtcNow;
-            cacheStatus.LogLevel = Logger.Factory.GlobalThreshold.Name;
+            //cacheStatus.LogLevel = Logger.Factory.GlobalThreshold.Name;
             cacheStatus.CpuUsage = UpdateCpuUsage().ToString("0.0");
 
             var stStr = JsonConvert.SerializeObject(cacheStatus);
+            var cache = cacheMuxer.GetDatabase();
             cache.HashSet(Consts.SERVICE_STATUS, new RedisValue(cacheStatus.ServiceId.ToString()), stStr);
         }
 
@@ -91,13 +95,12 @@ namespace BigMission.ServiceStatusTools
             {
                 try
                 {
-                    var cache = GetCache();
-                    Update(ServiceState.ONLINE, string.Empty, cache);
-                    ScanForUpdates(cache);
+                    Update(ServiceState.ONLINE, string.Empty);
+                    ScanForUpdates();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Logger.Error(ex, "Error updating service status");
+                    //Logger.Error(ex, "Error updating service status");
                 }
                 finally
                 {
@@ -110,16 +113,17 @@ namespace BigMission.ServiceStatusTools
         /// Look for other service timeouts.
         /// </summary>
         /// <param name="db"></param>
-        private void ScanForUpdates(IDatabase cache)
+        private void ScanForUpdates()
         {
+            var cache = cacheMuxer.GetDatabase();
             var timeoutThreshold = DateTime.UtcNow - TimeSpan.FromSeconds(30);
             var serviceStatus = cache.HashGetAll(Consts.SERVICE_STATUS);
 
             foreach (var ss in serviceStatus)
             {
                 var st = JsonConvert.DeserializeObject<Cache.Models.ServiceStatus>(ss.Value);
-                var timedout = st.Timestamp < timeoutThreshold;
-                if (timedout)
+                var timedOut = st.Timestamp < timeoutThreshold;
+                if (timedOut)
                 {
                     st.State = ServiceState.OFFLINE;
                     st.Note = "Service failed to respond within 30 seconds";
@@ -134,32 +138,19 @@ namespace BigMission.ServiceStatusTools
             var desiredLogLevel = cache.StringGet(desiredKey);
             if (desiredLogLevel.HasValue && !string.IsNullOrEmpty(desiredLogLevel))
             {
-                Logger.Trace($"Found desired log level={desiredLogLevel}");
-                var desiredLevel = LogLevel.FromString(desiredLogLevel);
-                if (Logger.Factory.GlobalThreshold != desiredLevel)
-                {
-                    Logger.Factory.GlobalThreshold = desiredLevel;
-                    Logger.Info($"Applied new log level={desiredLevel}");
-                }
+                //Logger.Trace($"Found desired log level={desiredLogLevel}");
+                //var desiredLevel = LogLevel.FromString(desiredLogLevel);
+                //if (Logger.Factory.GlobalThreshold != desiredLevel)
+                //{
+                //    Logger.Factory.GlobalThreshold = desiredLevel;
+                //    Logger.Info($"Applied new log level={desiredLevel}");
+                //}
             }
-        }
-
-        private IDatabase GetCache()
-        {
-            if (cacheMuxer == null || !cacheMuxer.IsConnected)
-            {
-                cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
-            }
-            return cacheMuxer.GetDatabase();
         }
 
         public void Dispose()
         {
-            if (statusTimer != null)
-            {
-                statusTimer.Dispose();
-            }
-
+            statusTimer?.Dispose();
             cacheMuxer.Dispose();
         }
     }

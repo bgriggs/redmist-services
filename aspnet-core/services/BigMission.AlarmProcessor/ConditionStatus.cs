@@ -11,7 +11,7 @@ namespace BigMission.AlarmProcessor
     class ConditionStatus
     {
         public Database.Models.AlarmCondition ConditionConfig { get; }
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
         private bool? lastConditionActive;
 
         public static string GREATER_THAN = "GreaterThan";
@@ -20,7 +20,7 @@ namespace BigMission.AlarmProcessor
         public static string NOT_EQUAL = "NotEqual";
 
 
-        public ConditionStatus(Database.Models.AlarmCondition conditionConfig, ConnectionMultiplexer cacheMuxer)
+        public ConditionStatus(Database.Models.AlarmCondition conditionConfig, IConnectionMultiplexer cacheMuxer)
         {
             if (conditionConfig == null || cacheMuxer == null) { throw new ArgumentNullException(); }
             ConditionConfig = conditionConfig;

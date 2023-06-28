@@ -41,7 +41,7 @@ namespace BigMission.FuelStatistics
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "FuelStatistics", config["RedisConn"]);
                 serviceStatus.Update(ServiceState.STARTING, string.Empty);
 
                 var cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);

@@ -24,7 +24,9 @@ namespace BigMission.AlarmProcessor
     {
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
+        private readonly IDbContextFactory<RedMist> dbFactory;
+        private readonly StartupHealthCheck startup;
 
         /// <summary>
         /// Alarms by their group
@@ -35,13 +37,13 @@ namespace BigMission.AlarmProcessor
         private static readonly SemaphoreSlim deviceToChannelMappingsLock = new(1, 1);
 
 
-        public Application(IConfiguration config, ILoggerFactory loggerFactory)
+        public Application(IConfiguration config, ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDbContextFactory<RedMist> dbFactory, StartupHealthCheck startup)
         {
             Config = config;
             Logger = loggerFactory.CreateLogger(GetType().Name);
-            string redisConn = $"{config["REDIS_SVC"]},password={config["REDIS_PW"]}";
-            Logger.LogInformation($"Connecting to Redis:{config["REDIS_SVC"]},password={!string.IsNullOrWhiteSpace(config["REDIS_PW"])}");
-            cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
+            cacheMuxer = cache;
+            this.dbFactory = dbFactory;
+            this.startup = startup;
         }
 
 
@@ -71,6 +73,7 @@ namespace BigMission.AlarmProcessor
             });
 
             Logger.LogInformation("Started");
+            startup.SetStarted();
         }
 
         private async Task ProcessTelemetryForAlarms(RedisValue value, CancellationToken stoppingToken)
@@ -136,7 +139,7 @@ namespace BigMission.AlarmProcessor
         {
             try
             {
-                using var context = new RedMist(Config["DB_CONN"]);
+                using var context = await dbFactory.CreateDbContextAsync(stoppingToken);
                 var alarmConfig = await context.CarAlarms
                     .Include(a => a.AlarmConditions)
                     .Include(a => a.AlarmTriggers)
@@ -207,7 +210,7 @@ namespace BigMission.AlarmProcessor
             try
             {
                 Logger.LogInformation($"Loading device channels...");
-                using var context = new RedMist(Config["DB_CONN"]);
+                using var context = await dbFactory.CreateDbContextAsync(stoppingToken); 
                 var chMappings = await (from dev in context.DeviceAppConfigs
                                         join alarm in context.CarAlarms on dev.CarId equals alarm.CarId
                                         join ch in context.ChannelMappings on dev.Id equals ch.DeviceAppId

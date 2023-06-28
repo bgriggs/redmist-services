@@ -68,7 +68,7 @@ namespace BigMission.RaceControlLog
                 //    }
                 //    Console.WriteLine();
                 //}
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "WrlRaceControlLog", config["RedisConn"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "WrlRaceControlLog", config["RedisConn"]);
 
                 var host = new HostBuilder()
                    .ConfigureServices((builderContext, services) =>

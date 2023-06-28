@@ -34,7 +34,7 @@ namespace BigMission.RaceHeroAggregator
                     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                     .Build();
 
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "RaceHeroConnector", config["RedisConn"], logger);
+                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "RaceHeroConnector", config["RedisConn"]);
 
                 var host = new HostBuilder()
                    .ConfigureServices((builderContext, services) =>
