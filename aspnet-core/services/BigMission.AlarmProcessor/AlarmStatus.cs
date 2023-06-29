@@ -2,6 +2,7 @@
 using BigMission.Database;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System;
@@ -14,9 +15,10 @@ namespace BigMission.AlarmProcessor
     class AlarmStatus
     {
         public CarAlarm Alarm { get; }
-        public string ConnectionString { get; }
         private readonly List<ConditionStatus> conditionStatus = new();
         private ILogger Logger { get; }
+
+        private readonly IDbContextFactory<RedMist> dbFactory;
         private readonly IConnectionMultiplexer cacheMuxer;
         private readonly Func<int, Task<int>> getDeviceId;
         //private readonly Dictionary<int, int[]> deviceToChannelMappings;
@@ -36,10 +38,10 @@ namespace BigMission.AlarmProcessor
         private const string ANY = "Any";
 
 
-        public AlarmStatus(CarAlarm alarm, string connectionString, ILogger logger, IConnectionMultiplexer cacheMuxer, Func<int, Task<int>> getDeviceId)
+        public AlarmStatus(CarAlarm alarm, IDbContextFactory<RedMist> dbFactory, ILogger logger, IConnectionMultiplexer cacheMuxer, Func<int, Task<int>> getDeviceId)
         {
             Alarm = alarm ?? throw new ArgumentNullException();
-            ConnectionString = connectionString ?? throw new ArgumentNullException();
+            this.dbFactory = dbFactory;
             Logger = logger ?? throw new ArgumentNullException();
             this.cacheMuxer = cacheMuxer ?? throw new ArgumentNullException();
             this.getDeviceId = getDeviceId;
@@ -114,7 +116,7 @@ namespace BigMission.AlarmProcessor
             var rv = await cache.StringGetAsync(alarmKey);
 
             // Turn alarm off if it's active
-            using var context = new RedMist(ConnectionString);
+            using var context = await dbFactory.CreateDbContextAsync();
             if (rv.HasValue && !alarmOn)
             {
                 Logger.LogTrace($"Alarm {Alarm.Name} turning off");

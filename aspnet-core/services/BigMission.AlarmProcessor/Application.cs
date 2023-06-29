@@ -22,7 +22,6 @@ namespace BigMission.AlarmProcessor
     /// </summary>
     class Application : BackgroundService
     {
-        private IConfiguration Config { get; }
         private ILogger Logger { get; }
         private readonly IConnectionMultiplexer cacheMuxer;
         private readonly IDbContextFactory<RedMist> dbFactory;
@@ -37,9 +36,8 @@ namespace BigMission.AlarmProcessor
         private static readonly SemaphoreSlim deviceToChannelMappingsLock = new(1, 1);
 
 
-        public Application(IConfiguration config, ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDbContextFactory<RedMist> dbFactory, StartupHealthCheck startup)
+        public Application(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDbContextFactory<RedMist> dbFactory, StartupHealthCheck startup)
         {
-            Config = config;
             Logger = loggerFactory.CreateLogger(GetType().Name);
             cacheMuxer = cache;
             this.dbFactory = dbFactory;
@@ -181,7 +179,7 @@ namespace BigMission.AlarmProcessor
                 var als = new List<AlarmStatus>();
                 foreach (var ac in alarmConfig)
                 {
-                    var a = new AlarmStatus(ac, Config["DB_CONN"], Logger, cacheMuxer, GetDeviceAppId);
+                    var a = new AlarmStatus(ac, dbFactory, Logger, cacheMuxer, GetDeviceAppId);
                     als.Add(a);
                 }
 

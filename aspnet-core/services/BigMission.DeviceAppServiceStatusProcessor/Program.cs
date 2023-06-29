@@ -1,95 +1,79 @@
-﻿using BigMission.ServiceStatusTools;
+﻿using BigMission.CommandTools;
+using BigMission.Database;
+using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Configuration;
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using NLog;
-using NLog.Config;
-using System;
-using System.IO;
+using Microsoft.Extensions.Logging;
+using NLog.Web;
+using StackExchange.Redis;
 using System.Threading.Tasks;
 
 namespace BigMission.DeviceAppServiceStatusProcessor
 {
     class Program
     {
-        private static Logger logger;
-
-        async static Task Main()
+        async static Task Main(string[] args)
         {
-            try
+            var builder = WebApplication.CreateBuilder(args);
+            builder.Logging.ClearProviders();
+            builder.Logging.AddNLogWeb();
+
+            string redisConn = $"{builder.Configuration["REDIS_SVC"]},password={builder.Configuration["REDIS_PW"]}";
+
+            builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConn, c => { c.AbortOnConnectFail = false; c.ConnectRetry = 10; c.ConnectTimeout = 10; }));
+            builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["DB_CONN"]));
+            builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
+            builder.Services.AddSingleton<StartupHealthCheck>();
+            builder.Services.AddSingleton<IAppCommandsFactory, AppCommandsFactory>();
+            builder.Services.AddHostedService<Application>();
+            builder.Services.AddHealthChecks()
+                .AddCheck<StartupHealthCheck>("Startup", tags: new[] { "startup" })
+                .AddSqlServer(builder.Configuration["DB_CONN"], tags: new[] { "db", "sql", "sqlserver" })
+                .AddRedis(redisConn, tags: new[] { "cache", "redis" })
+                .AddProcessAllocatedMemoryHealthCheck(maximumMegabytesAllocated: 1024, name: "Process Allocated Memory", tags: new[] { "memory" });
+            builder.Services.AddControllers();
+
+            var app = builder.Build();
+            var logger = app.Services.GetService<ILoggerFactory>().CreateLogger("Main");
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            logger.LogInformation("DeviceAppServiceStatusProcessor Starting...");
+            logger.LogInformation(assembly.ToString());
+
+            if (app.Environment.IsDevelopment())
             {
-                AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
-
-                var basePath = Directory.GetCurrentDirectory();
-                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-                if (env.ToUpper() == "PRODUCTION")
-                {
-                    LogManager.Configuration = new XmlLoggingConfiguration($"{basePath}{Path.DirectorySeparatorChar}nlog.Production.config");
-                }
-                logger = LogManager.GetCurrentClassLogger();
-
-                logger.Info($"Starting env={env}...");
-                var config = new ConfigurationBuilder()
-                    .SetBasePath(basePath)
-                    .AddEnvironmentVariables()
-                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                    .Build();
-
-                var serviceStatus = new ServiceTracking(new Guid(config["ServiceId"]), "DeviceAppStatusProcessor", config["RedisConn"]);
-
-                var host = new HostBuilder()
-                    .ConfigureServices((builderContext, services) =>
-                    {
-                        services.AddSingleton<ILogger>(logger);
-                        services.AddSingleton<IConfiguration>(config);
-                        services.AddTransient<IDateTimeHelper, DateTimeHelper>();
-                        services.AddSingleton(serviceStatus);
-                        services.AddHostedService<Application>();
-                    })
-                    .Build();
-
-                try
-                {
-                    serviceStatus.Start();
-                    await host.RunAsync();
-                }
-                catch (OperationCanceledException)
-                {
-                    // suppress
-                }
+                app.UseDeveloperExceptionPage();
             }
-            catch (Exception ex)
+
+            app.UseCors(builder => builder
+               .AllowAnyHeader()
+               .AllowAnyMethod()
+               .AllowAnyOrigin());
+
+            app.UseRouting();
+
+            app.MapHealthChecks("/healthz/startup", new HealthCheckOptions
             {
-                logger.Error(ex);
-            }
-            finally
+                Predicate = _ => true, // Run all checks
+                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+            });
+            app.MapHealthChecks("/healthz/live", new HealthCheckOptions
             {
-                LogManager.Shutdown();
-            }
-        }
+                Predicate = _ => false, // Only check that service is not locked up
+                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+            });
+            app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
+            {
+                Predicate = _ => true, // Run all checks
+                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+            });
+            app.MapControllers();
 
-        private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
-        {
-            try
-            {
-                var exception = e.ExceptionObject as Exception;
-                if (exception != null)
-                {
-                    logger.Fatal(exception, "Unhandled exception");
-                }
-                else
-                {
-                    logger.Fatal("Unhandled exception, but unable to retrieve the exception.");
-                }
-            }
-            catch (Exception)
-            {
-                // This is a really bad place to be. We are currently in the unhandled exception event and
-                // as such we are going down already, but we can't necessarily figure out how to log the
-                // event. The only reason this catch is here is to prevent us generating yet another unhandled
-                // exception.
-            }
+            await app.RunAsync();
         }
     }
 }
