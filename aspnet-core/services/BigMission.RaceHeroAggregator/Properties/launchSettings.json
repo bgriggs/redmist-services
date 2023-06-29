@@ -3,8 +3,18 @@
     "BigMission.RaceHeroAggregator": {
       "commandName": "Project",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SERVICEID": "d4907a41-488d-4ed5-97f4-5278612d1502",
+        "DB_CONN": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
+        "REDIS_SVC": "localhost:6379",
+        "REDIS_PW": "***REMOVED***",
+        "RaceHeroUrl": "https://api.racehero.io/v1/",
+        "RaceHeroApiKey": "3c233e2af814aa2f8ff1",
+        "EventSubscriptionCheckMs": "10000",
+        "WaitForStartTimer": "3000",
+        "EventPollTimer": "1000"
+      },
+      "applicationUrl": "http://+:5000"
     },
     "Docker": {
       "commandName": "Docker"

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -14,14 +14,6 @@
 		<FileVersion>3.8.4.1</FileVersion>
 		<Copyright>2022-2023</Copyright>
 	</PropertyGroup>
-
-	<ItemGroup>
-	  <Content Remove="NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.2\contentFiles\any\any\NLog.config" />
-	</ItemGroup>
 
 	<ItemGroup>
 	  <None Include="NLog.config">
@@ -48,9 +40,6 @@
 
 	<ItemGroup>
 		<None Update="RedMist-KeypadServices.service">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="NLog.Production.config">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

@@ -22,14 +22,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Content Remove="NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.2\contentFiles\any\any\NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <None Include="NLog.config" />
 	</ItemGroup>
 	<ItemGroup>
@@ -55,17 +47,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Update="appsettings.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 		<None Update="RedMist-FuelStatistics.service">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="NLog.config">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
-		<None Update="NLog.Production.config">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="TestLaps.csv">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

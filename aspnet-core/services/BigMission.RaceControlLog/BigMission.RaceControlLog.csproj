@@ -18,14 +18,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Content Remove="NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.13\contentFiles\any\any\NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
 	  <None Include="NLog.config">
 	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	  </None>
@@ -49,12 +41,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Update="appsettings.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="NLog.Production.config">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 		<None Update="LogConnections\redmist-909d6942af1e.json">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
