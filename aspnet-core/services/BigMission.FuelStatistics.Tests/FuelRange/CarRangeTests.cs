@@ -3,9 +3,9 @@ using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.TestHelpers;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using NLog;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,7 +35,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
             fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
-            var loggerMock = new Mock<ILogger>();
+            var loggerMock = new Mock<ILoggerFactory>();
 
             var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = false };
 
@@ -64,7 +64,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
             fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
-            var loggerMock = new Mock<ILogger>();
+            var loggerMock = new Mock<ILoggerFactory>();
 
             var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
             var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object)
@@ -122,7 +122,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             {
                 ds.Data = new[] { data[i], fuelCh };
                 dtMock.Setup(p => p.UtcNow).Returns(timestamps[i]);
-                var changed = carRange.ProcessTelemetery(ds);
+                var changed = carRange.ProcessTelemetry(ds);
                 Assert.IsFalse(changed.Result);
                 var stints = carRange.GetStints();
                 Assert.AreEqual(0, stints.Length);
@@ -130,7 +130,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
 
             ds.Data = new[] { data.Last(), fuelCh };
             dtMock.Setup(p => p.UtcNow).Returns(timestamps.Last());
-            var changed2 = carRange.ProcessTelemetery(ds);
+            var changed2 = carRange.ProcessTelemetry(ds);
             Assert.IsTrue(changed2.Result);
             var stints2 = carRange.GetStints();
             Assert.AreEqual(1, stints2.Length);
@@ -146,7 +146,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
             fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
-            var loggerMock = new Mock<ILogger>();
+            var loggerMock = new Mock<ILoggerFactory>();
 
             var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
 
@@ -174,7 +174,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             for (int i = 0; i < telemTimestamps.Length; i++)
             {
                 dtMock.Setup(p => p.UtcNow).Returns(telemTimestamps[i]);
-                carRange.ProcessTelemetery(ds).Wait();
+                carRange.ProcessTelemetry(ds).Wait();
             }
 
             // Telemetry stops after 16 seconds, next run the laps to take over
@@ -204,7 +204,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
             fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
-            var loggerMock = new Mock<ILogger>();
+            var loggerMock = new Mock<ILoggerFactory>();
 
             var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
 
@@ -232,7 +232,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             for (int i = 0; i < telemTimestamps.Length; i++)
             {
                 dtMock.Setup(p => p.UtcNow).Returns(telemTimestamps[i]);
-                carRange.ProcessTelemetery(ds).Wait();
+                carRange.ProcessTelemetry(ds).Wait();
             }
 
             // Telemetry stops after 16 seconds, next run the laps to take over
@@ -262,7 +262,7 @@ namespace BigMission.FuelStatistics.Tests.FuelRange
             var fuelRangeContextMock = new Mock<IFuelRangeContext>();
             fuelRangeContextMock.Setup(f => f.SaveTeamStint(It.IsAny<Cache.Models.FuelRange.Stint>())).Returns(Task.FromResult(new Cache.Models.FuelRange.Stint { Id = -1 }));
 
-            var loggerMock = new Mock<ILogger>();
+            var loggerMock = new Mock<ILoggerFactory>();
 
             var settings = new FuelRangeSetting { UseRaceHeroTrigger = true, UseTelemetry = true };
             var carRange = new CarRange(settings, dtMock.Object, fuelRangeContextMock.Object, loggerMock.Object);
