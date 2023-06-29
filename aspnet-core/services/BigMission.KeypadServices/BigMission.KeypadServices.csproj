@@ -16,17 +16,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <Content Remove="NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.2\contentFiles\any\any\NLog.config" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Include="NLog.config">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
 	</ItemGroup>
 
 	<ItemGroup>
