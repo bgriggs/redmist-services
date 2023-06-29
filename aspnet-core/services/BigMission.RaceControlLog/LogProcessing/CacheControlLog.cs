@@ -3,7 +3,6 @@ using BigMission.Cache.Models.ControlLog;
 using BigMission.Database.Models;
 using BigMission.RaceControlLog.Configuration;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 
@@ -15,12 +14,12 @@ namespace BigMission.RaceControlLog.LogProcessing
     internal class CacheControlLog : ILogProcessor
     {
         public IDateTimeHelper DateTime { get; }
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
         private List<RaceControlLogEntry> last = new();
 
-        public CacheControlLog(IConfiguration config, IDateTimeHelper dateTime)
+        public CacheControlLog(IConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime)
         {
-            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
+            this.cacheMuxer = cacheMuxer;
             DateTime = dateTime;
         }
 

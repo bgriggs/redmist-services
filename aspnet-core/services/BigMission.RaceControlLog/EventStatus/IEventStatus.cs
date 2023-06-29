@@ -12,6 +12,6 @@ namespace BigMission.RaceControlLog.EventStatus
         /// </summary>
         /// <param name="rhEventId"></param>
         /// <returns></returns>
-        public Task<RaceHeroEventStatus?> GetEventStatusAsync(int rhEventId);
+        public Task<RaceHeroEventStatus> GetEventStatusAsync(int rhEventId);
     }
 }

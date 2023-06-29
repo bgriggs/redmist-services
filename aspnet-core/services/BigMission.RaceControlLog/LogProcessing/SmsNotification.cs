@@ -2,8 +2,6 @@
 using BigMission.Database.Models;
 using BigMission.RaceControlLog.Configuration;
 using BigMission.RaceControlLog.EventStatus;
-using Microsoft.Extensions.Configuration;
-using NLog;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 
@@ -21,11 +19,11 @@ namespace BigMission.RaceControlLog.LogProcessing
         private readonly Dictionary<(int sysEvent, string car, int order), RaceControlLogEntry> last = new();
         private bool isFirstUpdate = true;
 
-        public SmsNotification(IConfiguration config, ILogger logger, IEventStatus eventStatus)
+        public SmsNotification(IConfiguration config, ILoggerFactory loggerFactory, IEventStatus eventStatus)
         {
-            TwilioClient.Init(config["Twilio:AccountSid"], config["Twilio:AuthToken"]);
+            TwilioClient.Init(config["TWILIO_ACCOUNTSID"], config["TWILIO_AUTHTOKEN"]);
             this.config = config;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             EventStatus = eventStatus;
         }
 
@@ -46,14 +44,14 @@ namespace BigMission.RaceControlLog.LogProcessing
             // See if this car has a user subscription
             if (!string.IsNullOrWhiteSpace(car) && carSubscriptions.TryGetValue((evt.Id, car), out var subs))
             {
-                // When there is a race hero event availalbe, use it to further gate SMS sending to when the event is live
+                // When there is a race hero event available, use it to further gate SMS sending to when the event is live
                 if (int.TryParse(evt.RaceHeroEventId, out int rhId))
                 {
                     var rhevt = await EventStatus.GetEventStatusAsync(rhId);
                     // If there is no status available, send the SMS
                     if (!(rhevt?.IsLive ?? true))
                     {
-                        Logger.Debug("Skipping SMS messges-Event is not live");
+                        Logger.LogDebug("Skipping SMS messages-Event is not live");
                         return;
                     }
                 }
@@ -78,7 +76,7 @@ namespace BigMission.RaceControlLog.LogProcessing
 
         private async Task SendSms(AbpUser[] subscriptions, RaceControlLogEntry logEntry, bool isUpdate = false)
         {
-            // When service is reloaded, do not immediatly send updates since there is not state to compare and we don't want to spam.
+            // When service is reloaded, do not immediately send updates since there is not state to compare and we don't want to spam.
             if (isFirstUpdate) { return; }
 
             var time = logEntry.Timestamp.ToString("h:mm tt");
@@ -106,7 +104,7 @@ namespace BigMission.RaceControlLog.LogProcessing
             {
                 var resource = await MessageResource.CreateAsync(
                     body: message,
-                    @from: new Twilio.Types.PhoneNumber(config["Twilio:SenderNumber"]),
+                    @from: new Twilio.Types.PhoneNumber(config["TWILIO_SENDERNUMBER"]),
                     to: new Twilio.Types.PhoneNumber(user.PhoneNumber)
                 );
 
@@ -115,7 +113,7 @@ namespace BigMission.RaceControlLog.LogProcessing
                 {
                     logmsg += $"Error: {resource.ErrorMessage}";
                 }
-                Logger.Debug(logmsg);
+                Logger.LogDebug(logmsg);
             }
         }
 

@@ -2,8 +2,6 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
-using Microsoft.Extensions.Configuration;
-using NLog;
 
 namespace BigMission.RaceControlLog.LogConnections
 {
@@ -31,15 +29,15 @@ namespace BigMission.RaceControlLog.LogConnections
 
         private readonly Dictionary<int, SheetColumnMapping> columnIndexMappings = new();
 
-        public GoogleSheetsControlLog(IConfiguration config, ILogger logger)
+        public GoogleSheetsControlLog(IConfiguration config, ILoggerFactory loggerFactory)
         {
             Config = config;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
         }
 
         public async Task<IEnumerable<RaceControlLogEntry>> LoadControlLogAsync(string parameter)
         {
-            var googleCreds = GoogleCredential.FromFile(Config["GoogleAuthPath"]);
+            var googleCreds = GoogleCredential.FromFile(Config["GOOGLEAUTHPATH"]);
             var sheetsService = new SheetsService(new BaseClientService.Initializer()
             {
                 HttpClientInitializer = googleCreds,
@@ -53,7 +51,7 @@ namespace BigMission.RaceControlLog.LogConnections
                 // Parameter is the sheet title
                 range = $"{parameter}!{range}";
             }
-            var request = vals.Get(Config["SpreadsheetId"], range);
+            var request = vals.Get(Config["SPREADSHEETID"], range);
             var response = await request.ExecuteAsync();
 
             // Check for column mappings
@@ -87,7 +85,7 @@ namespace BigMission.RaceControlLog.LogConnections
                             }
                             else
                             {
-                                Logger.Trace($"Failed to parse and assign row {row + 4}, {mapping.PropertyName}, value='{cell}'");
+                                Logger.LogTrace($"Failed to parse and assign row {row + 4}, {mapping.PropertyName}, value='{cell}'");
                             }
                         }
                     }
@@ -102,7 +100,7 @@ namespace BigMission.RaceControlLog.LogConnections
                 {
                     foreach (var column in requiredColumns)
                     {
-                        Logger.Trace($"Row {row + 4} did not pass validation, missing {column.PropertyName}");
+                        Logger.LogTrace($"Row {row + 4} did not pass validation, missing {column.PropertyName}");
                     }
                 }
             }
@@ -114,7 +112,7 @@ namespace BigMission.RaceControlLog.LogConnections
         {
             for (int i = 0; i < header.Count; i++)
             {
-                SheetColumnMapping? map;
+                SheetColumnMapping map;
                 var col = header[i].ToString() ?? string.Empty;
 
                 // Since there are two identical Car # column headers, check whether the first one has already been used
@@ -134,7 +132,7 @@ namespace BigMission.RaceControlLog.LogConnections
                 }
                 else
                 {
-                    Logger.Warn($"Unable to find a mapping for column '{col}' at index {i}");
+                    Logger.LogWarning($"Unable to find a mapping for column '{col}' at index {i}");
                 }
             }
 
@@ -144,7 +142,7 @@ namespace BigMission.RaceControlLog.LogConnections
                 bool found = columnIndexMappings.Values.Any(c => c.PropertyName == requiredHeader.PropertyName);
                 if (!found)
                 {
-                    Logger.Error($"Required column '{requiredHeader.SheetColumn}'->'{requiredHeader.PropertyName}' not found");
+                    Logger.LogError($"Required column '{requiredHeader.SheetColumn}'->'{requiredHeader.PropertyName}' not found");
                     columnIndexMappings.Clear();
                 }
             }

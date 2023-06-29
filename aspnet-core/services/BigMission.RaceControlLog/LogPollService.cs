@@ -1,11 +1,7 @@
-﻿using BigMission.Cache.Models;
-using BigMission.RaceControlLog.Configuration;
+﻿using BigMission.RaceControlLog.Configuration;
 using BigMission.RaceControlLog.LogConnections;
 using BigMission.RaceControlLog.LogProcessing;
 using BigMission.ServiceStatusTools;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using NLog;
 using StackExchange.Redis;
 using System.Diagnostics;
 
@@ -16,7 +12,7 @@ namespace BigMission.RaceControlLog
     /// </summary>
     internal class LogPollService : BackgroundService
     {
-        private readonly ServiceTracking serviceTracking;
+        private readonly StartupHealthCheck startup;
 
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
@@ -25,21 +21,29 @@ namespace BigMission.RaceControlLog
         private IEnumerable<ILogProcessor> LogProcessors { get; }
 
 
-        public LogPollService(IConfiguration config, ILogger logger, ConfigurationContext configurationContext, 
-            IEnumerable<IControlLogConnection> logConnections, IEnumerable<ILogProcessor> logProcessors, ServiceTracking serviceTracking)
+        public LogPollService(IConfiguration config, ILoggerFactory loggerFactory, ConfigurationContext configurationContext, 
+            IEnumerable<IControlLogConnection> logConnections, IEnumerable<ILogProcessor> logProcessors, StartupHealthCheck startup)
         {
             Config = config;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             ConfigurationContext = configurationContext;
             LogConnections = logConnections.ToDictionary(k => k.Type);
             LogProcessors = logProcessors;
-            this.serviceTracking = serviceTracking;
-            serviceTracking.Start();
+            this.startup = startup;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            serviceTracking.Update(ServiceState.ONLINE, string.Empty);
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+            startup.Start();
+            startup.SetStarted();
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 var sw = Stopwatch.StartNew();
@@ -65,17 +69,17 @@ namespace BigMission.RaceControlLog
                         }
                         else
                         {
-                            Logger.Warn($"Unsupported ControlLogType: '{eventTarget.Key.ControlLogType}'");
+                            Logger.LogWarning($"Unsupported ControlLogType: '{eventTarget.Key.ControlLogType}'");
                         }
                     }
                     await Task.WhenAll(processingTasks);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error polling control log.");
+                    Logger.LogError(ex, "Error polling control log.");
                 }
-                Logger.Debug($"Log poll in {sw.ElapsedMilliseconds}ms");
-                await Task.Delay(int.Parse(Config["LogPollRateMs"]), stoppingToken);
+                Logger.LogDebug($"Log poll in {sw.ElapsedMilliseconds}ms");
+                await Task.Delay(int.Parse(Config["LOGPOLLRATEMS"]), stoppingToken);
             }
         }
     }

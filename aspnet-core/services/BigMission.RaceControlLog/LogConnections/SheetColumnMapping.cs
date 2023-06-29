@@ -11,7 +11,7 @@ namespace BigMission.RaceControlLog.LogConnections
         public string SheetColumn { get; set; } = string.Empty;
         public bool IsRequired { get; set; }
         public string PropertyName { get; set; } = string.Empty;
-        public Func<string, object>? Convert { get; set; }
+        public Func<string, object> Convert { get; set; }
 
         public bool SetEntryValue(RaceControlLogEntry entry, string value)
         {
