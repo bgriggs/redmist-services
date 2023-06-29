@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using BigMission.ServiceStatusTools;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -19,19 +20,28 @@ namespace BigMission.FuelStatistics
         private readonly TimeSpan lapCheckInterval;
         private readonly IDataContext dataContext;
         private readonly IEnumerable<ILapConsumer> lapConsumers;
+        private readonly StartupHealthCheck startup;
 
-
-        public LapProcessorService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IEnumerable<ILapConsumer> lapConsumers)
+        public LapProcessorService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IEnumerable<ILapConsumer> lapConsumers, StartupHealthCheck startup)
         {
             Logger = loggerFactory.CreateLogger(GetType().Name);
             this.dataContext = dataContext;
             this.lapConsumers = lapConsumers;
+            this.startup = startup;
             lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LAPCHECKMS"]));
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 try

@@ -11,7 +11,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using NLog;
 using NLog.Web;
 using StackExchange.Redis;
 using System;
@@ -92,7 +91,7 @@ namespace BigMission.FuelStatistics
             var app = builder.Build();
             var logger = app.Services.GetService<ILoggerFactory>().CreateLogger("Main");
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            logger.LogInformation("AlarmProcessor Starting...");
+            logger.LogInformation("FuelStatistics Starting...");
             logger.LogInformation(assembly.ToString());
 
             if (app.Environment.IsDevelopment())

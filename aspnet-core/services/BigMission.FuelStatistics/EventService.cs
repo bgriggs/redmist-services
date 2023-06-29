@@ -3,6 +3,7 @@ using BigMission.Cache.Models.FuelRange;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
+using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -31,11 +32,12 @@ namespace BigMission.FuelStatistics
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
         private readonly IFlagContext flagContext;
+        private readonly StartupHealthCheck startup;
         private readonly Dictionary<int, Event> eventSubscriptions = new();
 
 
         public EventService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IFuelRangeContext fuelRangeContext, 
-            IFlagContext flagContext, IDateTimeHelper dateTime)
+            IFlagContext flagContext, IDateTimeHelper dateTime, StartupHealthCheck startup)
         {
             Logger = loggerFactory.CreateLogger(GetType().Name);
             this.loggerFactory = loggerFactory;
@@ -43,6 +45,7 @@ namespace BigMission.FuelStatistics
             this.fuelRangeContext = fuelRangeContext;
             this.flagContext = flagContext;
             DateTime = dateTime;
+            this.startup = startup;
             subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTSUBSCRIPTIONCHECKMS"]));
             commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTCOMMITMS"]));
         }
@@ -50,6 +53,16 @@ namespace BigMission.FuelStatistics
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+            startup.Start();
+            startup.SetStarted();
+
             DateTime lastSubCheck = default;
             while (!stoppingToken.IsCancellationRequested)
             {
