@@ -2,7 +2,7 @@
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
-using NLog;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -42,14 +42,14 @@ namespace BigMission.FuelStatistics.FuelRange
         private readonly IFuelRangeContext fuelRangeContext;
 
 
-        public CarRange(FuelRangeSetting settings, IDateTimeHelper dateTimeHelper, IFuelRangeContext fuelRangeContext, ILogger logger)
+        public CarRange(FuelRangeSetting settings, IDateTimeHelper dateTimeHelper, IFuelRangeContext fuelRangeContext, ILoggerFactory loggerFactory)
         {
             this.settings = settings;
             CarId = settings.CarId;
             telemetryTriggers = new TelemetryTriggers(dateTimeHelper);
             flagUtils = new FlagDurationUtils(dateTimeHelper);
             this.fuelRangeContext = fuelRangeContext;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
         }
 
 
@@ -93,8 +93,8 @@ namespace BigMission.FuelStatistics.FuelRange
                 this.laps.Add(l);
             }
 
-            // Update stint range based on pit stops from race hero.  This get overriden when we have car telemetry
-            // that allows for determining when the car was refuled and when the car starts moving at speed again.
+            // Update stint range based on pit stops from race hero.  This get overridden when we have car telemetry
+            // that allows for determining when the car was refueled and when the car starts moving at speed again.
             if (settings.UseRaceHeroTrigger)
             {
                 foreach (var lap in laps)
@@ -131,7 +131,7 @@ namespace BigMission.FuelStatistics.FuelRange
             return changed;
         }
 
-        public async Task<bool> ProcessTelemetery(ChannelDataSetDto telemData)
+        public async Task<bool> ProcessTelemetry(ChannelDataSetDto telemData)
         {
             bool changed = false;
             if (settings.UseTelemetry)
@@ -190,7 +190,7 @@ namespace BigMission.FuelStatistics.FuelRange
         /// Take changes to a stint made by users and update the local stint.
         /// </summary>
         /// <param name="update"></param>
-        /// <returns>true if something was udpated</returns>
+        /// <returns>true if something was updated</returns>
         public Task<bool> OverrideStint(RangeUpdate update)
         {
             bool changed = false;
@@ -200,7 +200,7 @@ namespace BigMission.FuelStatistics.FuelRange
                 if (count > 0)
                 {
                     changed = true;
-                    Logger.Debug($"Deleting user removed stint ID={update.Stint.Id}");
+                    Logger.LogDebug($"Deleting user removed stint ID={update.Stint.Id}");
                 }
             }
 
@@ -249,7 +249,7 @@ namespace BigMission.FuelStatistics.FuelRange
                         // Recalculate values
                         UpdateCalculatedValues(st);
 
-                        Logger.Debug($"Updating user changes for stint ID={update.Stint.Id}");
+                        Logger.LogDebug($"Updating user changes for stint ID={update.Stint.Id}");
                     }
                     changed = true;
                 }
@@ -258,7 +258,7 @@ namespace BigMission.FuelStatistics.FuelRange
                     stints.Add(update.Stint);
                     UpdateCalculatedValues(update.Stint);
                     changed = true;
-                    Logger.Debug($"Adding user created stint ID={update.Stint.Id}");
+                    Logger.LogDebug($"Adding user created stint ID={update.Stint.Id}");
                 }
             }
 
@@ -344,7 +344,7 @@ namespace BigMission.FuelStatistics.FuelRange
                 }
             }
 
-            // Averge lap
+            // Average lap
             var oalt = stint.AverageLapTime;
             if (end.HasValue)
             {

@@ -13,7 +13,7 @@ namespace BigMission.FuelStatistics
         /// <summary>
         /// Maintains connection across calls.
         /// </summary>
-        void StartBatch();
+        Task StartBatch();
 
         /// <summary>
         /// Closes connection.

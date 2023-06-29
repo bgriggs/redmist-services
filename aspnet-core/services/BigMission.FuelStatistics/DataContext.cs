@@ -13,15 +13,15 @@ namespace BigMission.FuelStatistics
 {
     class DataContext : IDataContext
     {
-        private readonly ConnectionMultiplexer cacheMuxer;
-        private readonly string dbConnStr;
+        private readonly IConnectionMultiplexer cacheMuxer;
+        private readonly IDbContextFactory<RedMist> dbFactory;
         private RedMist batchDbContext;
 
 
-        public DataContext(ConnectionMultiplexer cacheMuxer, string dbConnStr)
+        public DataContext(IConnectionMultiplexer cacheMuxer, IDbContextFactory<RedMist> dbFactory)
         {
             this.cacheMuxer = cacheMuxer;
-            this.dbConnStr = dbConnStr;
+            this.dbFactory = dbFactory;
         }
 
         #region Database
@@ -29,13 +29,13 @@ namespace BigMission.FuelStatistics
         /// <summary>
         /// Maintains connection across calls.
         /// </summary>
-        public void StartBatch()
+        public async Task StartBatch()
         {
             if (batchDbContext != null)
             {
                 throw new InvalidOperationException("Batch already open");
             }
-            batchDbContext = new RedMist(dbConnStr);
+            batchDbContext = await dbFactory.CreateDbContextAsync();
         }
 
         /// <summary>
@@ -51,19 +51,19 @@ namespace BigMission.FuelStatistics
             }
         }
 
-        private RedMist GetDb()
+        private async Task<RedMist> GetDb()
         {
             if (batchDbContext != null)
             {
                 return batchDbContext;
             }
 
-            return new RedMist(dbConnStr);
+            return await dbFactory.CreateDbContextAsync();
         }
 
         public async Task<List<Lap>> GetSavedLaps(int eventId)
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 int latestRunId = 0;
@@ -102,7 +102,7 @@ namespace BigMission.FuelStatistics
 
         public async Task<List<FuelRangeSetting>> GetFuelRangeSettings(int[] carIds)
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 return await db.FuelRangeSettings.Where(c => carIds.Contains(c.CarId)).ToListAsync();
@@ -118,7 +118,7 @@ namespace BigMission.FuelStatistics
 
         public async Task<List<DeviceAppConfig>> GetDeviceAppConfig(int[] carIds)
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 return await db.DeviceAppConfigs.Where(d => d.CarId.HasValue && carIds.Contains(d.CarId.Value)).ToListAsync();
@@ -134,7 +134,7 @@ namespace BigMission.FuelStatistics
 
         public async Task<List<Database.Models.Car>> GetCars(int[] carIds)
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 return await db.Cars.Where(c => !c.IsDeleted && carIds.Contains(c.Id)).ToListAsync();
@@ -150,7 +150,7 @@ namespace BigMission.FuelStatistics
 
         public async Task<List<ChannelMapping>> GetChannelMappings(int[] deviceAppIds, string[] channelNames)
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 return await db.ChannelMappings.Where(ch => deviceAppIds.Contains(ch.DeviceAppId) && channelNames.Contains(ch.ReservedName)).ToListAsync();
@@ -166,7 +166,7 @@ namespace BigMission.FuelStatistics
 
         public async Task<List<FuelRangeStint>> GetTeamStints(int teamId, int rhEventId)
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 var latestRunId = await db.FuelRangeStints.Where(s => s.TenantId == teamId && s.EventId == rhEventId).Select(p => p.RunId).DefaultIfEmpty(0).MaxAsync();
@@ -183,7 +183,7 @@ namespace BigMission.FuelStatistics
 
         public async Task<List<RaceEventSetting>> GetEventSettings()
         {
-            var db = GetDb();
+            var db = await GetDb();
             try
             {
                 return await db.RaceEventSettings

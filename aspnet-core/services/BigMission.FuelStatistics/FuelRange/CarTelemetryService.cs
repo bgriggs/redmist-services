@@ -1,6 +1,5 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 using StackExchange.Redis;
@@ -12,19 +11,17 @@ using System.Threading.Tasks;
 namespace BigMission.FuelStatistics.FuelRange
 {
     /// <summary>
-    /// Receives car telemetry and propigates it to consumers.
+    /// Receives car telemetry and propagates it to consumers.
     /// </summary>
     public class CarTelemetryService : BackgroundService
     {
-        public IConfiguration Config { get; }
         private readonly IEnumerable<ICarTelemetryConsumer> telemetryConsumers;
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
 
-        public CarTelemetryService(IConfiguration config, IEnumerable<ICarTelemetryConsumer> telemetryConsumers)
+        public CarTelemetryService(IConnectionMultiplexer cacheMuxer, IEnumerable<ICarTelemetryConsumer> telemetryConsumers)
         {
-            Config = config;
             this.telemetryConsumers = telemetryConsumers;
-            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
+            this.cacheMuxer = cacheMuxer;
         }
 
 
@@ -43,7 +40,7 @@ namespace BigMission.FuelStatistics.FuelRange
 
             if (telemetryData.Data == null)
             {
-                telemetryData.Data = new ChannelStatusDto[] { };
+                telemetryData.Data = System.Array.Empty<ChannelStatusDto>();
             }
 
             var consumerTasks = telemetryConsumers.Select(async (consumer) =>

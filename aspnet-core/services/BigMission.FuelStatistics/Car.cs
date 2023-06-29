@@ -100,7 +100,7 @@ namespace BigMission.FuelStatistics
                     if (lap.Value.LastLapTimeSeconds > lastPitLapTime && Pits.Any())
                     {
                         var lps = (PitStop)Pits.Last();
-                        // Todo: Consider transering misclassified pit laps to the previous stint before clearing
+                        // Todo: Consider transferring misclassified pit laps to the previous stint before clearing
                         lps.Laps.Clear();
                         lps.Laps[lap.Key] = lap.Value;
                         lps.Comments = $"Timing loop is before pit stall, including next lap as pit stop. ";

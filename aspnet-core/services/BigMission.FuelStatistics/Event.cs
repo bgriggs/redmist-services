@@ -4,7 +4,7 @@ using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.TestHelpers;
-using NLog;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -21,6 +21,7 @@ namespace BigMission.FuelStatistics
         public const string SPEED = "Speed";
         public const string FUEL_LEVEL = "FuelLevel";
         private readonly RaceEventSetting settings;
+        private readonly ILoggerFactory loggerFactory;
         private readonly IDateTimeHelper dateTimeHelper;
         private ILogger Logger { get; }
         public int RhEventId { get; private set; }
@@ -34,13 +35,14 @@ namespace BigMission.FuelStatistics
         private readonly IFlagContext flagContext;
 
 
-        public Event(RaceEventSetting settings, ILogger logger, IDateTimeHelper dateTimeHelper, IDataContext dataContext, 
+        public Event(RaceEventSetting settings, ILoggerFactory loggerFactory, IDateTimeHelper dateTimeHelper, IDataContext dataContext, 
             IFuelRangeContext fuelRangeContext, IFlagContext flagContext)
         {
             this.settings = settings;
+            this.loggerFactory = loggerFactory;
             if (!int.TryParse(settings.RaceHeroEventId, out var id)) { throw new ArgumentException("rhEventId"); }
             RhEventId = id;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             this.dateTimeHelper = dateTimeHelper;
             this.dataContext = dataContext;
             this.fuelRangeContext = fuelRangeContext;
@@ -65,29 +67,29 @@ namespace BigMission.FuelStatistics
                 await UpdateLap(laps);
 
                 // Load range settings for event cars
-                Logger.Info("Loading Fuel Range Settings...");
+                Logger.LogInformation("Loading Fuel Range Settings...");
                 var carIds = settings.GetCarIds();
                 var carSettings = await dataContext.GetFuelRangeSettings(carIds);
-                Logger.Info($"Loaded {carSettings.Count} fuel range settings");
+                Logger.LogInformation($"Loaded {carSettings.Count} fuel range settings");
                 foreach (var cs in carSettings)
                 {
-                    var carRange = new CarRange(cs, dateTimeHelper, fuelRangeContext, Logger);
+                    var carRange = new CarRange(cs, dateTimeHelper, fuelRangeContext, loggerFactory);
                     carRanges[cs.CarId] = carRange;
                 }
 
                 // Load mappings to associate telemetry from device ID to Car ID
-                Logger.Info("Loading device apps...");
+                Logger.LogInformation("Loading device apps...");
                 var deviceApps = await dataContext.GetDeviceAppConfig(carIds);
-                Logger.Info($"Loaded {deviceApps.Count} device apps");
+                Logger.LogInformation($"Loaded {deviceApps.Count} device apps");
                 foreach (var da in deviceApps)
                 {
                     deviceAppCarMappings[da.Id] = da.CarId.Value;
                 }
 
                 // Load Cars to be able to go from RH car number to a car ID
-                Logger.Info("Loading cars...");
+                Logger.LogInformation("Loading cars...");
                 var cars = await dataContext.GetCars(carIds);
-                Logger.Info($"Loaded {cars.Count} cars");
+                Logger.LogInformation($"Loaded {cars.Count} cars");
                 foreach (var c in cars)
                 {
                     carNumberToIdMappings[c.Number.ToUpper()] = c.Id;
@@ -137,7 +139,7 @@ namespace BigMission.FuelStatistics
                 }
 
                 // Check for an event/lap reset when new laps are less than what's tracked for the car.
-                // This is typcially when you have a multi-race event.
+                // This is typically when you have a multi-race event.
                 if (laps.Any() && car.Laps.Any())
                 {
                     var latestLap = laps.Max(l => l.CurrentLap);
@@ -183,7 +185,7 @@ namespace BigMission.FuelStatistics
             {
                 if (carRanges.TryGetValue(carId, out CarRange cr))
                 {
-                    var changed = await cr.ProcessTelemetery(telem);
+                    var changed = await cr.ProcessTelemetry(telem);
                     if (changed)
                     {
                         SetDirty(carId);
@@ -250,11 +252,11 @@ namespace BigMission.FuelStatistics
                     await fuelRangeContext.UpdateTeamStints(eventStints);
                 }
 
-                Logger.Trace($"CommitFuelRangeStintUpdates for event {RhEventId} in {sw.ElapsedMilliseconds}ms");
+                Logger.LogTrace($"CommitFuelRangeStintUpdates for event {RhEventId} in {sw.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Error saving fuel ranges");
+                Logger.LogError(ex, "Error saving fuel ranges");
             }
         }
 

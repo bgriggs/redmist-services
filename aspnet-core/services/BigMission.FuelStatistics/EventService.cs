@@ -6,7 +6,7 @@ using BigMission.FuelStatistics.FuelRange;
 using BigMission.TestHelpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using NLog;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,22 +27,24 @@ namespace BigMission.FuelStatistics
 
         private readonly TimeSpan subCheckInterval;
         private readonly TimeSpan commitInterval;
+        private readonly ILoggerFactory loggerFactory;
         private readonly IDataContext dataContext;
         private readonly IFuelRangeContext fuelRangeContext;
         private readonly IFlagContext flagContext;
         private readonly Dictionary<int, Event> eventSubscriptions = new();
 
 
-        public EventService(IConfiguration configuration, ILogger logger, IDataContext dataContext, IFuelRangeContext fuelRangeContext, 
+        public EventService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IFuelRangeContext fuelRangeContext, 
             IFlagContext flagContext, IDateTimeHelper dateTime)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
+            this.loggerFactory = loggerFactory;
             this.dataContext = dataContext;
             this.fuelRangeContext = fuelRangeContext;
             this.flagContext = flagContext;
             DateTime = dateTime;
-            subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EventSubscriptionCheckMs"]));
-            commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EventCommitMs"]));
+            subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTSUBSCRIPTIONCHECKMS"]));
+            commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTCOMMITMS"]));
         }
 
 
@@ -56,7 +58,7 @@ namespace BigMission.FuelStatistics
                     if ((DateTime.UtcNow - lastSubCheck) >= subCheckInterval)
                     {
                         var eventSettings = await LoadEventSettings();
-                        Logger.Info($"Loaded {eventSettings.Length} event subscriptions.");
+                        Logger.LogInformation($"Loaded {eventSettings.Length} event subscriptions.");
                         var settingEventGrps = eventSettings.GroupBy(s => s.RaceHeroEventId);
                         var eventIds = eventSettings.Select(s => int.Parse(s.RaceHeroEventId)).Distinct();
 
@@ -65,7 +67,7 @@ namespace BigMission.FuelStatistics
                             var eventId = int.Parse(settings.RaceHeroEventId);
                             if (!eventSubscriptions.TryGetValue(eventId, out Event e))
                             {
-                                e = new Event(settings, Logger, DateTime, dataContext, fuelRangeContext, flagContext);
+                                e = new Event(settings, loggerFactory, DateTime, dataContext, fuelRangeContext, flagContext);
                                 await e.Initialize();
                                 eventSubscriptions[eventId] = e;
                                 
@@ -79,7 +81,7 @@ namespace BigMission.FuelStatistics
                         var expiredEvents = eventSubscriptions.Keys.Except(eventIds);
                         foreach(var ee in expiredEvents)
                         {
-                            Logger.Info($"Removing event subscription {ee}");
+                            Logger.LogInformation($"Removing event subscription {ee}");
                             eventSubscriptions.Remove(ee);
                         }
 
@@ -96,7 +98,7 @@ namespace BigMission.FuelStatistics
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error polling subscriptions");
+                    Logger.LogError(ex, "Error polling subscriptions");
                 }
 
                 await Task.Delay(commitInterval, stoppingToken);
@@ -143,7 +145,7 @@ namespace BigMission.FuelStatistics
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Unable to load events");
+                Logger.LogError(ex, "Unable to load events");
             }
             return Array.Empty<RaceEventSetting>();
         }
@@ -166,7 +168,7 @@ namespace BigMission.FuelStatistics
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error processing car telemetry.");
+                    Logger.LogError(ex, "Error processing car telemetry.");
                 }
             });
 
@@ -183,7 +185,7 @@ namespace BigMission.FuelStatistics
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error processing stint override.");
+                    Logger.LogError(ex, "Error processing stint override.");
                 }
             });
 

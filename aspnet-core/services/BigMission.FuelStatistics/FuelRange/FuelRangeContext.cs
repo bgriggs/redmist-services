@@ -3,6 +3,7 @@ using BigMission.Cache.Models;
 using BigMission.Cache.Models.FuelRange;
 using BigMission.Database;
 using BigMission.Database.Models;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 using System;
@@ -14,14 +15,13 @@ namespace BigMission.FuelStatistics.FuelRange
 {
     internal class FuelRangeContext : IFuelRangeContext
     {
-        private string ConnectionString { get; }
-        private ConnectionMultiplexer CacheMuxer { get; }
+        private IConnectionMultiplexer CacheMuxer { get; }
         private readonly IMapper objectMapper;
+        private readonly IDbContextFactory<RedMist> dbFactory;
 
-
-        public FuelRangeContext(string connectionString, ConnectionMultiplexer cacheMuxer)
+        public FuelRangeContext(IDbContextFactory<RedMist> dbFactory, IConnectionMultiplexer cacheMuxer)
         {
-            ConnectionString = connectionString;
+            this.dbFactory = dbFactory;
             CacheMuxer = cacheMuxer;
             var mapperConfiguration = new MapperConfiguration(cfg => 
             {
@@ -55,7 +55,7 @@ namespace BigMission.FuelStatistics.FuelRange
         public async Task<Cache.Models.FuelRange.Stint> SaveTeamStint(Cache.Models.FuelRange.Stint stint)
         {
             var dbstint = objectMapper.Map<FuelRangeStint>(stint);
-            using var db = new RedMist(ConnectionString);
+            using var db = await dbFactory.CreateDbContextAsync();
             db.FuelRangeStints.Add(dbstint);
             await db.SaveChangesAsync();
             stint.Id = dbstint.Id;
@@ -89,7 +89,7 @@ namespace BigMission.FuelStatistics.FuelRange
                 {
                     // Save to DB
                     var dbstints = objectMapper.Map<List<FuelRangeStint>>(stints);
-                    using var db = new RedMist(ConnectionString);
+                    using var db = await dbFactory.CreateDbContextAsync();
                     db.UpdateRange(dbstints);
                     await db.SaveChangesAsync();
                 }

@@ -3,7 +3,6 @@ using BigMission.Database;
 using BigMission.DeviceApp.Shared;
 using BigMission.ServiceStatusTools;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;

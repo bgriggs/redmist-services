@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using NLog;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace BigMission.FuelStatistics
 {
     /// <summary>
-    /// Receive car laps that have come in from Race Hero and propigate them to consumers.
+    /// Receive car laps that have come in from Race Hero and propagate them to consumers.
     /// </summary>
     public class LapProcessorService : BackgroundService
     {
@@ -21,12 +21,12 @@ namespace BigMission.FuelStatistics
         private readonly IEnumerable<ILapConsumer> lapConsumers;
 
 
-        public LapProcessorService(IConfiguration configuration, ILogger logger, IDataContext dataContext, IEnumerable<ILapConsumer> lapConsumers)
+        public LapProcessorService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IEnumerable<ILapConsumer> lapConsumers)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             this.dataContext = dataContext;
             this.lapConsumers = lapConsumers;
-            lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LapCheckMs"]));
+            lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LAPCHECKMS"]));
         }
 
 
@@ -47,24 +47,24 @@ namespace BigMission.FuelStatistics
                                 var laps = await dataContext.PopEventLaps(evt);
                                 if (laps.Any())
                                 {
-                                    Logger.Debug($"Loaded {laps.Count} laps for event {evt}");
+                                    Logger.LogDebug($"Loaded {laps.Count} laps for event {evt}");
                                     await consumer.UpdateLaps(evt, laps);
                                 }
                             }
                             catch (Exception ex)
                             {
-                                Logger.Error(ex, $"Error processing event laps for event={evt}");
+                                Logger.LogError(ex, $"Error processing event laps for event={evt}");
                             }
                         });
 
                         await Task.WhenAll(eventTasks);
                     }
 
-                    Logger.Trace($"Processed lap updates in {sw.ElapsedMilliseconds}ms");
+                    Logger.LogTrace($"Processed lap updates in {sw.ElapsedMilliseconds}ms");
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Error checking for laps to process");
+                    Logger.LogError(ex, "Error checking for laps to process");
                 }
 
                 await Task.Delay(lapCheckInterval, stoppingToken);

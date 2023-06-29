@@ -9,9 +9,9 @@ namespace BigMission.FuelStatistics
 {
     internal class FlagContext : IFlagContext
     {
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
 
-        public FlagContext(ConnectionMultiplexer cacheMuxer)
+        public FlagContext(IConnectionMultiplexer cacheMuxer)
         {
             this.cacheMuxer = cacheMuxer;
         }

@@ -3,9 +3,9 @@ using BigMission.Cache.Models.FuelRange;
 using BigMission.Database.Models;
 using BigMission.RaceHeroTestHelpers;
 using BigMission.TestHelpers;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using NLog;
 
 namespace BigMission.FuelStatistics.Tests
 {
@@ -16,7 +16,7 @@ namespace BigMission.FuelStatistics.Tests
         public void CheckNegativePitTimes()
         {
             var settings = new RaceEventSetting { RaceHeroEventId = "29201" };
-            var logger = new Mock<ILogger>();
+            var logger = new Mock<ILoggerFactory>();
             var dateTime = new Mock<IDateTimeHelper>();
             var dataContext = new Mock<IDataContext>();
             var fuelRangeContext = new Mock<IFuelRangeContext>();

@@ -20,7 +20,7 @@ namespace BigMission.FuelStatistics.FuelRange
         public ChannelMapping FuelLevelChannel { get; set; }
 
         /// <summary>
-        /// Determines if there is sufficent telemetry available to be usable.
+        /// Determines if there is sufficient telemetry available to be usable.
         /// </summary>
         public bool IsTelemetryAvailable
         {
@@ -54,7 +54,7 @@ namespace BigMission.FuelStatistics.FuelRange
         /// <returns>Start or End updates with notes, or null if not available</returns>
         public Cache.Models.FuelRange.Stint ProcessCarTelemetry(ChannelDataSetDto telem, Cache.Models.FuelRange.Stint currentStint)
         {
-            // If we dont have speed and fuel channels defined, we can't use telemetry
+            // If we don't have speed and fuel channels defined, we can't use telemetry
             if (SpeedChannel == null || FuelLevelChannel == null)
             {
                 return null;
@@ -85,11 +85,11 @@ namespace BigMission.FuelStatistics.FuelRange
                 // Check for end of stint based on a refuel point
                 if (speedCh != null && flCh != null)
                 {
-                    var isRefuling = refuelCheck.IsRefuling((int)speedCh.Value, flCh.Value);
-                    if (isRefuling)
+                    var isRefueling = refuelCheck.IsRefuling((int)speedCh.Value, flCh.Value);
+                    if (isRefueling)
                     {
                         stintUpdates.End = dateTimeHelper.UtcNow;
-                        stintUpdates.Note += "End triggered by telem refuling. ";
+                        stintUpdates.Note += "End triggered by telem refueling. ";
                     }
                 }
             }
