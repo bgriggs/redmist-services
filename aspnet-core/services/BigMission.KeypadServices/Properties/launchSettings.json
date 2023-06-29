@@ -3,8 +3,12 @@
     "BigMission.KeypadServices": {
       "commandName": "Project",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "SERVICEID": "95b3fb21-2d5e-4eb7-8a75-fae097505183",
+        "REDIS_SVC": "localhost:6379",
+        "REDIS_PW": "***REMOVED***"
+      },
+      "applicationUrl": "http://+:5000"
     },
     "Docker": {
       "commandName": "Docker"

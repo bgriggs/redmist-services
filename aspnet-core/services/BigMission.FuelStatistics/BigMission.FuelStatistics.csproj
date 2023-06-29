@@ -39,11 +39,8 @@
 		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="6.0.2" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
 		<PackageReference Include="AspNetCore.HealthChecks.System" Version="6.0.5" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="7.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
 		<PackageReference Include="NLog.Web.AspNetCore" Version="5.3.0" />
-		<PackageReference Include="System.Collections.Specialized" Version="4.3.0" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -51,7 +48,9 @@
 		<ProjectReference Include="..\..\common\BigMission.Database\BigMission.Database.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.RaceHeroSdk\BigMission.RaceHeroSdk.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.TestHelpers\BigMission.TestHelpers.csproj" />
-		<ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj" />
+		<ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj">
+		  <TreatAsUsed>true</TreatAsUsed>
+		</ProjectReference>
 		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
 	</ItemGroup>
 

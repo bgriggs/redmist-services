@@ -6,8 +6,6 @@
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "1279a886-3c40-42f8-a3fd-fecba3f19527",
         "DB_CONN": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
-        "REDIS_MASTER_SERVICE_HOST": "localhost",
-        "REDIS_MASTER_SERVICE_PORT_TCP-REDIS": "6379",
         "REDIS_SVC": "localhost:6379",
         "REDIS_PW": "***REMOVED***"
       },

@@ -2,11 +2,11 @@
 using BigMission.DeviceApp.Shared;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -16,27 +16,31 @@ namespace BigMission.KeypadServices
 {
     class Application : BackgroundService
     {
-        private IConfiguration Config { get; }
         private ILogger Logger { get; }
-        private ServiceTracking ServiceTracking { get; }
         public IDateTimeHelper DateTime { get; }
 
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
+        private readonly StartupHealthCheck startup;
 
-
-        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDateTimeHelper dateTimeHelper)
+        public Application(IConnectionMultiplexer cacheMuxer, ILoggerFactory loggerFactory, StartupHealthCheck startup, IDateTimeHelper dateTimeHelper)
         {
-            Config = config;
-            Logger = logger;
-            ServiceTracking = serviceTracking;
+            this.cacheMuxer = cacheMuxer;
+            this.startup = startup;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             DateTime = dateTimeHelper;
-            cacheMuxer = ConnectionMultiplexer.Connect(Config["RedisConn"]);
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            ServiceTracking.Update(ServiceState.STARTING, string.Empty);
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+            startup.Start();
 
             var sub = cacheMuxer.GetSubscriber();
             await sub.SubscribeAsync(Consts.CAR_KEYPAD_SUB, async (channel, message) =>
@@ -44,7 +48,8 @@ namespace BigMission.KeypadServices
                 await HandleKeypadStatus(message);
             });
 
-            Logger.Info("Started");
+            Logger.LogInformation("Started");
+            startup.SetStarted();
         }
 
         private async Task HandleKeypadStatus(RedisValue value)
@@ -52,7 +57,7 @@ namespace BigMission.KeypadServices
             var sw = Stopwatch.StartNew();
             var keypadStatus = JsonConvert.DeserializeObject<KeypadStatusDto>(value);
 
-            Logger.Trace($"Received keypad status: {keypadStatus.DeviceAppId} Count={keypadStatus.LedStates.Count}");
+            Logger.LogTrace($"Received keypad status: {keypadStatus.DeviceAppId} Count={keypadStatus.LedStates.Count}");
 
             // Reset time to server time to prevent timeouts when data is being updated.
             keypadStatus.Timestamp = DateTime.UtcNow;
@@ -70,8 +75,8 @@ namespace BigMission.KeypadServices
 
             await db.HashSetAsync(key, buttonEntries.ToArray());
 
-            Logger.Trace($"Cached new keypad status for device: {keypadStatus.DeviceAppId}");
-            Logger.Trace($"Processed status in {sw.ElapsedMilliseconds}ms");
+            Logger.LogTrace($"Cached new keypad status for device: {keypadStatus.DeviceAppId}");
+            Logger.LogTrace($"Processed status in {sw.ElapsedMilliseconds}ms");
         }
     }
 }
