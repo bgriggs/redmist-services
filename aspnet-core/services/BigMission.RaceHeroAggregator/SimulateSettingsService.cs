@@ -1,6 +1,6 @@
 ﻿using BigMission.Database;
 using BigMission.Database.Models;
-using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
 
@@ -14,11 +14,11 @@ namespace BigMission.RaceHeroAggregator
         public SimulationSetting Settings { get { return settings.Value; } }
         private readonly Lazy<SimulationSetting> settings;
 
-        public SimulateSettingsService(IConfiguration config)
+        public SimulateSettingsService(IDbContextFactory<RedMist> dbFactory)
         {
             settings = new Lazy<SimulationSetting>(() =>
             {
-                using var db = new RedMist(config["ConnectionString"]);
+                using var db = dbFactory.CreateDbContext();
                 return db.SimulationSettings.First();
             });
         }

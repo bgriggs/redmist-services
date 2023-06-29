@@ -7,8 +7,8 @@ using BigMission.RaceHeroSdk.Status;
 using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -35,7 +35,8 @@ namespace BigMission.RaceHeroAggregator
         private IDateTimeHelper DateTime { get; }
 
         private const int FUEL_STATS_MAX_LEN = 200;
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly IConnectionMultiplexer cacheMuxer;
 
 
         private FlagStatus flagStatus;
@@ -56,6 +57,7 @@ namespace BigMission.RaceHeroAggregator
 
         #region Simulation
         private ISimulateSettingsService simulateSettingsService;
+        private readonly IDbContextFactory<RedMist> dbFactory;
         private DateTime lastFlagChange;
         private RaceHeroClient.Flag? overrideFlag;
         private DateTime lastPitStop;
@@ -63,18 +65,19 @@ namespace BigMission.RaceHeroAggregator
         #endregion
 
 
-        public EventSubscription(ILogger logger, IConfiguration config, ConnectionMultiplexer cacheMuxer, IRaceHeroClient raceHeroClient,
-            IDateTimeHelper dateTime, ISimulateSettingsService simulateSettingsService)
+        public EventSubscription(ILoggerFactory loggerFactory, IConfiguration config, IConnectionMultiplexer cacheMuxer, IRaceHeroClient raceHeroClient,
+            IDateTimeHelper dateTime, ISimulateSettingsService simulateSettingsService, IDbContextFactory<RedMist> dbFactory)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
+            this.loggerFactory = loggerFactory;
             Config = config;
             this.cacheMuxer = cacheMuxer;
             RhClient = raceHeroClient;
             DateTime = dateTime;
             this.simulateSettingsService = simulateSettingsService;
-
-            waitForStartInterval = TimeSpan.FromMilliseconds(int.Parse(Config["WaitForStartTimer"]));
-            eventPollInterval = TimeSpan.FromMilliseconds(int.Parse(Config["EventPollTimer"]));
+            this.dbFactory = dbFactory;
+            waitForStartInterval = TimeSpan.FromMilliseconds(int.Parse(Config["WAITFORSTARTTIMER"]));
+            eventPollInterval = TimeSpan.FromMilliseconds(int.Parse(Config["EVENTPOLLTIMER"]));
             logRHToFile = bool.Parse(Config["LogRHToFile"]);
             readTestFiles = bool.Parse(Config["ReadTestFiles"]);
         }
@@ -86,7 +89,7 @@ namespace BigMission.RaceHeroAggregator
             if (EventId == null) { return; }
             if (eventPoll == null)
             {
-                eventPoll = new EventPollRequest(EventId, Logger, RhClient);
+                eventPoll = new EventPollRequest(EventId, loggerFactory, RhClient);
             }
 
             var pollDiff = DateTime.UtcNow - lastPoll;
@@ -106,7 +109,7 @@ namespace BigMission.RaceHeroAggregator
                     if (flagStatus == null && int.TryParse(EventId, out int eid))
                     {
                         lastFlagChange = DateTime.Now;
-                        flagStatus = new FlagStatus(eid, Logger, Config, cacheMuxer, DateTime);
+                        flagStatus = new FlagStatus(eid, loggerFactory, cacheMuxer, DateTime, dbFactory);
                     }
 
                     await ProcessLeaderboardAsync(pollResponse.leaderboard);
@@ -129,7 +132,7 @@ namespace BigMission.RaceHeroAggregator
                 lastPoll = DateTime.UtcNow;
             }
 
-            Logger.Debug($"Updated event in {sw.ElapsedMilliseconds}ms");
+            Logger.LogDebug($"Updated event in {sw.ElapsedMilliseconds}ms");
         }
 
 
@@ -155,7 +158,7 @@ namespace BigMission.RaceHeroAggregator
 
             foreach (var c in newCars)
             {
-                var cs = new CarSubscription(Config, cacheMuxer, DateTime) { CarId = c.Id, CarNumber = c.Number };
+                var cs = new CarSubscription(cacheMuxer, DateTime, dbFactory) { CarId = c.Id, CarNumber = c.Number };
                 subscriberCars.Add(cs);
                 await cs.InitializeChannels();
             }
@@ -185,7 +188,7 @@ namespace BigMission.RaceHeroAggregator
                 // Stop polling when the event is over
                 if (leaderboard == null || leaderboard.Racers == null)
                 {
-                    Logger.Info($"Event {EventId} has ended");
+                    Logger.LogInformation($"Event {EventId} has ended");
                     await flagStatus?.EndEvent();
                 }
                 else // Process lap updates
@@ -243,7 +246,7 @@ namespace BigMission.RaceHeroAggregator
                     }
 
                     var latestStatusCopy = racerStatus.Values.ToArray();
-                    Logger.Trace($"Processing subscriber car lap changes");
+                    Logger.LogTrace($"Processing subscriber car lap changes");
 
                     // Update car data with full current field
                     subscriberCars.ForEach(async c => { await c.ProcessUpdate(latestStatusCopy); });
@@ -274,7 +277,7 @@ namespace BigMission.RaceHeroAggregator
                         }
 
                         await CacheToFuelStatisticsAsync(carRaceLaps);
-                        Logger.Trace($"CacheToFuelStatistics {sw.ElapsedMilliseconds}ms");
+                        Logger.LogTrace($"CacheToFuelStatistics {sw.ElapsedMilliseconds}ms");
 
                         if (!readTestFiles)
                         {
@@ -285,13 +288,13 @@ namespace BigMission.RaceHeroAggregator
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Error polling leaderboard");
+                Logger.LogError(ex, "Error polling leaderboard");
             }
         }
 
         private async Task LogLapChangesAsync(List<CarRaceLap> laps)
         {
-            Logger.Trace($"Logging leaderboard laps count={laps.Count}");
+            Logger.LogTrace($"Logging leaderboard laps count={laps.Count}");
             using var db = new RedMist(Config["ConnectionString"]);
             db.CarRaceLaps.AddRange(laps);
             await db.SaveChangesAsync();
@@ -303,7 +306,7 @@ namespace BigMission.RaceHeroAggregator
         /// <param name="laps"></param>
         private async Task CacheToFuelStatisticsAsync(List<CarRaceLap> laps)
         {
-            Logger.Trace($"Caching leaderboard for fuel statistics laps count={laps.Count}");
+            Logger.LogTrace($"Caching leaderboard for fuel statistics laps count={laps.Count}");
             var cache = cacheMuxer.GetDatabase();
             var eventKey = string.Format(Consts.LAPS_FUEL_STAT, EventId);
             foreach (var lap in laps)

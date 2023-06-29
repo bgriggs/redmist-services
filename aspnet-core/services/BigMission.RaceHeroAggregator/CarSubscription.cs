@@ -8,6 +8,7 @@ using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
+using NLog.Config;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -35,18 +36,18 @@ namespace BigMission.RaceHeroAggregator
             BEST_LAP
         };
 
-        private IConfiguration Config { get; }
         private IDateTimeHelper DateTime { get; }
         public int CarId { get; set; }
         public string CarNumber { get; set; }
         public ChannelMapping[] VirtualChannels { get; private set; }
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
+        private readonly IDbContextFactory<RedMist> dbFactory;
 
-        public CarSubscription(IConfiguration config, ConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime)
+        public CarSubscription(IConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime, IDbContextFactory<RedMist> dbFactory)
         {
-            Config = config;
             this.cacheMuxer = cacheMuxer;
             DateTime = dateTime;
+            this.dbFactory = dbFactory;
         }
 
 
@@ -55,7 +56,7 @@ namespace BigMission.RaceHeroAggregator
         /// </summary>
         public async Task InitializeChannels()
         {
-            using var db = new RedMist(Config["ConnectionString"]);
+            using var db = await dbFactory.CreateDbContextAsync();
 
             // Check for race hero processing in the car.  Skip it here if it is enabled.
             var canAppConfig = await (from d in db.DeviceAppConfigs

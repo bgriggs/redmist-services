@@ -21,7 +21,7 @@ namespace BigMission.RaceControlLog.EventStatus
             var cache = cacheMuxer.GetDatabase();
             var key = string.Format(Consts.EVENT_STATUS, rhEventId);
             var json = await cache.StringGetAsync(key);
-            return JsonConvert.DeserializeObject<RaceHeroEventStatus?>(json);
+            return JsonConvert.DeserializeObject<RaceHeroEventStatus>(json);
         }
     }
 }
