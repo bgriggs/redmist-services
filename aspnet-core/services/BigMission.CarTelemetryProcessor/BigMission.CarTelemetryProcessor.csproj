@@ -18,6 +18,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Content Remove="NLog.config" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="NLog.config" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="6.0.4" />
 		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="6.0.2" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
@@ -43,7 +51,7 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="NLog.config">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
 		<None Update="NLog.Production.config">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
