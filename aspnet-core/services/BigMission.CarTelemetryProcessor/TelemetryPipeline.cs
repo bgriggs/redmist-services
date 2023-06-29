@@ -1,35 +1,30 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.ServiceStatusTools;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 using System.Threading.Tasks.Dataflow;
 
 namespace BigMission.CarTelemetryProcessor
 {
     /// <summary>
-    /// Subscribes to, receives, and propogates telemetry to registered consumers.
+    /// Subscribes to, receives, and propagates telemetry to registered consumers.
     /// </summary>
     internal class TelemetryPipeline : BackgroundService
     {
-        public IConfiguration Configuration { get; }
         public ILogger Logger { get; }
         public IEnumerable<ITelemetryConsumer> TelemetryConsumers { get; }
-        public ServiceTracking ServiceTracking { get; }
 
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
+        private readonly StartupHealthCheck startup;
         private readonly BroadcastBlock<DeviceApp.Shared.ChannelDataSetDto> producer;
 
 
-        public TelemetryPipeline(IConfiguration configuration, ILogger logger, IEnumerable<ITelemetryConsumer> telemetryConsumers, ServiceTracking serviceTracking)
+        public TelemetryPipeline(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IEnumerable<ITelemetryConsumer> telemetryConsumers, StartupHealthCheck startup)
         {
-            Configuration = configuration;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             TelemetryConsumers = telemetryConsumers;
-            ServiceTracking = serviceTracking;
-            cacheMuxer = ConnectionMultiplexer.Connect(Configuration["RedisConn"]);
+            this.startup = startup;
+            cacheMuxer = cache;
             producer = new BroadcastBlock<DeviceApp.Shared.ChannelDataSetDto>(chs => chs);
 
             foreach (var tc in telemetryConsumers)
@@ -42,14 +37,23 @@ namespace BigMission.CarTelemetryProcessor
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            ServiceTracking.Update(ServiceState.STARTING, $"Consumers: {TelemetryConsumers.Count()}");
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+            startup.Start();
 
             var sub = cacheMuxer.GetSubscriber();
             await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
             {
                 await HandleTelemetry(message);
             });
-            Logger.Info("Started");
+
+            Logger.LogInformation("Started");
+            startup.SetStarted();
         }
 
         private async Task HandleTelemetry(RedisValue value)
@@ -57,14 +61,14 @@ namespace BigMission.CarTelemetryProcessor
             var telemetryData = JsonConvert.DeserializeObject<DeviceApp.Shared.ChannelDataSetDto>(value);
             if (telemetryData != null)
             {
-                Logger.Debug($"Received telemetry from: '{telemetryData.DeviceAppId}'");
+                Logger.LogDebug($"Received telemetry from: '{telemetryData.DeviceAppId}'");
                 if (telemetryData.Data != null)
                 {
                     await producer.SendAsync(telemetryData);
                 }
                 else
                 {
-                    Logger.Debug($"Skipping empty data from: '{telemetryData.DeviceAppId}'");
+                    Logger.LogDebug($"Skipping empty data from: '{telemetryData.DeviceAppId}'");
                 }
             }
         }

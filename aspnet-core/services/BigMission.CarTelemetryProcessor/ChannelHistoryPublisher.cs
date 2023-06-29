@@ -1,9 +1,7 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 
 namespace BigMission.CarTelemetryProcessor
@@ -13,21 +11,21 @@ namespace BigMission.CarTelemetryProcessor
         public ILogger Logger { get; }
         public IDateTimeHelper DateTime { get; }
 
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
         private readonly Dictionary<int, ChannelStatusDto> last = new();
         private const int HIST_MAX_LEN = 60;
 
 
-        public ChannelHistoryPublisher(ILogger logger, IConfiguration config, IDateTimeHelper dateTime)
+        public ChannelHistoryPublisher(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDateTimeHelper dateTime)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
+            cacheMuxer = cache;
             DateTime = dateTime;
-            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
         }
 
         public async Task ProcessTelemetryMessage(ChannelDataSetDto receivedTelem)
         {
-            Logger.Trace($"ChannelHistoryPublisher received log: {receivedTelem.DeviceAppId} Count={receivedTelem.Data.Length}");
+            Logger.LogTrace($"ChannelHistoryPublisher received log: {receivedTelem.DeviceAppId} Count={receivedTelem.Data.Length}");
             if (!receivedTelem.Data.Any()) { return; }
 
             var history = new List<KeyValuePair<RedisKey, RedisValue>>();
@@ -40,7 +38,7 @@ namespace BigMission.CarTelemetryProcessor
                 }
 
                 // Append changed value to the moving channel history list
-                if (last.TryGetValue(ch.ChannelId, out ChannelStatusDto? row))
+                if (last.TryGetValue(ch.ChannelId, out ChannelStatusDto row))
                 {
                     if (row.Value != ch.Value)
                     {
@@ -73,7 +71,7 @@ namespace BigMission.CarTelemetryProcessor
                         await db.ListTrimAsync(h.Key, 0, HIST_MAX_LEN - 1, flags: CommandFlags.FireAndForget);
                     }
                 }
-                Logger.Trace($"Cached new history for device: {receivedTelem.DeviceAppId}");
+                Logger.LogTrace($"Cached new history for device: {receivedTelem.DeviceAppId}");
             }
         }
 

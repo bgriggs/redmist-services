@@ -1,9 +1,7 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 
 namespace BigMission.CarTelemetryProcessor
@@ -13,20 +11,20 @@ namespace BigMission.CarTelemetryProcessor
         public ILogger Logger { get; }
         public IDateTimeHelper DateTime { get; }
 
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
 
 
-        public StatusPublisher(ILogger logger, IConfiguration config, IDateTimeHelper dateTime)
+        public StatusPublisher(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDateTimeHelper dateTime)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
+            cacheMuxer = cache;
             DateTime = dateTime;
-            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
         }
 
 
         public async Task ProcessTelemetryMessage(ChannelDataSetDto receivedTelem)
         {
-            Logger.Trace($"StatusPublisher received log: {receivedTelem.DeviceAppId} Count={receivedTelem.Data.Length}");
+            Logger.LogTrace($"StatusPublisher received log: {receivedTelem.DeviceAppId} Count={receivedTelem.Data.Length}");
             if (!receivedTelem.Data.Any()) { return; }
 
             var kvps = new List<KeyValuePair<RedisKey, RedisValue>>();
@@ -44,7 +42,7 @@ namespace BigMission.CarTelemetryProcessor
             {
                 await db.StringSetAsync(kvp.Key, kvp.Value, expiry: TimeSpan.FromMinutes(1), flags: CommandFlags.FireAndForget);
             }
-            Logger.Trace($"Cached new status for device: {receivedTelem.DeviceAppId}");
+            Logger.LogTrace($"Cached new status for device: {receivedTelem.DeviceAppId}");
         }
     }
 }

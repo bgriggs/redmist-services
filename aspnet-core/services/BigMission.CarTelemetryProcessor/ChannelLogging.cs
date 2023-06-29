@@ -1,29 +1,29 @@
 ﻿using BigMission.Database;
 using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
-using Microsoft.Extensions.Configuration;
-using NLog;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 
 namespace BigMission.CarTelemetryProcessor
 {
     internal class ChannelLogging : ITelemetryConsumer
     {
+        private readonly IDbContextFactory<RedMist> dbFactory;
+
         public ILogger Logger { get; }
-        public IConfiguration Config { get; }
 
 
-        public ChannelLogging(ILogger logger, IConfiguration config)
+        public ChannelLogging(ILoggerFactory loggerFactory, IDbContextFactory<RedMist> dbFactory)
         {
-            Logger = logger;
-            Config = config;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
+            this.dbFactory = dbFactory;
         }
 
         public async Task ProcessTelemetryMessage(ChannelDataSetDto receivedTelem)
         {
             try
             {
-                Logger.Trace($"ChannelLogging received log: {receivedTelem.DeviceAppId} Count={receivedTelem.Data.Length}");
+                Logger.LogTrace($"ChannelLogging received log: {receivedTelem.DeviceAppId} Count={receivedTelem.Data.Length}");
                 if (receivedTelem.Data?.Length > 0)
                 {
                     var logs = new List<ChannelLog>();
@@ -37,16 +37,16 @@ namespace BigMission.CarTelemetryProcessor
                         logs.Add(dblog);
                     }
 
-                    using var db = new RedMist(Config["ConnectionString"]);
+                    using var db = await dbFactory.CreateDbContextAsync();
                     db.ChannelLogs.AddRange(logs);
                     var sw = Stopwatch.StartNew();
                     await db.SaveChangesAsync();
-                    Logger.Trace($"Device source {receivedTelem.DeviceAppId} DB Commit in {sw.ElapsedMilliseconds}ms");
+                    Logger.LogTrace($"Device source {receivedTelem.DeviceAppId} DB Commit in {sw.ElapsedMilliseconds}ms");
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Unable to save logs");
+                Logger.LogError(ex, "Unable to save logs");
             }
         }
     }
