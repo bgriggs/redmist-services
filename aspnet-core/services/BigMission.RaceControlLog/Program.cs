@@ -44,7 +44,7 @@ namespace BigMission.RaceControlLog
             var app = builder.Build();
             var logger = app.Services.GetService<ILoggerFactory>().CreateLogger("Main");
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            logger.LogInformation("AlarmProcessor Starting...");
+            logger.LogInformation("RaceControlLog Starting...");
             logger.LogInformation(assembly.ToString());
 
             if (app.Environment.IsDevelopment())
