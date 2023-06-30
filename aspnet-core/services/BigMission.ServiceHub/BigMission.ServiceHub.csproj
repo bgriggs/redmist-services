@@ -18,6 +18,7 @@
 
 	<ItemGroup>
 	  <Content Remove="nlog - Copy.Production.config" />
+	  <Content Remove="NLog.config" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -25,9 +26,14 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Include="NLog.config">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="AWSSDK.S3" Version="3.7.101.60" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
 		<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="6.0.4" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
 		<PackageReference Include="AspNetCore.HealthChecks.System" Version="6.0.5" />
@@ -35,7 +41,6 @@
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
 		<PackageReference Include="NLog.Web.AspNetCore" Version="5.3.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="6.0.1" />
 	</ItemGroup>
 

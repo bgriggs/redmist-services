@@ -9,8 +9,8 @@ using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -22,7 +22,7 @@ using System.Threading.Tasks;
 namespace BigMission.VirtualChannelAggregator
 {
     /// <summary>
-    /// Manages the sending of virtual channels to CAN device Apps.  This reads the Virtuals channel
+    /// Manages the sending of virtual channels to CAN device Apps.  This reads the Virtual channel
     /// configuration and initializes from the Channel DB status.  Then it receives channel data 
     /// updates from the cardata channel.  The services originating the Virtual channel data are 
     /// responsible for publishing that data to the cardata channel.  The StatusProcessor will
@@ -36,16 +36,20 @@ namespace BigMission.VirtualChannelAggregator
         public IDateTimeHelper DateTime { get; }
 
         private readonly Dictionary<int, Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>>> deviceCommandClients = new();
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
+        private readonly ILoggerFactory loggerFactory;
+        private readonly IDbContextFactory<RedMist> dbFactory;
 
-
-        public Application(IConfiguration config, ILogger logger, ServiceTracking serviceTracking, IDateTimeHelper dateTimeHelper)
+        public Application(IConfiguration config, IConnectionMultiplexer cacheMuxer, ILoggerFactory loggerFactory, ServiceTracking serviceTracking,
+            IDateTimeHelper dateTimeHelper, IDbContextFactory<RedMist> dbFactory)
         {
             Config = config;
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             ServiceTracking = serviceTracking;
             DateTime = dateTimeHelper;
-            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
+            this.dbFactory = dbFactory;
+            this.cacheMuxer = cacheMuxer;
+            this.loggerFactory = loggerFactory;
         }
 
 
@@ -56,10 +60,10 @@ namespace BigMission.VirtualChannelAggregator
 
             var sub = cacheMuxer.GetSubscriber();
 
-            // Watch for changes in device app configuraiton such as channels
+            // Watch for changes in device app configuration such as channels
             await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
             {
-                Logger.Info("Car device app configuration notification received");
+                Logger.LogInformation("Car device app configuration notification received");
                 await InitDeviceClients();
             });
 
@@ -74,8 +78,8 @@ namespace BigMission.VirtualChannelAggregator
             {
                 var sw = Stopwatch.StartNew();
                 await SendFullUpdate();
-                Logger.Debug($"Sent full update in {sw.ElapsedMilliseconds}ms");
-                await Task.Delay(int.Parse(Config["FullUpdateFrequenceMs"]), stoppingToken);
+                Logger.LogDebug($"Sent full update in {sw.ElapsedMilliseconds}ms");
+                await Task.Delay(int.Parse(Config["FULLUPDATEFREQUENCYMS"]), stoppingToken);
             }
         }
 
@@ -84,40 +88,40 @@ namespace BigMission.VirtualChannelAggregator
             var telemetryData = JsonConvert.DeserializeObject<ChannelDataSetDto>(value);
             if (telemetryData != null)
             {
-                Logger.Debug($"Received status from: '{telemetryData.DeviceAppId}'");
+                Logger.LogDebug($"Received status from: '{telemetryData.DeviceAppId}'");
 
                 // Only process virtual channels
                 if (telemetryData.IsVirtual)
                 {
-                    await SendChannelStaus(telemetryData.Data);
+                    await SendChannelStatus(telemetryData.Data);
                 }
             }
         }
 
         private async Task InitDeviceClients()
         {
-            Logger.Debug("Loading device channel mappings");
+            Logger.LogDebug("Loading device channel mappings");
             deviceCommandClients.Clear();
 
             try
             {
-                using var context = new RedMist(Config["ConnectionString"]);
+                using var context = await dbFactory.CreateDbContextAsync();
                 var devices = await context.DeviceAppConfigs.Where(d => !d.IsDeleted).ToListAsync();
                 var deviceIds = devices.Select(d => d.Id);
                 var channels = await context.ChannelMappings.Where(c => c.IsVirtual).ToListAsync();
 
-                var serviceId = new Guid(Config["ServiceId"]);
+                var serviceId = new Guid(Config["SERVICEID"]);
                 foreach (var d in devices)
                 {
                     var devVirtChs = channels.Where(c => c.DeviceAppId == d.Id).Select(c => c.Id);
                     var t = new Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>>(
-                        new AppCommands(serviceId, Config["ApiKey"], Config["ApiUrl"], Logger), d, devVirtChs);
+                        new AppCommands(serviceId, Config["APIKEY"], Config["APIURL"], loggerFactory), d, devVirtChs);
                     deviceCommandClients[d.Id] = t;
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Could not initialize car app devices.");
+                Logger.LogError(ex, "Could not initialize car app devices.");
             }
         }
 
@@ -128,22 +132,21 @@ namespace BigMission.VirtualChannelAggregator
         {
             try
             {
-                Logger.Info("Sending full status udpate");
+                Logger.LogInformation("Sending full status update");
 
                 var deviceIds = deviceCommandClients.Keys.ToArray();
                 var channelIds = deviceCommandClients.Values.SelectMany(v => v.Item3).ToArray();
-
 
                 // Load current status
                 var cache = cacheMuxer.GetDatabase();
                 var rks = channelIds.Select(i => new RedisKey(string.Format(Consts.CHANNEL_KEY, i))).ToArray();
                 var channelStatusStrs = await cache.StringGetAsync(rks);
                 var channelStatus = ConvertToDeviceChStatus(channelIds, channelStatusStrs);
-                await SendChannelStaus(channelStatus.ToArray());
+                await SendChannelStatus(channelStatus.ToArray());
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Error sending full updates to devices.");
+                Logger.LogError(ex, "Error sending full updates to devices.");
             }
         }
 
@@ -163,7 +166,7 @@ namespace BigMission.VirtualChannelAggregator
             return css;
         }
 
-        private async Task SendChannelStaus(ChannelStatusDto[] status)
+        private async Task SendChannelStatus(ChannelStatusDto[] status)
         {
             var deviceStatus = status.GroupBy(s => s.DeviceAppId);
             var tasks = deviceStatus.Select(async ds =>
@@ -173,7 +176,7 @@ namespace BigMission.VirtualChannelAggregator
                     var hasDevice = deviceCommandClients.TryGetValue(ds.Key, out Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>> client);
                     if (hasDevice)
                     {
-                        Logger.Trace($"Sending virtual status to device {ds.Key}");
+                        Logger.LogTrace($"Sending virtual status to device {ds.Key}");
                         var dataSet = new ChannelDataSetDto { DeviceAppId = ds.Key, IsVirtual = true, Timestamp = DateTime.UtcNow, Data = ds.ToArray() };
                         var cmd = new Command
                         {
@@ -188,7 +191,7 @@ namespace BigMission.VirtualChannelAggregator
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Unable to send status");
+                    Logger.LogError(ex, "Unable to send status");
                 }
             });
 
