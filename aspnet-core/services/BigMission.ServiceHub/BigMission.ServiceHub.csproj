@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
-		<Nullable>enable</Nullable>
+		<TargetFramework>net7.0</TargetFramework>
+		<Nullable>disable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
 		<AssemblyVersion>1.0.0.1</AssemblyVersion>
@@ -10,12 +10,14 @@
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<DockerfileContext>..\..</DockerfileContext>
 		<DockerComposeProjectPath>..\..\docker-compose.dcproj</DockerComposeProjectPath>
+		<Authors>Brian Griggs</Authors>
+		<Company>Big Mission Motorsports, LLC</Company>
+		<Product>Red Mist</Product>
+		<Copyright>2022-2023</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>
 	  <Content Remove="nlog - Copy.Production.config" />
-	  <Content Remove="nlog.config" />
-	  <Content Remove="nlog.Production.config" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -23,21 +25,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Include="nlog.config">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Include="nlog.Production.config">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
-
-	<ItemGroup>
 		<PackageReference Include="AWSSDK.S3" Version="3.7.101.60" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-		<PackageReference Include="NLog" Version="4.7.13" />
-		<PackageReference Include="NLog.Extensions.Logging" Version="1.7.4" />
-		<PackageReference Include="StackExchange.Redis" Version="2.2.88" />
+		<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="6.0.4" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
+		<PackageReference Include="AspNetCore.HealthChecks.System" Version="6.0.5" />
+		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="6.0.2" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
+		<PackageReference Include="NLog.Web.AspNetCore" Version="5.3.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Core" Version="1.1.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="6.0.1" />
@@ -49,6 +45,7 @@
 		<ProjectReference Include="..\..\common\BigMission.Database\BigMission.Database.csproj" />
 		<ProjectReference Include="..\..\common\BigMission.TestHelpers\BigMission.TestHelpers.csproj" />
 		<ProjectReference Include="..\..\common\NLog.Targets.ServiceHub\NLog.Targets.ServiceHub.csproj" />
+		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -8,23 +8,23 @@ using StackExchange.Redis;
 namespace BigMission.ServiceHub
 {
     /// <summary>
-    /// Facilitates the propigation of data from service hub to microservices.
+    /// Facilitates the propagation of data from service hub to microservices.
     /// </summary>
     public class DataClearinghouse
     {
-        public NLog.ILogger Logger { get; }
+        public ILogger Logger { get; }
         private IDateTimeHelper DateTime { get; }
 
-        private readonly ConnectionMultiplexer cacheMuxer;
+        private readonly IConnectionMultiplexer cacheMuxer;
         private readonly int maxLogListLength = 100;
         private readonly TimeSpan logLengthTrim = TimeSpan.FromSeconds(30);
         private readonly Dictionary<Guid, DateTime> logLastTrims = new();
 
 
-        public DataClearinghouse(IConfiguration config, NLog.ILogger logger, IDateTimeHelper dateTime)
+        public DataClearinghouse(IConnectionMultiplexer cacheMuxer, ILoggerFactory loggerFactory, IDateTimeHelper dateTime)
         {
-            cacheMuxer = ConnectionMultiplexer.Connect(config["RedisConn"]);
-            Logger = logger;
+            this.cacheMuxer = cacheMuxer;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             DateTime = dateTime;
         }
 
@@ -50,7 +50,7 @@ namespace BigMission.ServiceHub
                     {
                         await cache.ListTrimAsync(cacheKey, 0, maxLogListLength, flags: CommandFlags.FireAndForget);
                         logLastTrims[message.SourceKey] = DateTime.UtcNow;
-                        Logger.Trace($"Trimed logs for: {message.SourceKey}");
+                        Logger.LogTrace($"Trimmed logs for: {message.SourceKey}");
                     }
                 }
                 else

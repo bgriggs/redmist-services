@@ -9,19 +9,19 @@ namespace BigMission.ServiceHub.Hubs
 {
     public class EdgeDeviceHub : Hub
     {
-        private NLog.ILogger Logger { get; }
+        private ILogger Logger { get; }
         private DataClearinghouse Clearinghouse { get; }
 
-        public EdgeDeviceHub(NLog.ILogger logger, DataClearinghouse clearinghouse)
+        public EdgeDeviceHub(ILoggerFactory loggerFactory, DataClearinghouse clearinghouse)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             Clearinghouse = clearinghouse;
         }
 
         public async override Task OnConnectedAsync()
         {
             var details = GetAuthDetails();
-            Logger.Debug($"Connection from ID {details.appId}");
+            Logger.LogDebug($"Connection from ID {details.appId}");
             await Groups.AddToGroupAsync(Context.ConnectionId, details.appId.ToString().ToUpper());
             await base.OnConnectedAsync();
         }
@@ -29,7 +29,7 @@ namespace BigMission.ServiceHub.Hubs
         public async override Task OnDisconnectedAsync(Exception? exception)
         {
             var details = GetAuthDetails();
-            Logger.Debug($"Device {details.appId} disconnected.");
+            Logger.LogDebug($"Device {details.appId} disconnected.");
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, details.appId.ToString().ToUpper());
             await base.OnDisconnectedAsync(exception);
         }
@@ -51,7 +51,7 @@ namespace BigMission.ServiceHub.Hubs
 
         public async Task<bool> SendCommandV1(Command command, Guid destinationGuid)
         {
-            Logger.Debug($"SendCommandV1 {command.CommandType} to {destinationGuid}.");
+            Logger.LogDebug($"SendCommandV1 {command.CommandType} to {destinationGuid}.");
             var c = Clients.Group(destinationGuid.ToString().ToUpper());
             if (c != null)
             {
@@ -69,7 +69,7 @@ namespace BigMission.ServiceHub.Hubs
         /// <returns></returns>
         public async Task RegisterHeartbeatV1(DeviceAppHeartbeat heartbeat)
         {
-            Logger.Debug($"Heartbeat from {heartbeat.DeviceAppId}.");
+            Logger.LogDebug($"Heartbeat from {heartbeat.DeviceAppId}.");
             await Clearinghouse.PublishHeartbeat(heartbeat);
         }
 
@@ -80,19 +80,19 @@ namespace BigMission.ServiceHub.Hubs
         /// <returns></returns>
         public async Task PostLogMessage(LogMessage message)
         {
-            Logger.Trace($"RX log from: {message.SourceKey}");
+            Logger.LogTrace($"RX log from: {message.SourceKey}");
             await Clearinghouse.PublishConsoleLog(message);
         }
 
         public async Task ReceiveChannelStatusV1(ChannelDataSetDto dataSet)
         {
-            Logger.Trace($"Channel status from {dataSet.DeviceAppId}.");
+            Logger.LogTrace($"Channel status from {dataSet.DeviceAppId}.");
             await Clearinghouse.PublishChannelStatus(dataSet);
         }
 
         public async Task ReceiveKeypadStatusV1(KeypadStatusDto keypadStatus)
         {
-            Logger.Trace($"Keyboard status from {keypadStatus.DeviceAppId}.");
+            Logger.LogTrace($"Keyboard status from {keypadStatus.DeviceAppId}.");
             await Clearinghouse.PublishKeyboardStatus(keypadStatus);
         }
     }

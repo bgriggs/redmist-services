@@ -16,13 +16,16 @@ namespace BigMission.ServiceHub.Controllers
     [Route("[controller]/[action]")]
     public class EdgeDeviceController : ControllerBase
     {
-        public NLog.ILogger Logger { get; }
+        private readonly IDbContextFactory<RedMist> dbFactory;
+
+        public ILogger Logger { get; }
         public IConfiguration Config { get; }
 
-        public EdgeDeviceController(NLog.ILogger logger, IConfiguration config)
+        public EdgeDeviceController(ILoggerFactory loggerFactory, IConfiguration config, IDbContextFactory<RedMist> dbFactory)
         {
-            Logger = logger;
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             Config = config;
+            this.dbFactory = dbFactory;
         }
 
 
@@ -39,7 +42,7 @@ namespace BigMission.ServiceHub.Controllers
 
             var master = new MasterConfiguration { DeviceAppKey = authData.appId };
 
-            using var db = new RedMist(Config["ConnectionString"]);
+            using var db = await dbFactory.CreateDbContextAsync();
 
             var deviceAppConfig = await db.DeviceAppConfigs.FirstOrDefaultAsync(d => d.DeviceAppKey == authData.appId);
             if (deviceAppConfig != null)
@@ -118,7 +121,7 @@ namespace BigMission.ServiceHub.Controllers
         [HttpGet]
         public async Task<Guid> LatestDeviceCanAppCongifurationId(int deviceId)
         {
-            using var db = new RedMist(Config["ConnectionString"]);
+            using var db = await dbFactory.CreateDbContextAsync();
             var carConfig = await db.CanAppConfigs.FirstOrDefaultAsync(c => c.DeviceAppId == deviceId);
             if (carConfig != null)
             {
@@ -138,10 +141,10 @@ namespace BigMission.ServiceHub.Controllers
             if (!System.IO.File.Exists(localFilePath))
             {
                 // Pull from digital ocean S3 bucket
-                var endpointUrl = Config["DigitalOcean:EndpointUrl"];
-                var releaseBucket = Config["DigitalOcean:ReleaseBucket"];
-                var keyId = Config["DigitalOcean:KeyId"];
-                var keySecret = Config["DigitalOcean:KeySecret"];
+                var endpointUrl = Config["DIGITALOCEAN_ENDPOINTURL"];
+                var releaseBucket = Config["DIGITALOCEAN_RELEASEBUCKET"];
+                var keyId = Config["DIGITALOCEAN_KEYID"];
+                var keySecret = Config["DIGITALOCEAN_KEYSECRET"];
 
                 using IAmazonS3 client = new AmazonS3Client(keyId, keySecret, new AmazonS3Config { ServiceURL = endpointUrl });
 
