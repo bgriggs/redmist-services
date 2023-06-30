@@ -67,17 +67,17 @@ namespace BigMission.ServiceHub
             {
                 Predicate = _ => true, // Run all checks
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
+            }).AllowAnonymous();
             app.MapHealthChecks("/healthz/live", new HealthCheckOptions
             {
                 Predicate = _ => false, // Only check that service is not locked up
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
+            }).AllowAnonymous();
             app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
             {
                 Predicate = _ => true, // Run all checks
                 ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
+            }).AllowAnonymous();
 
             app.UseHttpsRedirection();
 
@@ -86,6 +86,11 @@ namespace BigMission.ServiceHub
 
             app.MapControllers();
             app.MapHub<EdgeDeviceHub>("/edgedevhub");
+
+            var startup = app.Services.GetService<StartupHealthCheck>();
+            startup.Start();
+            startup.SetStarted();
+
             await app.RunAsync();
         }
     }

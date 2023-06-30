@@ -2,6 +2,7 @@
 using BigMission.Database;
 using BigMission.TestHelpers;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using System.Security.Claims;
@@ -26,6 +27,16 @@ namespace BigMission.ServiceHub.Security
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
+            // Check for access to AllowAnonymous to allow for health checks
+            var endpoint = Context.GetEndpoint();
+            if (endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null)
+            {
+                var c = new[] { new Claim(ClaimTypes.Anonymous, string.Empty) };
+                var ci = new ClaimsIdentity(c, nameof(ApiKeyAuthHandler));
+                var t = new AuthenticationTicket(new ClaimsPrincipal(ci), Scheme.Name);
+                return Task.FromResult(AuthenticateResult.Success(t));
+            }
+
             if (!Request.Headers.ContainsKey(HeaderNames.Authorization))
             {
                 return Task.FromResult(AuthenticateResult.Fail("Header Not Found."));
