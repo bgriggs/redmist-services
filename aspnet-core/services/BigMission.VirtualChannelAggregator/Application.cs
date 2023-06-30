@@ -81,6 +81,8 @@ namespace BigMission.VirtualChannelAggregator
                 await HandleTelemetry(message);
             });
 
+            startup.SetStarted();
+
             // Start loop for sending full updates
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -89,7 +91,6 @@ namespace BigMission.VirtualChannelAggregator
                 Logger.LogDebug($"Sent full update in {sw.ElapsedMilliseconds}ms");
                 await Task.Delay(int.Parse(Config["FULLUPDATEFREQUENCYMS"]), stoppingToken);
             }
-            startup.SetStarted();
         }
 
         private async Task HandleTelemetry(RedisValue value)
