@@ -11,7 +11,7 @@
         "APIKEY": "***REMOVED***",
         "APIURL": "http://localhost:5199/edgedevhub/"
       },
-      "applicationUrl": "http://+:5000"
+      "applicationUrl": "http://+:5003"
     },
     "Docker": {
       "commandName": "Docker"

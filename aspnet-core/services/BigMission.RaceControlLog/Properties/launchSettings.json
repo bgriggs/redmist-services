@@ -15,7 +15,7 @@
         "TWILIO_AUTHTOKEN": "***REMOVED***",
         "TWILIO_SENDERNUMBER": "***REMOVED***"
       },
-      "applicationUrl": "http://+:5000"
+      "applicationUrl": "http://+:5006"
     },
     "Docker": {
       "commandName": "Docker"

@@ -9,7 +9,7 @@
         "REDIS_SVC": "localhost:6379",
         "REDIS_PW": "***REMOVED***"
       },
-      "applicationUrl": "http://+:5000"
+      "applicationUrl": "http://+:5001"
     },
     "Docker": {
       "commandName": "Docker"

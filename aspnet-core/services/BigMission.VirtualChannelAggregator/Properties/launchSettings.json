@@ -12,7 +12,7 @@
         "APIURL": "https://localhost:7199/edgedevhub/",
         "FULLUPDATEFREQUENCYMS": "2500"
       },
-      "applicationUrl": "http://+:5000"
+      "applicationUrl": "http://+:5010"
     },
     "Docker": {
       "commandName": "Docker"

@@ -12,7 +12,7 @@
         "EVENTCOMMITMS": "500",
         "LAPCHECKMS": "500"
       },
-      "applicationUrl": "http://+:5000"
+      "applicationUrl": "http://+:5004"
     },
     "Docker": {
       "commandName": "Docker"

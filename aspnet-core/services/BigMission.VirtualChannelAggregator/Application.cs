@@ -32,30 +32,38 @@ namespace BigMission.VirtualChannelAggregator
     {
         private IConfiguration Config { get; }
         private ILogger Logger { get; }
-        private ServiceTracking ServiceTracking { get; }
         public IDateTimeHelper DateTime { get; }
 
         private readonly Dictionary<int, Tuple<AppCommands, DeviceAppConfig, IEnumerable<int>>> deviceCommandClients = new();
         private readonly IConnectionMultiplexer cacheMuxer;
         private readonly ILoggerFactory loggerFactory;
+        private readonly StartupHealthCheck startup;
         private readonly IDbContextFactory<RedMist> dbFactory;
 
-        public Application(IConfiguration config, IConnectionMultiplexer cacheMuxer, ILoggerFactory loggerFactory, ServiceTracking serviceTracking,
+        public Application(IConfiguration config, IConnectionMultiplexer cacheMuxer, ILoggerFactory loggerFactory, StartupHealthCheck startup,
             IDateTimeHelper dateTimeHelper, IDbContextFactory<RedMist> dbFactory)
         {
             Config = config;
             Logger = loggerFactory.CreateLogger(GetType().Name);
-            ServiceTracking = serviceTracking;
             DateTime = dateTimeHelper;
             this.dbFactory = dbFactory;
             this.cacheMuxer = cacheMuxer;
             this.loggerFactory = loggerFactory;
+            this.startup = startup;
         }
 
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            ServiceTracking.Update(ServiceState.STARTING, string.Empty);
+            Logger.LogInformation("Waiting for dependencies...");
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                if (await startup.CheckDependencies())
+                    break;
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            }
+            startup.Start();
+
             await InitDeviceClients();
 
             var sub = cacheMuxer.GetSubscriber();
@@ -81,6 +89,7 @@ namespace BigMission.VirtualChannelAggregator
                 Logger.LogDebug($"Sent full update in {sw.ElapsedMilliseconds}ms");
                 await Task.Delay(int.Parse(Config["FULLUPDATEFREQUENCYMS"]), stoppingToken);
             }
+            startup.SetStarted();
         }
 
         private async Task HandleTelemetry(RedisValue value)

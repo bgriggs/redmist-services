@@ -14,7 +14,7 @@
         "WAITFORSTARTTIMER": "3000",
         "EVENTPOLLTIMER": "1000"
       },
-      "applicationUrl": "http://+:5000"
+      "applicationUrl": "http://+:5007"
     },
     "Docker": {
       "commandName": "Docker"
