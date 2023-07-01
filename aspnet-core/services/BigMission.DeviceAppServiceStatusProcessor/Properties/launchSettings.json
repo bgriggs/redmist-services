@@ -5,7 +5,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "0d4effd3-6b70-46de-9865-36e766ad37f3",
-        "DB_CONN": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
+        "ConnectionStrings__Default": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
         "REDIS_SVC": "localhost:6379",
         "REDIS_PW": "***REMOVED***",
         "APIKEY": "***REMOVED***",

@@ -29,7 +29,7 @@ namespace BigMission.FuelStatistics
             string redisConn = $"{builder.Configuration["REDIS_SVC"]},password={builder.Configuration["REDIS_PW"]}";
 
             builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConn, c => { c.AbortOnConnectFail = false; c.ConnectRetry = 10; c.ConnectTimeout = 10; }));
-            builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["DB_CONN"]));
+            builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["ConnectionStrings:Default"]));
             builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
             builder.Services.AddSingleton<StartupHealthCheck>();
             builder.Services.AddSingleton<IFuelRangeContext, FuelRangeContext>();
@@ -83,7 +83,7 @@ namespace BigMission.FuelStatistics
             builder.Services.AddHostedService<CarTelemetryService>();
             builder.Services.AddHealthChecks()
                 .AddCheck<StartupHealthCheck>("Startup", tags: new[] { "startup" })
-                .AddSqlServer(builder.Configuration["DB_CONN"], tags: new[] { "db", "sql", "sqlserver" })
+                .AddSqlServer(builder.Configuration["ConnectionStrings:Default"], tags: new[] { "db", "sql", "sqlserver" })
                 .AddRedis(redisConn, tags: new[] { "cache", "redis" })
                 .AddProcessAllocatedMemoryHealthCheck(maximumMegabytesAllocated: 1024, name: "Process Allocated Memory", tags: new[] { "memory" });
             builder.Services.AddControllers();
