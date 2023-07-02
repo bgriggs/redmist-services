@@ -67,7 +67,7 @@ namespace BigMission.ServiceHub.Controllers
                     var kpId = master.KeypadSettings.Id;
 
                     // Load with manual SQL since EF is failing on an error on column that is non-existent
-                    using var conn = new SqlConnection(Config["ConnectionString"]);
+                    using var conn = new SqlConnection(Config["ConnectionStrings:Default"]);
                     await conn.OpenAsync();
                     var cmd = new SqlCommand($"SELECT CanId,Offset,Length,Value,ButtonNumber,LedNumber,Blink FROM KeypadCarAppCanStateRules WHERE KeypadId={kpId}", conn);
                     var crs = new List<KeypadCarAppCanStateRule>();

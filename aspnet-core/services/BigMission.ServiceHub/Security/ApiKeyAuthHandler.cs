@@ -3,6 +3,7 @@ using BigMission.Database;
 using BigMission.TestHelpers;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using System.Security.Claims;
@@ -12,20 +13,23 @@ namespace BigMission.ServiceHub.Security
 {
     public class ApiKeyAuthHandler : AuthenticationHandler<ApiKeyAuthSchemeOptions>
     {
+        private readonly IDbContextFactory<RedMist> dbFactory;
+
         private IConfiguration Config { get; }
         private IDateTimeHelper DateTimeHelper { get; }
 
 
-        public ApiKeyAuthHandler(IOptionsMonitor<ApiKeyAuthSchemeOptions> options, ILoggerFactory logger,
+        public ApiKeyAuthHandler(IOptionsMonitor<ApiKeyAuthSchemeOptions> options, ILoggerFactory logger, IDbContextFactory<RedMist> dbFactory,
             UrlEncoder encoder, ISystemClock clock, IConfiguration config, IDateTimeHelper dateTimeHelper)
             : base(options, logger, encoder, clock)
         {
+            this.dbFactory = dbFactory;
             Config = config;
             DateTimeHelper = dateTimeHelper;
         }
 
 
-        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        protected async override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             // Check for access to AllowAnonymous to allow for health checks
             var endpoint = Context.GetEndpoint();
@@ -34,37 +38,37 @@ namespace BigMission.ServiceHub.Security
                 var c = new[] { new Claim(ClaimTypes.Anonymous, string.Empty) };
                 var ci = new ClaimsIdentity(c, nameof(ApiKeyAuthHandler));
                 var t = new AuthenticationTicket(new ClaimsPrincipal(ci), Scheme.Name);
-                return Task.FromResult(AuthenticateResult.Success(t));
+                return AuthenticateResult.Success(t);
             }
 
             if (!Request.Headers.ContainsKey(HeaderNames.Authorization))
             {
-                return Task.FromResult(AuthenticateResult.Fail("Header Not Found."));
+                return AuthenticateResult.Fail("Header Not Found.");
             }
 
             var token = Request.Headers[HeaderNames.Authorization].ToString();
             if (string.IsNullOrEmpty(token))
             {
-                return Task.FromResult(AuthenticateResult.Fail("Invalid token"));
+                return AuthenticateResult.Fail("Invalid token");
             }
 
             var authData = KeyUtilities.DecodeToken(token.Remove(0, 7));
-            var result = ValidateToken(authData.appId, authData.apiKey);
+            var result = await ValidateToken(authData.appId, authData.apiKey);
             if (!result.isValid)
             {
-                return Task.FromResult(AuthenticateResult.Fail(result.message));
+                return AuthenticateResult.Fail(result.message);
             }
 
             var claims = new[] { new Claim(ClaimTypes.NameIdentifier, token) };
 
             var claimsIdentity = new ClaimsIdentity(claims, nameof(ApiKeyAuthHandler));
             var ticket = new AuthenticationTicket(new ClaimsPrincipal(claimsIdentity), Scheme.Name);
-            return Task.FromResult(AuthenticateResult.Success(ticket));
+            return AuthenticateResult.Success(ticket);
         }
 
-        private (bool isValid, string message) ValidateToken(Guid appId, string apiKey)
+        private async Task<(bool isValid, string message)> ValidateToken(Guid appId, string apiKey)
         {
-            using var db = new RedMist(Config["ConnectionString"]);
+            using var db = await dbFactory.CreateDbContextAsync();
             var key = db.ApiKeys.FirstOrDefault(k => k.ServiceId == appId && k.Key == apiKey);
 
             if (key == null)

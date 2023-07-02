@@ -169,7 +169,7 @@ namespace BigMission.RaceHeroAggregator
 
         private async Task<Car[]> LoadCarsAsync(int[] carIds)
         {
-            using var db = new RedMist(Config["ConnectionString"]);
+            using var db = await dbFactory.CreateDbContextAsync();
             return await db.Cars
                          .Where(s => !s.IsDeleted && carIds.Contains(s.Id))
                          .ToArrayAsync();
@@ -295,7 +295,7 @@ namespace BigMission.RaceHeroAggregator
         private async Task LogLapChangesAsync(List<CarRaceLap> laps)
         {
             Logger.LogTrace($"Logging leaderboard laps count={laps.Count}");
-            using var db = new RedMist(Config["ConnectionString"]);
+            using var db = await dbFactory.CreateDbContextAsync();
             db.CarRaceLaps.AddRange(laps);
             await db.SaveChangesAsync();
         }
