@@ -5,7 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\common\BigMission.RaceHeroSdk\BigMission.RaceHeroSdk.csproj" />
+    <PackageReference Include="BigMission.RaceHeroSdk" Version="2.0.0-CI-20230703-005333" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\BigMission.FuelStatistics\BigMission.FuelStatistics.csproj" />
   </ItemGroup>
 
