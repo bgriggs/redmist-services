@@ -1,0 +1,71 @@
+version: '3.4'
+
+services:
+  bigmission.alarmprocessor:
+    image: bigmission/alarmprocessor
+    build:
+      context: .
+      dockerfile: BigMission.AlarmProcessor/Dockerfile
+
+  bigmission.cartelemetryprocessor:
+    image: bigmission/cartelemetryprocessor
+    build:
+      context: .
+      dockerfile: BigMission.CarTelemetryProcessor/Dockerfile
+
+
+  bigmission.deviceappservicestatusprocessor:
+    image: bigmission/deviceappservicestatusprocessor
+    build:
+      context: .
+      dockerfile: BigMission.DeviceAppServiceStatusProcessor/Dockerfile
+
+
+  bigmission.fuelstatistics:
+    image: bigmission/fuelstatistics
+    build:
+      context: .
+      dockerfile: BigMission.FuelStatistics/Dockerfile
+
+
+  bigmission.keypadservices:
+    image: bigmission/keypadservices
+    build:
+      context: .
+      dockerfile: BigMission.KeypadServices/Dockerfile
+
+
+  bigmission.racecontrollog:
+    image: bigmission/racecontrollog
+    build:
+      context: .
+      dockerfile: BigMission.RaceControlLog/Dockerfile
+
+
+  bigmission.raceheroaggregator:
+    image: bigmission/raceheroaggregator
+    build:
+      context: .
+      dockerfile: BigMission.RaceHeroAggregator/Dockerfile
+
+
+  bigmission.servicehub:
+    image: bigmission/servicehub
+    build:
+      context: .
+      dockerfile: BigMission.ServiceHub/Dockerfile
+
+
+  bigmission.virtualchannelaggregator:
+    image: bigmission/virtualchannelaggregator
+    build:
+      context: .
+      dockerfile: BigMission.VirtualChannelAggregator/Dockerfile
+
+
+  bigmission.webhost:
+    image: bigmission/webhost
+    build:
+      context: .
+      dockerfile: webhost/BigMission.Web.Host/Dockerfile
+

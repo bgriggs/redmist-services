@@ -1,0 +1,18 @@
+{
+  "profiles": {
+    "Docker Compose": {
+      "commandName": "DockerCompose",
+      "commandVersion": "1.0",
+      "serviceActions": {
+        "bigmission.alarmprocessor": "StartDebugging",
+        "bigmission.cartelemetryprocessor": "StartDebugging",
+        "bigmission.deviceappservicestatusprocessor": "StartDebugging",
+        "bigmission.fuelstatistics": "StartDebugging",
+        "bigmission.racecontrollog": "StartDebugging",
+        "bigmission.raceheroaggregator": "StartDebugging",
+        "bigmission.servicehub": "StartDebugging",
+        "bigmission.virtualchannelaggregator": "StartDebugging"
+      }
+    }
+  }
+}
