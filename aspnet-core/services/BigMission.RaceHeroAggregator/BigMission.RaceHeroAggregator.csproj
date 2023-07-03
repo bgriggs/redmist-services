@@ -26,12 +26,10 @@
 		<PackageReference Include="BigMission.RaceHeroSdk" Version="2.0.0-CI-20230703-005333" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
 		<PackageReference Include="BigMission.CommandTools" Version="2.0.0-CI-20230703-001026" />
+		<PackageReference Include="NLog.Targets.Redis" Version="2.0.0-CI-20230703-202818" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\common\NLog.Targets.Redis\NLog.Targets.Redis\NLog.Targets.Redis.csproj">
-		  <TreatAsUsed>true</TreatAsUsed>
-		</ProjectReference>
 		<ProjectReference Include="..\BigMission.RaceHeroTestHelpers\BigMission.RaceHeroTestHelpers.csproj" />
 		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
 	</ItemGroup>
