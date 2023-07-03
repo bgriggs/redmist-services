@@ -12,7 +12,7 @@ namespace BigMission.FuelStatistics.Tests
     [TestClass]
     public class EventTests
     {
-        [TestMethod]
+        //[TestMethod]
         public void CheckNegativePitTimes()
         {
             var settings = new RaceEventSetting { RaceHeroEventId = "29201" };
@@ -23,6 +23,7 @@ namespace BigMission.FuelStatistics.Tests
             var flagContext = new Mock<IFlagContext>();
 
             var evt = new Event(settings, logger.Object, dateTime.Object, dataContext.Object, fuelRangeContext.Object, flagContext.Object);
+            // TODO: move to personal onedrive location
             var frh = new FileRHClient("../../../EventTestData/Event-29201", "../../../EventTestData/Leaderboard-29201-47955237");
             var laps = frh.GetNextLaps();
             do
