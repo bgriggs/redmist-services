@@ -10,15 +10,13 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="7.0.8" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="NLog" Version="4.7.2" />
 		<PackageReference Include="NLog.Config" Version="4.7.2" />
 		<PackageReference Include="NLog.Extensions.Logging" Version="1.6.4" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="3.1.4" />
-		<PackageReference Include="StackExchange.Redis" Version="2.2.4" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<ProjectReference Include="..\..\common\BigMission.Cache.Models\BigMission.Cache.Models.csproj" />
+		<PackageReference Include="BigMission.Cache.Models" Version="2.0.0-CI-20230703-204508" />
+		<PackageReference Include="StackExchange.Redis" Version="2.6.116" />
 	</ItemGroup>
 
 	<PropertyGroup>

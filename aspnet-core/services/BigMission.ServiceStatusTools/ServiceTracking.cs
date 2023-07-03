@@ -1,7 +1,5 @@
 ﻿using BigMission.Cache.Models;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using NLog;
 using StackExchange.Redis;
 using System;
 using System.Diagnostics;
@@ -15,7 +13,6 @@ namespace BigMission.ServiceStatusTools
         private readonly Cache.Models.ServiceStatus cacheStatus;
         private Timer statusTimer;
         private readonly IConnectionMultiplexer cacheMuxer;
-        private readonly string redisConn;
         private TimeSpan lastCpu;
         private DateTime lastResourceUpdateTimestamp;
 
@@ -28,9 +25,7 @@ namespace BigMission.ServiceStatusTools
             }
             serviceId = id;
             cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = name, State = ServiceState.OFFLINE, Note = "Initializing" };
-            this.redisConn = redisConn;
             cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
-            var cache = cacheMuxer.GetDatabase();
             Update(cacheStatus.State, cacheStatus.Note);
         }
 
