@@ -5,47 +5,47 @@ VisualStudioVersion = 17.7.33808.371
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "webhost", "webhost", "{02571907-DABC-4AED-84A9-7DB76430346A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Application", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Application\BigMission.Application.csproj", "{CA799DE5-13C1-48C0-A8BC-7C787AA2B827}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Application", "webhost\BigMission.Application\BigMission.Application.csproj", "{CA799DE5-13C1-48C0-A8BC-7C787AA2B827}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Application.Shared", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Application.Shared\BigMission.Application.Shared.csproj", "{2AD39E56-F551-4B60-89BE-5AECDD2A564F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Application.Shared", "webhost\BigMission.Application.Shared\BigMission.Application.Shared.csproj", "{2AD39E56-F551-4B60-89BE-5AECDD2A564F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Cache", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Cache\BigMission.Cache.csproj", "{946F4BB0-C713-4632-90AE-C631832F5773}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Cache", "webhost\BigMission.Cache\BigMission.Cache.csproj", "{946F4BB0-C713-4632-90AE-C631832F5773}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Core", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Core\BigMission.Core.csproj", "{F3834CC7-74C9-4F0D-9BB8-A5253CCFA6EF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Core", "webhost\BigMission.Core\BigMission.Core.csproj", "{F3834CC7-74C9-4F0D-9BB8-A5253CCFA6EF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Core.Shared", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Core.Shared\BigMission.Core.Shared.csproj", "{158CACCE-B2D9-4F68-9F25-F79DF3859645}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Core.Shared", "webhost\BigMission.Core.Shared\BigMission.Core.Shared.csproj", "{158CACCE-B2D9-4F68-9F25-F79DF3859645}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.EntityFrameworkCore", "..\..\RedMist\aspnet-core\services\webhost\BigMission.EntityFrameworkCore\BigMission.EntityFrameworkCore.csproj", "{2C5572F8-ED2C-42F1-8507-779E2F3216D7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.EntityFrameworkCore", "webhost\BigMission.EntityFrameworkCore\BigMission.EntityFrameworkCore.csproj", "{2C5572F8-ED2C-42F1-8507-779E2F3216D7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Web.Core", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Web.Core\BigMission.Web.Core.csproj", "{967E168A-40DB-4D1A-A921-39B3792EA7AE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Web.Core", "webhost\BigMission.Web.Core\BigMission.Web.Core.csproj", "{967E168A-40DB-4D1A-A921-39B3792EA7AE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Web.Host", "..\..\RedMist\aspnet-core\services\webhost\BigMission.Web.Host\BigMission.Web.Host.csproj", "{2F542A5B-A9BC-49CD-BA6F-4CF27D5B27F8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Web.Host", "webhost\BigMission.Web.Host\BigMission.Web.Host.csproj", "{2F542A5B-A9BC-49CD-BA6F-4CF27D5B27F8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.AlarmProcessor", "..\..\RedMist\aspnet-core\services\BigMission.AlarmProcessor\BigMission.AlarmProcessor.csproj", "{2EE076B7-D4FA-4F46-A307-FDA468C1F1F4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.AlarmProcessor", "BigMission.AlarmProcessor\BigMission.AlarmProcessor.csproj", "{2EE076B7-D4FA-4F46-A307-FDA468C1F1F4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.CarTelemetryProcessor", "..\..\RedMist\aspnet-core\services\BigMission.CarTelemetryProcessor\BigMission.CarTelemetryProcessor.csproj", "{CA118BDA-E507-4213-B32B-E6702EEA36AC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.CarTelemetryProcessor", "BigMission.CarTelemetryProcessor\BigMission.CarTelemetryProcessor.csproj", "{CA118BDA-E507-4213-B32B-E6702EEA36AC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Database", "..\..\RedMist\aspnet-core\services\BigMission.Database\BigMission.Database.csproj", "{4F574480-FAED-408B-9449-0E7C8ADF6D3B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.Database", "BigMission.Database\BigMission.Database.csproj", "{4F574480-FAED-408B-9449-0E7C8ADF6D3B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.DeviceAppServiceStatusProcessor", "..\..\RedMist\aspnet-core\services\BigMission.DeviceAppServiceStatusProcessor\BigMission.DeviceAppServiceStatusProcessor.csproj", "{E3ED6351-FF82-4F5E-8FEA-B20A2BACA11A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.DeviceAppServiceStatusProcessor", "BigMission.DeviceAppServiceStatusProcessor\BigMission.DeviceAppServiceStatusProcessor.csproj", "{E3ED6351-FF82-4F5E-8FEA-B20A2BACA11A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.FuelStatistics", "..\..\RedMist\aspnet-core\services\BigMission.FuelStatistics\BigMission.FuelStatistics.csproj", "{52371023-D70A-43D0-BB70-BFBB3BD4652E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.FuelStatistics", "BigMission.FuelStatistics\BigMission.FuelStatistics.csproj", "{52371023-D70A-43D0-BB70-BFBB3BD4652E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.FuelStatistics.Tests", "..\..\RedMist\aspnet-core\services\BigMission.FuelStatistics.Tests\BigMission.FuelStatistics.Tests.csproj", "{D19B9B86-799D-43A9-A8C6-DBA5C61E0E48}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.FuelStatistics.Tests", "BigMission.FuelStatistics.Tests\BigMission.FuelStatistics.Tests.csproj", "{D19B9B86-799D-43A9-A8C6-DBA5C61E0E48}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.KeypadServices", "..\..\RedMist\aspnet-core\services\BigMission.KeypadServices\BigMission.KeypadServices.csproj", "{5E2005DE-BBA3-467E-8B5E-F679F0116D6F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.KeypadServices", "BigMission.KeypadServices\BigMission.KeypadServices.csproj", "{5E2005DE-BBA3-467E-8B5E-F679F0116D6F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.RaceControlLog", "..\..\RedMist\aspnet-core\services\BigMission.RaceControlLog\BigMission.RaceControlLog.csproj", "{2730674D-3B0B-4E56-8F23-0CBB425BC997}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.RaceControlLog", "BigMission.RaceControlLog\BigMission.RaceControlLog.csproj", "{2730674D-3B0B-4E56-8F23-0CBB425BC997}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.RaceHeroAggregator", "..\..\RedMist\aspnet-core\services\BigMission.RaceHeroAggregator\BigMission.RaceHeroAggregator.csproj", "{4E7AB87D-BD5F-4954-9B72-47F97B585386}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.RaceHeroAggregator", "BigMission.RaceHeroAggregator\BigMission.RaceHeroAggregator.csproj", "{4E7AB87D-BD5F-4954-9B72-47F97B585386}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.RaceHeroTestHelpers", "..\..\RedMist\aspnet-core\services\BigMission.RaceHeroTestHelpers\BigMission.RaceHeroTestHelpers.csproj", "{02AA1719-FDEC-4217-8CA8-8776D0DF90E5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.RaceHeroTestHelpers", "BigMission.RaceHeroTestHelpers\BigMission.RaceHeroTestHelpers.csproj", "{02AA1719-FDEC-4217-8CA8-8776D0DF90E5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.ServiceHub", "..\..\RedMist\aspnet-core\services\BigMission.ServiceHub\BigMission.ServiceHub.csproj", "{E63171E4-C4A6-48A6-920C-780FE1F7D52A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.ServiceHub", "BigMission.ServiceHub\BigMission.ServiceHub.csproj", "{E63171E4-C4A6-48A6-920C-780FE1F7D52A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.ServiceStatusTools", "..\..\RedMist\aspnet-core\services\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj", "{50058BE2-41FB-4EC9-9A98-015721A12EA3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.ServiceStatusTools", "BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj", "{50058BE2-41FB-4EC9-9A98-015721A12EA3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.VirtualChannelAggregator", "..\..\RedMist\aspnet-core\services\BigMission.VirtualChannelAggregator\BigMission.VirtualChannelAggregator.csproj", "{831F7987-B113-444D-B293-19DF511FB61B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BigMission.VirtualChannelAggregator", "BigMission.VirtualChannelAggregator\BigMission.VirtualChannelAggregator.csproj", "{831F7987-B113-444D-B293-19DF511FB61B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5E5A3C06-8323-4838-A564-76FA27A94671}"
 	ProjectSection(SolutionItems) = preProject
