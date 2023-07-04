@@ -10,6 +10,20 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
+# Required for custom access to Artifacts
+# https://stackoverflow.com/questions/74597803/azure-pipeline-consuming-azure-artifact-nuget-nu1301-unable-to-load-the-servi
+- task: PowerShell@2
+  displayName: "Install Artifacts Provider"
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "Install Artifacts Provider"
+      Invoke-Expression "& { $(irm https://aka.ms/install-artifacts-credprovider.ps1) } -AddNetfx"
+
+# Check we can authenticate
+- task: NuGetAuthenticate@1
+  displayName: "Nuget Authentication"
+
 - task: NuGetToolInstaller@1
 
 - task: NuGetCommand@2
