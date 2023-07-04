@@ -6,17 +6,13 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["services/BigMission.VirtualChannelAggregator/BigMission.VirtualChannelAggregator.csproj", "services/BigMission.VirtualChannelAggregator/"]
-COPY ["common/BigMission.CommandTools/BigMission.CommandTools.csproj", "common/BigMission.CommandTools/"]
-COPY ["common/BigMission.DeviceApp.Shared/BigMission.DeviceApp.Shared.csproj", "common/BigMission.DeviceApp.Shared/"]
-COPY ["common/BigMission.TestHelpers/BigMission.TestHelpers.csproj", "common/BigMission.TestHelpers/"]
-COPY ["common/BigMission.Database/BigMission.Database.csproj", "common/BigMission.Database/"]
-COPY ["common/NLog.Targets.Redis/NLog.Targets.Redis/NLog.Targets.Redis.csproj", "common/NLog.Targets.Redis/NLog.Targets.Redis/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["common/BigMission.Cache.Models/BigMission.Cache.Models.csproj", "common/BigMission.Cache.Models/"]
-RUN dotnet restore "services/BigMission.VirtualChannelAggregator/BigMission.VirtualChannelAggregator.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.VirtualChannelAggregator/BigMission.VirtualChannelAggregator.csproj", "BigMission.VirtualChannelAggregator/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "BigMission.VirtualChannelAggregator/BigMission.VirtualChannelAggregator.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.VirtualChannelAggregator"
+WORKDIR "/src/BigMission.VirtualChannelAggregator"
 RUN dotnet build "BigMission.VirtualChannelAggregator.csproj" -c Release -o /app/build
 
 FROM build AS publish

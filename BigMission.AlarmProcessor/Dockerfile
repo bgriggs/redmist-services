@@ -6,16 +6,13 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["services/BigMission.AlarmProcessor/BigMission.AlarmProcessor.csproj", "services/BigMission.AlarmProcessor/"]
-COPY ["common/BigMission.Database/BigMission.Database.csproj", "common/BigMission.Database/"]
-COPY ["common/BigMission.DeviceApp.Shared/BigMission.DeviceApp.Shared.csproj", "common/BigMission.DeviceApp.Shared/"]
-COPY ["common/BigMission.TestHelpers/BigMission.TestHelpers.csproj", "common/BigMission.TestHelpers/"]
-COPY ["common/NLog.Targets.Redis/NLog.Targets.Redis/NLog.Targets.Redis.csproj", "common/NLog.Targets.Redis/NLog.Targets.Redis/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["common/BigMission.Cache.Models/BigMission.Cache.Models.csproj", "common/BigMission.Cache.Models/"]
-RUN dotnet restore "services/BigMission.AlarmProcessor/BigMission.AlarmProcessor.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.AlarmProcessor/BigMission.AlarmProcessor.csproj", "BigMission.AlarmProcessor/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "BigMission.AlarmProcessor/BigMission.AlarmProcessor.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.AlarmProcessor"
+WORKDIR "/src/BigMission.AlarmProcessor"
 RUN dotnet build "BigMission.AlarmProcessor.csproj" -c Release -o /app/build
 
 FROM build AS publish

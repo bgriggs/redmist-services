@@ -6,18 +6,13 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["services/BigMission.FuelStatistics/BigMission.FuelStatistics.csproj", "services/BigMission.FuelStatistics/"]
-COPY ["common/BigMission.CommandTools/BigMission.CommandTools.csproj", "common/BigMission.CommandTools/"]
-COPY ["common/BigMission.DeviceApp.Shared/BigMission.DeviceApp.Shared.csproj", "common/BigMission.DeviceApp.Shared/"]
-COPY ["common/BigMission.TestHelpers/BigMission.TestHelpers.csproj", "common/BigMission.TestHelpers/"]
-COPY ["common/BigMission.Database/BigMission.Database.csproj", "common/BigMission.Database/"]
-COPY ["common/BigMission.RaceHeroSdk/BigMission.RaceHeroSdk.csproj", "common/BigMission.RaceHeroSdk/"]
-COPY ["common/NLog.Targets.Redis/NLog.Targets.Redis/NLog.Targets.Redis.csproj", "common/NLog.Targets.Redis/NLog.Targets.Redis/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["common/BigMission.Cache.Models/BigMission.Cache.Models.csproj", "common/BigMission.Cache.Models/"]
-RUN dotnet restore "services/BigMission.FuelStatistics/BigMission.FuelStatistics.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.FuelStatistics/BigMission.FuelStatistics.csproj", "BigMission.FuelStatistics/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "BigMission.FuelStatistics/BigMission.FuelStatistics.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.FuelStatistics"
+WORKDIR "/src/BigMission.FuelStatistics"
 RUN dotnet build "BigMission.FuelStatistics.csproj" -c Release -o /app/build
 
 FROM build AS publish

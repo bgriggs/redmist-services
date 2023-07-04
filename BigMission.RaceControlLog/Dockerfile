@@ -6,14 +6,13 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["services/BigMission.RaceControlLog/BigMission.RaceControlLog.csproj", "services/BigMission.RaceControlLog/"]
-COPY ["common/BigMission.Database/BigMission.Database.csproj", "common/BigMission.Database/"]
-COPY ["common/BigMission.TestHelpers/BigMission.TestHelpers.csproj", "common/BigMission.TestHelpers/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["common/BigMission.Cache.Models/BigMission.Cache.Models.csproj", "common/BigMission.Cache.Models/"]
-RUN dotnet restore "services/BigMission.RaceControlLog/BigMission.RaceControlLog.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.RaceControlLog/BigMission.RaceControlLog.csproj", "BigMission.RaceControlLog/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "BigMission.RaceControlLog/BigMission.RaceControlLog.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.RaceControlLog"
+WORKDIR "/src/BigMission.RaceControlLog"
 RUN dotnet build "BigMission.RaceControlLog.csproj" -c Release -o /app/build
 
 FROM build AS publish

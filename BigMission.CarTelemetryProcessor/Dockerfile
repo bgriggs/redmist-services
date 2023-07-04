@@ -6,15 +6,13 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["services/BigMission.CarTelemetryProcessor/BigMission.CarTelemetryProcessor.csproj", "services/BigMission.CarTelemetryProcessor/"]
-COPY ["common/BigMission.Database/BigMission.Database.csproj", "common/BigMission.Database/"]
-COPY ["common/BigMission.DeviceApp.Shared/BigMission.DeviceApp.Shared.csproj", "common/BigMission.DeviceApp.Shared/"]
-COPY ["common/BigMission.TestHelpers/BigMission.TestHelpers.csproj", "common/BigMission.TestHelpers/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["common/BigMission.Cache.Models/BigMission.Cache.Models.csproj", "common/BigMission.Cache.Models/"]
-RUN dotnet restore "services/BigMission.CarTelemetryProcessor/BigMission.CarTelemetryProcessor.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.CarTelemetryProcessor/BigMission.CarTelemetryProcessor.csproj", "BigMission.CarTelemetryProcessor/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "BigMission.CarTelemetryProcessor/BigMission.CarTelemetryProcessor.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.CarTelemetryProcessor"
+WORKDIR "/src/BigMission.CarTelemetryProcessor"
 RUN dotnet build "BigMission.CarTelemetryProcessor.csproj" -c Release -o /app/build
 
 FROM build AS publish

@@ -6,15 +6,12 @@ EXPOSE 80
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-COPY ["services/BigMission.KeypadServices/BigMission.KeypadServices.csproj", "services/BigMission.KeypadServices/"]
-COPY ["common/BigMission.DeviceApp.Shared/BigMission.DeviceApp.Shared.csproj", "common/BigMission.DeviceApp.Shared/"]
-COPY ["common/BigMission.TestHelpers/BigMission.TestHelpers.csproj", "common/BigMission.TestHelpers/"]
-COPY ["common/NLog.Targets.Redis/NLog.Targets.Redis/NLog.Targets.Redis.csproj", "common/NLog.Targets.Redis/NLog.Targets.Redis/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["common/BigMission.Cache.Models/BigMission.Cache.Models.csproj", "common/BigMission.Cache.Models/"]
-RUN dotnet restore "services/BigMission.KeypadServices/BigMission.KeypadServices.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.KeypadServices/BigMission.KeypadServices.csproj", "BigMission.KeypadServices/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "BigMission.KeypadServices/BigMission.KeypadServices.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.KeypadServices"
+WORKDIR "/src/BigMission.KeypadServices"
 RUN dotnet build "BigMission.KeypadServices.csproj" -c Release -o /app/build
 
 FROM build AS publish
