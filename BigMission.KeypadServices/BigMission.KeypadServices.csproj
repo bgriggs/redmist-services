@@ -10,8 +10,6 @@
 		<Company>Big Mission Motorsports, LLC</Company>
 		<Product>Red Mist</Product>
 		<Version>3.8.4.1</Version>
-		<AssemblyVersion>3.8.4.1</AssemblyVersion>
-		<FileVersion>3.8.4.1</FileVersion>
 		<Copyright>2022-2023</Copyright>
 	</PropertyGroup>
 
