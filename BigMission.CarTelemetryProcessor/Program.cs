@@ -23,18 +23,21 @@ namespace BigMission.CarTelemetryProcessor
             builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["ConnectionStrings:Default"]));
             builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
             builder.Services.AddSingleton<StartupHealthCheck>();
+            builder.Services.AddSingleton<ServiceTracking>();
             builder.Services.AddSingleton<ITelemetryConsumer, StatusPublisher>();
             builder.Services.AddSingleton<ITelemetryConsumer, ChannelHistoryPublisher>();
             builder.Services.AddSingleton<ITelemetryConsumer, ChannelLogging>();
-            builder.Services.AddHostedService<TelemetryPipeline>();
             builder.Services.AddHealthChecks()
                 .AddCheck<StartupHealthCheck>("Startup", tags: new[] { "startup" })
                 .AddSqlServer(builder.Configuration["ConnectionStrings:Default"], tags: new[] { "db", "sql", "sqlserver" })
                 .AddRedis(redisConn, tags: new[] { "cache", "redis" })
                 .AddProcessAllocatedMemoryHealthCheck(maximumMegabytesAllocated: 1024, name: "Process Allocated Memory", tags: new[] { "memory" });
             builder.Services.AddControllers();
+            builder.Services.AddHostedService<TelemetryPipeline>();
+            builder.Services.AddHostedService(s => s.GetRequiredService<ServiceTracking>());
 
             var app = builder.Build();
+            builder.AddRedisLogTarget();
             var logger = app.Services.GetService<ILoggerFactory>().CreateLogger("Main");
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
             logger.LogInformation("CarTelemetryProcessor Starting...");
@@ -51,22 +54,7 @@ namespace BigMission.CarTelemetryProcessor
                .AllowAnyOrigin());
 
             app.UseRouting();
-
-            app.MapHealthChecks("/healthz/startup", new HealthCheckOptions
-            {
-                Predicate = _ => true, // Run all checks
-                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
-            app.MapHealthChecks("/healthz/live", new HealthCheckOptions
-            {
-                Predicate = _ => false, // Only check that service is not locked up
-                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
-            app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
-            {
-                Predicate = _ => true, // Run all checks
-                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
+            app.UseRedMistHealthCheckEndpoints();
             app.MapControllers();
 
             await app.RunAsync();

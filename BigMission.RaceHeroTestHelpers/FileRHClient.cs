@@ -72,7 +72,7 @@ namespace BigMission.RaceHeroTestHelpers
         {
             if (eventData.Any())
             {
-                for (int i = 0; i < eventData.Count; i++)
+                for (int i = 0; i < eventData.Count; )
                 {
                     int nextIndex = i + 1;
                     if (nextIndex < eventData.Count)

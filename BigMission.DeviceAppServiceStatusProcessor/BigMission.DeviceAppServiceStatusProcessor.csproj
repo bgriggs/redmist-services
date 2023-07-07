@@ -23,14 +23,11 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="6.0.4" />
 		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="6.0.2" />
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
 		<PackageReference Include="AspNetCore.HealthChecks.System" Version="6.0.5" />
 		<PackageReference Include="BigMission.CommandTools" Version="2.0.0-CI-20230703-001026" />
 		<PackageReference Include="BigMission.DeviceApp.Shared" Version="2.0.0-CI-20230703-001727" />
-		<PackageReference Include="BigMission.TestHelpers" Version="2.0.0-CI-20230702-223939" />
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
 		<PackageReference Include="NLog.Web.AspNetCore" Version="5.3.0" />
-		<PackageReference Include="NLog.Targets.Redis" Version="2.0.0-CI-20230703-202818" />
 	</ItemGroup>
 
 	<ItemGroup>

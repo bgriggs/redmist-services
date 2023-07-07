@@ -67,7 +67,7 @@ namespace BigMission.RaceHeroAggregator
                     break;
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
-            startup.Start();
+            await startup.Start();
 
             var eventSubInterval = TimeSpan.FromMilliseconds(int.Parse(Config["EVENTSUBSCRIPTIONCHECKMS"]));
             var waitForStartInterval = TimeSpan.FromMilliseconds(int.Parse(Config["WAITFORSTARTTIMER"]));
@@ -75,7 +75,7 @@ namespace BigMission.RaceHeroAggregator
             var minInterval = new[] { eventSubInterval, waitForStartInterval, eventPollInterval }.Min();
 
             var lastEventSubCheck = System.DateTime.MinValue;
-            startup.SetStarted();
+            await startup.SetStarted();
 
             while (!stoppingToken.IsCancellationRequested)
             {

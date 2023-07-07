@@ -48,7 +48,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
                     break;
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
-            startup.Start();
+            await startup.Start();
 
             var sub = cacheMuxer.GetSubscriber();
             await sub.SubscribeAsync(Consts.HEARTBEAT_CH, async (channel, message) =>
@@ -87,7 +87,7 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             });
 
             Logger.LogInformation("Started");
-            startup.SetStarted();
+            await startup.SetStarted();
         }
 
         private async Task HandleHeartbeat(RedisValue value, CancellationToken stoppingToken)

@@ -62,7 +62,7 @@ namespace BigMission.VirtualChannelAggregator
                     break;
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
-            startup.Start();
+            await startup.Start();
 
             await InitDeviceClients();
 
@@ -81,7 +81,7 @@ namespace BigMission.VirtualChannelAggregator
                 await HandleTelemetry(message);
             });
 
-            startup.SetStarted();
+            await startup.SetStarted();
 
             // Start loop for sending full updates
             while (!stoppingToken.IsCancellationRequested)

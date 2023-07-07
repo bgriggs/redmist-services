@@ -53,7 +53,7 @@ namespace BigMission.AlarmProcessor
                     break;
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
-            startup.Start();
+            await startup.Start();
 
             await LoadAlarmConfiguration(stoppingToken);
             await LoadDeviceChannels(stoppingToken);
@@ -79,7 +79,7 @@ namespace BigMission.AlarmProcessor
             });
 
             Logger.LogInformation("Started");
-            startup.SetStarted();
+            await startup.SetStarted();
         }
 
         private async Task ProcessTelemetryForAlarms(RedisValue value, CancellationToken stoppingToken)

@@ -41,8 +41,8 @@ namespace BigMission.RaceControlLog
                     break;
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
-            startup.Start();
-            startup.SetStarted();
+            await startup.Start();
+            await startup.SetStarted();
 
             while (!stoppingToken.IsCancellationRequested)
             {

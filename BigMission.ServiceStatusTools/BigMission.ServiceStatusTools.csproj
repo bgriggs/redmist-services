@@ -1,28 +1,24 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<Import Project="..\version"></Import>
+	
 	<ItemGroup>
-		<None Remove="C:\Users\brian\.nuget\packages\nlog.config\4.7.2\contentFiles\any\any\NLog.config" />
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
-
+	
 	<ItemGroup>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="3.1.4">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="7.0.8" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<PackageReference Include="NLog" Version="4.7.2" />
-		<PackageReference Include="NLog.Config" Version="4.7.2" />
-		<PackageReference Include="NLog.Extensions.Logging" Version="1.6.4" />
-		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="3.1.4" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
 		<PackageReference Include="BigMission.Cache.Models" Version="2.0.0-CI-20230703-204508" />
-		<PackageReference Include="StackExchange.Redis" Version="2.6.116" />
+		<PackageReference Include="BigMission.TestHelpers" Version="2.0.0-CI-20230702-223939" />
+		<PackageReference Include="NLog.Targets.Redis" Version="2.0.0-CI-20230703-202818" />
 	</ItemGroup>
 
 	<PropertyGroup>
-		<TargetFramework>netcoreapp3.1</TargetFramework>
+		<TargetFramework>net7.0</TargetFramework>
 		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
-		<Version>3.8.4.1</Version>
+		<Authors>Brian Griggs</Authors>
+		<Company>Big Mission Motorsports, LLC</Company>
+		<Product>Red Mist</Product>
+		<Copyright>2022-2023</Copyright>
 	</PropertyGroup>
 
 </Project>

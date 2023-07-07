@@ -5,8 +5,6 @@ using BigMission.RaceControlLog.LogConnections;
 using BigMission.RaceControlLog.LogProcessing;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
-using HealthChecks.UI.Client;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using NLog.Web;
 using StackExchange.Redis;
@@ -27,21 +25,24 @@ namespace BigMission.RaceControlLog
             builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["ConnectionStrings:Default"]));
             builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
             builder.Services.AddSingleton<StartupHealthCheck>();
+            builder.Services.AddSingleton<ServiceTracking>();
             builder.Services.AddSingleton<IControlLogConnection, GoogleSheetsControlLog>();
             builder.Services.AddSingleton<ILogProcessor, CacheControlLog>();
             builder.Services.AddSingleton<ILogProcessor, SmsNotification>();
             builder.Services.AddSingleton<ConfigurationContext>();
             builder.Services.AddSingleton<IEventStatus, EventRedisStatus>();
-            builder.Services.AddHostedService<ConfigurationService>();
-            builder.Services.AddHostedService<LogPollService>();
             builder.Services.AddHealthChecks()
                 .AddCheck<StartupHealthCheck>("Startup", tags: new[] { "startup" })
                 .AddSqlServer(builder.Configuration["ConnectionStrings:Default"], tags: new[] { "db", "sql", "sqlserver" })
                 .AddRedis(redisConn, tags: new[] { "cache", "redis" })
                 .AddProcessAllocatedMemoryHealthCheck(maximumMegabytesAllocated: 1024, name: "Process Allocated Memory", tags: new[] { "memory" });
             builder.Services.AddControllers();
+            builder.Services.AddHostedService<ConfigurationService>();
+            builder.Services.AddHostedService<LogPollService>();
+            builder.Services.AddHostedService(s => s.GetRequiredService<ServiceTracking>());
 
             var app = builder.Build();
+            builder.AddRedisLogTarget();
             var logger = app.Services.GetService<ILoggerFactory>().CreateLogger("Main");
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
             logger.LogInformation("RaceControlLog Starting...");
@@ -58,22 +59,7 @@ namespace BigMission.RaceControlLog
                .AllowAnyOrigin());
 
             app.UseRouting();
-
-            app.MapHealthChecks("/healthz/startup", new HealthCheckOptions
-            {
-                Predicate = _ => true, // Run all checks
-                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
-            app.MapHealthChecks("/healthz/live", new HealthCheckOptions
-            {
-                Predicate = _ => false, // Only check that service is not locked up
-                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
-            app.MapHealthChecks("/healthz/ready", new HealthCheckOptions
-            {
-                Predicate = _ => true, // Run all checks
-                ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-            });
+            app.UseRedMistHealthCheckEndpoints();
             app.MapControllers();
 
             await app.RunAsync();

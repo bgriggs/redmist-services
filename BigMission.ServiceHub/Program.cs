@@ -26,6 +26,7 @@ namespace BigMission.ServiceHub
             builder.Services.AddDbContextFactory<RedMist>(op => op.UseSqlServer(builder.Configuration["ConnectionStrings:Default"]));
             builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
             builder.Services.AddSingleton<StartupHealthCheck>();
+            builder.Services.AddSingleton<ServiceTracking>();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSingleton<DataClearinghouse>();
             builder.Services.AddSwaggerGen();
@@ -34,8 +35,9 @@ namespace BigMission.ServiceHub
                 .AddSqlServer(builder.Configuration["ConnectionStrings:Default"], tags: new[] { "db", "sql", "sqlserver" })
                 .AddRedis(redisConn, tags: new[] { "cache", "redis" })
                 .AddProcessAllocatedMemoryHealthCheck(maximumMegabytesAllocated: 1024, name: "Process Allocated Memory", tags: new[] { "memory" });
-           
-            builder.Services.AddSignalR().AddStackExchangeRedis(redisConn, options => {
+
+            builder.Services.AddSignalR().AddStackExchangeRedis(redisConn, options =>
+            {
                 options.Configuration.ChannelPrefix = "svcsr";
             });
 
@@ -43,8 +45,10 @@ namespace BigMission.ServiceHub
                 options => options.DefaultScheme = "ApiKey")
                     .AddScheme<ApiKeyAuthSchemeOptions, ApiKeyAuthHandler>("ApiKey", options => { });
             builder.Services.AddControllers();
+            builder.Services.AddHostedService(s => s.GetRequiredService<ServiceTracking>());
 
             var app = builder.Build();
+            builder.AddRedisLogTarget();
             var logger = app.Services.GetService<ILoggerFactory>().CreateLogger("Main");
             var assembly = System.Reflection.Assembly.GetExecutingAssembly();
             logger.LogInformation("ServiceHub Starting...");
@@ -88,9 +92,14 @@ namespace BigMission.ServiceHub
             app.MapHub<EdgeDeviceHub>("/edgedevhub");
 
             var startup = app.Services.GetService<StartupHealthCheck>();
-            startup.Start();
-            startup.SetStarted();
-
+            await startup.Start();
+            logger.LogInformation("Waiting for dependencies...");
+            while (!await startup.CheckDependencies())
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
+            await startup.SetStarted();
+            logger.LogInformation("Started");
             await app.RunAsync();
         }
     }

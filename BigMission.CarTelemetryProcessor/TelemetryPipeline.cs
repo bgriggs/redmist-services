@@ -44,7 +44,7 @@ namespace BigMission.CarTelemetryProcessor
                     break;
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
-            startup.Start();
+            await startup.Start();
 
             var sub = cacheMuxer.GetSubscriber();
             await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
@@ -53,7 +53,7 @@ namespace BigMission.CarTelemetryProcessor
             });
 
             Logger.LogInformation("Started");
-            startup.SetStarted();
+            await startup.SetStarted();
         }
 
         private async Task HandleTelemetry(RedisValue value)

@@ -1,54 +1,50 @@
 ﻿using BigMission.Cache.Models;
+using BigMission.TestHelpers;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using NLog;
 using StackExchange.Redis;
 using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BigMission.ServiceStatusTools
 {
-    public class ServiceTracking : IDisposable
+    public class ServiceTracking : BackgroundService
     {
         private readonly Guid serviceId;
-        private readonly Cache.Models.ServiceStatus cacheStatus;
-        private Timer statusTimer;
+        private ServiceStatus cacheStatus;
         private readonly IConnectionMultiplexer cacheMuxer;
         private TimeSpan lastCpu;
         private DateTime lastResourceUpdateTimestamp;
+        private Microsoft.Extensions.Logging.ILogger Logger { get; }
+        public IDateTimeHelper DateTime { get; }
 
-
-        public ServiceTracking(Guid id, string name, string redisConn)
+        public ServiceTracking(IConfiguration config, IConnectionMultiplexer cache, ILoggerFactory loggerFactory, IDateTimeHelper dateTime)
         {
-            if (name == null || redisConn == null)
-            {
-                throw new ArgumentNullException();
-            }
-            serviceId = id;
-            cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = name, State = ServiceState.OFFLINE, Note = "Initializing" };
-            cacheMuxer = ConnectionMultiplexer.Connect(redisConn);
-            Update(cacheStatus.State, cacheStatus.Note);
-        }
-
-        public ServiceTracking(Guid id, IConnectionMultiplexer cache)
-        {
-            serviceId = id;
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            cacheStatus = new Cache.Models.ServiceStatus { ServiceId = id, Name = assembly.GetName().Name, State = ServiceState.OFFLINE, Note = "Initializing" };
-
+            _ = Guid.TryParse(config["SERVICEID"], out serviceId);
+            Logger = loggerFactory.CreateLogger(GetType().Name);
             cacheMuxer = cache;
+            DateTime = dateTime;
+
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            cacheStatus = new ServiceStatus { ServiceId = serviceId, Name = assembly.GetName().Name, State = ServiceState.OFFLINE, Note = "Initializing" };
         }
 
-        public void Update(string state, string note)
+        public async Task Update(string state, string note)
         {
             cacheStatus.State = state;
             cacheStatus.Note = note;
             cacheStatus.Timestamp = DateTime.UtcNow;
-            //cacheStatus.LogLevel = Logger.Factory.GlobalThreshold.Name;
+            cacheStatus.LogLevel = LogManager.GlobalThreshold.ToString();
             cacheStatus.CpuUsage = UpdateCpuUsage().ToString("0.0");
 
             var stStr = JsonConvert.SerializeObject(cacheStatus);
             var cache = cacheMuxer.GetDatabase();
-            cache.HashSet(Consts.SERVICE_STATUS, new RedisValue(cacheStatus.ServiceId.ToString()), stStr);
+            await cache.HashSetAsync(Consts.SERVICE_STATUS, new RedisValue(cacheStatus.ServiceId.ToString()), stStr);
         }
 
         private double UpdateCpuUsage()
@@ -65,41 +61,21 @@ namespace BigMission.ServiceStatusTools
             return cpuUsageTotal * 100;
         }
 
-        /// <summary>
-        /// Updates service status on a frequency while the service is running.
-        /// </summary>
-        public void Start()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            if (statusTimer != null)
-            {
-                throw new InvalidOperationException("Already running.");
-            }
-
-            UpdateCpuUsage();
-            statusTimer = new Timer(UpdateCallback, null, 100, 5000);
-        }
-
-        /// <summary>
-        /// Update service status timestamp in the database.
-        /// </summary>
-        /// <param name="obj"></param>
-        private void UpdateCallback(object obj)
-        {
-            if (Monitor.TryEnter(statusTimer))
+            while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    Update(ServiceState.ONLINE, string.Empty);
-                    ScanForUpdates();
+                    await Update(ServiceState.ONLINE, string.Empty);
+                    await ScanForUpdates();
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    //Logger.Error(ex, "Error updating service status");
+                    Logger.LogError(ex, "Error checking service status");
                 }
-                finally
-                {
-                    Monitor.Exit(statusTimer);
-                }
+
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
 
@@ -107,15 +83,15 @@ namespace BigMission.ServiceStatusTools
         /// Look for other service timeouts.
         /// </summary>
         /// <param name="db"></param>
-        private void ScanForUpdates()
+        private async Task ScanForUpdates()
         {
             var cache = cacheMuxer.GetDatabase();
             var timeoutThreshold = DateTime.UtcNow - TimeSpan.FromSeconds(30);
-            var serviceStatus = cache.HashGetAll(Consts.SERVICE_STATUS);
+            var serviceStatus = await cache.HashGetAllAsync(Consts.SERVICE_STATUS);
 
             foreach (var ss in serviceStatus)
             {
-                var st = JsonConvert.DeserializeObject<Cache.Models.ServiceStatus>(ss.Value);
+                var st = JsonConvert.DeserializeObject<ServiceStatus>(ss.Value);
                 var timedOut = st.Timestamp < timeoutThreshold;
                 if (timedOut)
                 {
@@ -123,29 +99,25 @@ namespace BigMission.ServiceStatusTools
                     st.Note = "Service failed to respond within 30 seconds";
                     st.LogLevel = string.Empty;
                     var stStr = JsonConvert.SerializeObject(st);
-                    cache.HashSet(Consts.SERVICE_STATUS, ss.Name, stStr);
+                    await cache.HashSetAsync(Consts.SERVICE_STATUS, ss.Name, stStr);
                 }
             }
 
             // Check to see if user is overriding the log level
             var desiredKey = string.Format(Consts.SERVICE_LOG_DESIRED_LEVEL, serviceId);
-            var desiredLogLevel = cache.StringGet(desiredKey);
+            var desiredLogLevel = await cache.StringGetAsync(desiredKey);
             if (desiredLogLevel.HasValue && !string.IsNullOrEmpty(desiredLogLevel))
             {
-                //Logger.Trace($"Found desired log level={desiredLogLevel}");
-                //var desiredLevel = LogLevel.FromString(desiredLogLevel);
-                //if (Logger.Factory.GlobalThreshold != desiredLevel)
-                //{
-                //    Logger.Factory.GlobalThreshold = desiredLevel;
-                //    Logger.Info($"Applied new log level={desiredLevel}");
-                //}
+                Logger.LogTrace($"Found desired log level={desiredLogLevel}");
+                var desiredLevel = NLog.LogLevel.FromString(desiredLogLevel);
+                if (LogManager.GlobalThreshold != desiredLevel)
+                {
+                    LogManager.GlobalThreshold = desiredLevel;
+                    LogManager.ReconfigExistingLoggers();
+                    Logger.LogInformation($"Applied new log level={desiredLevel}");
+                }
             }
         }
 
-        public void Dispose()
-        {
-            statusTimer?.Dispose();
-            cacheMuxer.Dispose();
-        }
     }
 }

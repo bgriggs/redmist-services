@@ -59,7 +59,7 @@ namespace BigMission.FuelStatistics
             deviceAppCarMappings.Clear();
             carNumberToIdMappings.Clear();
 
-            dataContext.StartBatch();
+            await dataContext.StartBatch();
             try
             {
                 // Load any saved laps from log for the event
