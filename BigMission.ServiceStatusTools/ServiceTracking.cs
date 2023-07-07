@@ -30,8 +30,7 @@ namespace BigMission.ServiceStatusTools
             cacheMuxer = cache;
             DateTime = dateTime;
 
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            cacheStatus = new ServiceStatus { ServiceId = serviceId, Name = assembly.GetName().Name, State = ServiceState.OFFLINE, Note = "Initializing" };
+            cacheStatus = new ServiceStatus { ServiceId = serviceId, Name = AppDomain.CurrentDomain.FriendlyName, State = ServiceState.OFFLINE, Note = "Initializing" };
         }
 
         public async Task Update(string state, string note)
