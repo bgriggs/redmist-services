@@ -67,7 +67,7 @@ namespace BigMission.FuelStatistics.FuelRange
             if (overrideHandler == null) { throw new ArgumentNullException(); }
 
             var sub = CacheMuxer.GetSubscriber();
-            await sub.SubscribeAsync(Consts.FUEL_STINT_OVERRIDES, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.FUEL_STINT_OVERRIDES), async (channel, message) =>
             {
                 var stint = JsonConvert.DeserializeObject<RangeUpdate>(message);
                 await overrideHandler(stint);

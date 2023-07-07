@@ -57,21 +57,21 @@ namespace BigMission.AlarmProcessor
 
             await LoadAlarmConfiguration(stoppingToken);
             await LoadDeviceChannels(stoppingToken);
-
+            
             var sub = cacheMuxer.GetSubscriber();
-            await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), async (channel, message) =>
             {
                 await Task.Run(() => ProcessTelemetryForAlarms(message, stoppingToken));
             });
 
             // Watch for changes in device app configuration such as channels
-            await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_CONFIG_CHANGED_SUB), async (channel, message) =>
             {
                 Logger.LogInformation("Car device app configuration notification received");
                 await LoadDeviceChannels(stoppingToken);
             });
 
-            await sub.SubscribeAsync(Consts.CAR_ALARM_CONFIG_CHANGED_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_ALARM_CONFIG_CHANGED_SUB), async (channel, message) =>
             {
                 Logger.LogInformation("Alarm configuration notification received");
                 await LoadAlarmConfiguration(stoppingToken);
@@ -88,10 +88,7 @@ namespace BigMission.AlarmProcessor
             var telemetryData = JsonConvert.DeserializeObject<ChannelDataSetDto>(value);
             if (telemetryData != null)
             {
-                if (telemetryData.Data == null)
-                {
-                    telemetryData.Data = Array.Empty<ChannelStatusDto>();
-                }
+                telemetryData.Data ??= Array.Empty<ChannelStatusDto>();
                 Logger.LogDebug($"Received telemetry from: '{telemetryData.DeviceAppId}'");
 
                 Dictionary<string, List<AlarmStatus>> alarms;
@@ -149,7 +146,7 @@ namespace BigMission.AlarmProcessor
                 var alarmConfig = await context.CarAlarms
                     .Include(a => a.AlarmConditions)
                     .Include(a => a.AlarmTriggers)
-                    .ToListAsync();
+                    .ToListAsync(cancellationToken: stoppingToken);
 
                 Logger.LogInformation($"Loaded {alarmConfig.Count} Alarms");
 

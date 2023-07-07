@@ -69,14 +69,14 @@ namespace BigMission.VirtualChannelAggregator
             var sub = cacheMuxer.GetSubscriber();
 
             // Watch for changes in device app configuration such as channels
-            await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_CONFIG_CHANGED_SUB), async (channel, message) =>
             {
                 Logger.LogInformation("Car device app configuration notification received");
                 await InitDeviceClients();
             });
 
             // Process changes from stream and cache them here in the service
-            await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), async (channel, message) =>
             {
                 await HandleTelemetry(message);
             });

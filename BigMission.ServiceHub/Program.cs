@@ -38,7 +38,7 @@ namespace BigMission.ServiceHub
 
             builder.Services.AddSignalR().AddStackExchangeRedis(redisConn, options =>
             {
-                options.Configuration.ChannelPrefix = "svcsr";
+                options.Configuration.ChannelPrefix = RedisChannel.Literal("svcsr");
             });
 
             builder.Services.AddAuthentication(

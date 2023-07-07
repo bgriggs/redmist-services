@@ -33,7 +33,7 @@ namespace BigMission.ServiceHub
         {
             var hbjson = JsonConvert.SerializeObject(heartbeat);
             var pub = cacheMuxer.GetSubscriber();
-            await pub.PublishAsync(Consts.HEARTBEAT_CH, hbjson);
+            await pub.PublishAsync(RedisChannel.Literal(Consts.HEARTBEAT_CH), hbjson);
         }
 
         public async Task PublishConsoleLog(LogMessage message)
@@ -64,14 +64,14 @@ namespace BigMission.ServiceHub
         {
             var json = JsonConvert.SerializeObject(dataSet);
             var pub = cacheMuxer.GetSubscriber();
-            await pub.PublishAsync(Consts.CAR_TELEM_SUB, json);
+            await pub.PublishAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), json);
         }
 
         public async Task PublishKeyboardStatus(KeypadStatusDto keypadStatus)
         {
             var json = JsonConvert.SerializeObject(keypadStatus);
             var pub = cacheMuxer.GetSubscriber();
-            await pub.PublishAsync(Consts.CAR_KEYPAD_SUB, json);
+            await pub.PublishAsync(RedisChannel.Literal(Consts.CAR_KEYPAD_SUB), json);
         }
     }
 }

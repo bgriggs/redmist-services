@@ -51,14 +51,14 @@ namespace BigMission.DeviceAppServiceStatusProcessor
             await startup.Start();
 
             var sub = cacheMuxer.GetSubscriber();
-            await sub.SubscribeAsync(Consts.HEARTBEAT_CH, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.HEARTBEAT_CH), async (channel, message) =>
             {
                 await HandleHeartbeat(message, stoppingToken);
             });
 
             // Watch for changes in device app configuration such as channels
             var commands = commandsFactory.CreateAppCommands();
-            await sub.SubscribeAsync(Consts.CAR_CONFIG_CHANGED_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_CONFIG_CHANGED_SUB), async (channel, message) =>
             {
                 if (int.TryParse(message, out int deviceId))
                 {

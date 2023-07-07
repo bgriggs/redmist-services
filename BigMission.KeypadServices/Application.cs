@@ -43,7 +43,7 @@ namespace BigMission.KeypadServices
             await startup.Start();
 
             var sub = cacheMuxer.GetSubscriber();
-            await sub.SubscribeAsync(Consts.CAR_KEYPAD_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_KEYPAD_SUB), async (channel, message) =>
             {
                 await HandleKeypadStatus(message);
             });

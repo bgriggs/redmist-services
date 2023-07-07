@@ -15,8 +15,8 @@ namespace BigMission.RaceHeroTestHelpers
     /// </summary>
     public class FileRHClient : IRaceHeroClient
     {
-        private readonly List<Tuple<DateTime, RaceHeroSdk.Models.Event>> eventData = new List<Tuple<DateTime, RaceHeroSdk.Models.Event>>();
-        private readonly List<Tuple<DateTime, Leaderboard>> lbData = new List<Tuple<DateTime, Leaderboard>>();
+        private readonly List<Tuple<DateTime, RaceHeroSdk.Models.Event>> eventData = new();
+        private readonly List<Tuple<DateTime, Leaderboard>> lbData = new();
         private DateTime lastLb;
 
 

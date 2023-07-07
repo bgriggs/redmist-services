@@ -43,7 +43,7 @@ namespace BigMission.FuelStatistics.FuelRange
             }
 
             var sub = cacheMuxer.GetSubscriber();
-            await sub.SubscribeAsync(Consts.CAR_TELEM_SUB, async (channel, message) =>
+            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), async (channel, message) =>
             {
                 await HandleTelemetry(message);
             });

@@ -165,7 +165,7 @@ namespace BigMission.RaceHeroAggregator
                 var channelDs = new ChannelDataSetDto { IsVirtual = true, Timestamp = DateTime.UtcNow, Data = channelStatusUpdates.ToArray() };
                 var json = JsonConvert.SerializeObject(channelDs);
                 var pub = cacheMuxer.GetSubscriber();
-                await pub.PublishAsync(Consts.CAR_TELEM_SUB, json);
+                await pub.PublishAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), json);
             }
 
             //lastLap = lap;
