@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace BigMission.ServiceStatusTools
 {
-    public class StartupHealthCheck : IHealthCheck
+    public class StartupHealthCheck : IStartupHealthCheck
     {
         private readonly IConnectionMultiplexer cache;
         private readonly ServiceTracking serviceTracking;

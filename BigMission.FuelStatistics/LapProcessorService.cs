@@ -9,78 +9,79 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BigMission.FuelStatistics
-{
-    /// <summary>
-    /// Receive car laps that have come in from Race Hero and propagate them to consumers.
-    /// </summary>
-    public class LapProcessorService : BackgroundService
-    {
-        private ILogger Logger { get; set; }
-        private readonly TimeSpan lapCheckInterval;
-        private readonly IDataContext dataContext;
-        private readonly IEnumerable<ILapConsumer> lapConsumers;
-        private readonly StartupHealthCheck startup;
+namespace BigMission.FuelStatistics;
 
-        public LapProcessorService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IEnumerable<ILapConsumer> lapConsumers, StartupHealthCheck startup)
+/// <summary>
+/// Receive car laps that have come in from Race Hero and propagate them to consumers.
+/// </summary>
+public class LapProcessorService : BackgroundService
+{
+    private ILogger Logger { get; set; }
+    private readonly TimeSpan lapCheckInterval;
+    private readonly IDataContext dataContext;
+    private readonly IEnumerable<ILapConsumer> lapConsumers;
+    private readonly IStartupHealthCheck startup;
+
+    public LapProcessorService(IConfiguration configuration, ILoggerFactory loggerFactory, IDataContext dataContext, IEnumerable<ILapConsumer> lapConsumers, IStartupHealthCheck startup)
+    {
+        Logger = loggerFactory.CreateLogger(GetType().Name);
+        this.dataContext = dataContext;
+        this.lapConsumers = lapConsumers;
+        this.startup = startup;
+        lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LAPCHECKMS"]));
+    }
+
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        Logger.LogInformation("Waiting for dependencies...");
+        while (!stoppingToken.IsCancellationRequested)
         {
-            Logger = loggerFactory.CreateLogger(GetType().Name);
-            this.dataContext = dataContext;
-            this.lapConsumers = lapConsumers;
-            this.startup = startup;
-            lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LAPCHECKMS"]));
+            if (await startup.CheckDependencies())
+                break;
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
         }
 
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        while (!stoppingToken.IsCancellationRequested)
         {
-            Logger.LogInformation("Waiting for dependencies...");
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                if (await startup.CheckDependencies())
-                    break;
-                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-            }
-
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                try
+                var sw = Stopwatch.StartNew();
+                var eventIds = lapConsumers.SelectMany(e => e.EventIds).Distinct();
+                var lapResults = eventIds.Select(l => dataContext.PopEventLaps(l));
+                var laps = await Task.WhenAll(lapResults);
+                if (laps.Any())
                 {
-                    var sw = Stopwatch.StartNew();
+                    var flat = laps.SelectMany(l => l);
+                    var lg = flat.GroupBy(l => l.EventId).ToDictionary(g => g.Key, g => g.ToList());
                     foreach (var consumer in lapConsumers)
                     {
-                        var eventTasks = consumer.EventIds.Select(async (evt) =>
+                        foreach (var eid in consumer.EventIds)
                         {
-                            try
+                            if (lg.TryGetValue(eid, out List<Lap> evtLaps))
                             {
-                                // This is a bug if there is ever more than one consumer looking for laps for the same event.. Convert to Data Flow?
-                                var laps = await dataContext.PopEventLaps(evt);
-                                if (laps.Any())
+                                try
                                 {
-                                    Logger.LogDebug($"Loaded {laps.Count} laps for event {evt}");
-                                    await consumer.UpdateLaps(evt, laps);
+                                    Logger.LogDebug($"Loaded {evtLaps.Count} laps for event {eid}");
+                                    await consumer.UpdateLaps(eid, evtLaps);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Logger.LogError(ex, $"Error processing event laps for event={eid}");
                                 }
                             }
-                            catch (Exception ex)
-                            {
-                                Logger.LogError(ex, $"Error processing event laps for event={evt}");
-                            }
-                        });
-
-                        await Task.WhenAll(eventTasks);
+                        }
                     }
-
-                    Logger.LogTrace($"Processed lap updates in {sw.ElapsedMilliseconds}ms");
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "Error checking for laps to process");
                 }
 
-                await Task.Delay(lapCheckInterval, stoppingToken);
+                Logger.LogTrace($"Processed lap updates in {sw.ElapsedMilliseconds}ms");
             }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error checking for laps to process");
+            }
+
+            await Task.Delay(lapCheckInterval, stoppingToken);
         }
-
-
     }
 }

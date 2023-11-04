@@ -18,9 +18,9 @@ namespace BigMission.FuelStatistics
         private ILogger Logger { get; set; }
         private readonly IFuelRangeContext dataContext;
         private readonly IEnumerable<IStintOverrideConsumer> overrideConsumers;
-        private readonly StartupHealthCheck startup;
+        private readonly IStartupHealthCheck startup;
 
-        public StintOverrideService(ILoggerFactory loggerFactory, IFuelRangeContext dataContext, IEnumerable<IStintOverrideConsumer> overrideConsumers, StartupHealthCheck startup)
+        public StintOverrideService(ILoggerFactory loggerFactory, IFuelRangeContext dataContext, IEnumerable<IStintOverrideConsumer> overrideConsumers, IStartupHealthCheck startup)
         {
             this.dataContext = dataContext;
             this.overrideConsumers = overrideConsumers;
