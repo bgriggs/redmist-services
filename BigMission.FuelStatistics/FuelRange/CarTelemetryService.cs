@@ -20,10 +20,10 @@ namespace BigMission.FuelStatistics.FuelRange
     {
         private ILogger Logger { get; set; }
         private readonly IEnumerable<ICarTelemetryConsumer> telemetryConsumers;
-        private readonly StartupHealthCheck startup;
+        private readonly IStartupHealthCheck startup;
         private readonly IConnectionMultiplexer cacheMuxer;
 
-        public CarTelemetryService(IConnectionMultiplexer cacheMuxer, IEnumerable<ICarTelemetryConsumer> telemetryConsumers, ILoggerFactory loggerFactory, StartupHealthCheck startup)
+        public CarTelemetryService(IConnectionMultiplexer cacheMuxer, IEnumerable<ICarTelemetryConsumer> telemetryConsumers, ILoggerFactory loggerFactory, IStartupHealthCheck startup)
         {
             this.telemetryConsumers = telemetryConsumers;
             this.startup = startup;

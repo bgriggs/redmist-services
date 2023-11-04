@@ -60,8 +60,8 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
                 break;
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
         }
-        startup.Start();
-        startup.SetStarted();
+        await startup.Start();
+        await startup.SetStarted();
 
         DateTime lastSubCheck = default;
         while (!stoppingToken.IsCancellationRequested)
