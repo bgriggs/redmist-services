@@ -23,6 +23,7 @@ public class CarConsumption
     public const string SVR_CONS_GAL_LAP = "SrvConsGalLap";
     public const string SVR_RANGE_LAPS = "SrvRangeLaps";
     public const string SVR_RANGE_TIME = "SrvRangeTime";
+    public const string SVR_FL_CONS_GAL_LAP = "SrvFlConsGalLap";
     public const string SVR_FL_RANGE_LAPS = "SrvFlRangeLaps";
     public const string SVR_FL_RANGE_TIME = "SrvFlRangeTime";
 
@@ -31,6 +32,7 @@ public class CarConsumption
         SVR_CONS_GAL_LAP,
         SVR_RANGE_LAPS,
         SVR_RANGE_TIME,
+        SVR_FL_CONS_GAL_LAP,
         SVR_FL_RANGE_LAPS,
         SVR_FL_RANGE_TIME,
     };
@@ -61,6 +63,7 @@ public class CarConsumption
         double cons = 0;
         double rangeLaps = 0;
         double rangeTime = 0;
+        double consFiltered = 0;
         double rangeLapsFiltered = 0;
         double rangeTimeFiltered = 0;
         var diff = lastLapFuelLevel - FuelLevel;
@@ -94,17 +97,18 @@ public class CarConsumption
 
         if (lapConsHistory.Any())
         {
-            rangeLapsFiltered = FuelLevel / lapConsHistory.Select(c => c.cons).Average();
+            consFiltered = lapConsHistory.Select(c => c.cons).Average();
+            rangeLapsFiltered = FuelLevel / consFiltered;
             rangeTimeFiltered = lapConsHistory.Select(c => c.lapSecs).Average() * rangeLapsFiltered;
 
             if (rangeLapsFiltered < 0) rangeLapsFiltered = 0;
             if (rangeTimeFiltered < 0) rangeTimeFiltered = 0;
         }
 
-        await PublishChannels(cons, rangeLaps, rangeTime, rangeLapsFiltered, rangeTimeFiltered);
+        await PublishChannels(cons, rangeLaps, rangeTime, consFiltered, rangeLapsFiltered, rangeTimeFiltered);
     }
 
-    private async Task PublishChannels(double consGalLap, double rangeLaps, double rangeTimeSecs, double rangeLapsFiltered, double rangeTimeSecsFiltered)
+    private async Task PublishChannels(double consGalLap, double rangeLaps, double rangeTimeSecs, double consFiltered, double rangeLapsFiltered, double rangeTimeSecsFiltered)
     {
         channelMappings ??= await dataContext.GetConsumptionChannels(carId);
 
@@ -150,6 +154,20 @@ public class CarConsumption
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = rangeTimeCh.DeviceAppId,
                     Value = (float)Math.Round(rangeTimeSecs / 60.0, 1)
+                };
+                channelStatusUpdates.Add(s);
+            }
+
+            // Consumption Smoothed/Filtered Laps
+            var consFilteredCh = channelMappings.FirstOrDefault(c => c.ReservedName == SVR_FL_CONS_GAL_LAP);
+            if (consFilteredCh != null)
+            {
+                var s = new ChannelStatusDto
+                {
+                    ChannelId = consFilteredCh.Id,
+                    Timestamp = dateTime.UtcNow,
+                    DeviceAppId = consFilteredCh.DeviceAppId,
+                    Value = (float)consFiltered
                 };
                 channelStatusUpdates.Add(s);
             }

@@ -119,6 +119,9 @@ public class CarConsumptionTests
 
         var rangeTimeFlCh = dataContext.ChannelDataSetDto.Data.First(x => x.ChannelId == 4);
         Assert.AreEqual(47.5, rangeTimeFlCh.Value, 0.001);
+
+        var consFlCh = dataContext.ChannelDataSetDto.Data.First(x => x.ChannelId == 100);
+        Assert.AreEqual(0.3, consFlCh.Value, 0.001);
     }
 
     [TestMethod]
@@ -203,11 +206,13 @@ public class DataContext : IDataContext
         var rangeFlLapsMap = new ChannelMapping { Id = 3, DeviceAppId = 2, ReservedName = CarConsumption.SVR_FL_RANGE_LAPS };
         var rangeFlTimeMap = new ChannelMapping { Id = 4, DeviceAppId = 2, ReservedName = CarConsumption.SVR_FL_RANGE_TIME };
         var consMap = new ChannelMapping { Id = 10, DeviceAppId = 2, ReservedName = CarConsumption.SVR_CONS_GAL_LAP };
+        var consFlMap = new ChannelMapping { Id = 100, DeviceAppId = 2, ReservedName = CarConsumption.SVR_FL_CONS_GAL_LAP };
         mappings.Add(rangeLapsMap);
         mappings.Add(rangeTimeMap);
         mappings.Add(rangeFlLapsMap);
         mappings.Add(rangeFlTimeMap);
         mappings.Add(consMap);
+        mappings.Add(consFlMap);
 
         return Task.FromResult(mappings);
     }
