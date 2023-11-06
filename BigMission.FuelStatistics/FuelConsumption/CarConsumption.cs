@@ -20,6 +20,7 @@ public class CarConsumption
     private readonly List<(double lapSecs, double cons)> lapConsHistory = new();
     private const int MAX_CONS_HISTORY = 3;
 
+    public const string SVR_CONS_GAL_LAP = "SrvConsGalLap";
     public const string SVR_RANGE_LAPS = "SrvRangeLaps";
     public const string SVR_RANGE_TIME = "SrvRangeTime";
     public const string SVR_FL_RANGE_LAPS = "SrvFlRangeLaps";
@@ -27,6 +28,7 @@ public class CarConsumption
 
     public static readonly string[] ConsumptionChannelNames = new[]
     {
+        SVR_CONS_GAL_LAP,
         SVR_RANGE_LAPS,
         SVR_RANGE_TIME,
         SVR_FL_RANGE_LAPS,
@@ -99,16 +101,30 @@ public class CarConsumption
             if (rangeTimeFiltered < 0) rangeTimeFiltered = 0;
         }
 
-        await PublishChannels(rangeLaps, rangeTime, rangeLapsFiltered, rangeTimeFiltered);
+        await PublishChannels(cons, rangeLaps, rangeTime, rangeLapsFiltered, rangeTimeFiltered);
     }
 
-    private async Task PublishChannels(double rangeLaps, double rangeTimeSecs, double rangeLapsFiltered, double rangeTimeSecsFiltered)
+    private async Task PublishChannels(double consGalLap, double rangeLaps, double rangeTimeSecs, double rangeLapsFiltered, double rangeTimeSecsFiltered)
     {
         channelMappings ??= await dataContext.GetConsumptionChannels(carId);
 
         if (channelMappings.Any())
         {
             var channelStatusUpdates = new List<ChannelStatusDto>();
+
+            // Consumption Gal/Lap
+            var consCh = channelMappings.FirstOrDefault(c => c.ReservedName == SVR_CONS_GAL_LAP);
+            if (consCh != null)
+            {
+                var s = new ChannelStatusDto
+                {
+                    ChannelId = consCh.Id,
+                    Timestamp = dateTime.UtcNow,
+                    DeviceAppId = consCh.DeviceAppId,
+                    Value = (float)consGalLap
+                };
+                channelStatusUpdates.Add(s);
+            }
 
             // Range Laps
             var rangeLapsCh = channelMappings.FirstOrDefault(c => c.ReservedName == SVR_RANGE_LAPS);
