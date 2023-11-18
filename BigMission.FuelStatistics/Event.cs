@@ -274,4 +274,12 @@ public class Event
     {
         return Cars.Values.ToArray();
     }
+
+    /// <summary>
+    /// Update direct fuel flow meter consumption and range timestamps for the event's cars.
+    /// </summary>
+    public async Task PublishDirectFuelConsumptionRanges()
+    {
+        await consumptionProcessor.PublishConsumptionRanges();
+    }
 }

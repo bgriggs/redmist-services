@@ -52,4 +52,17 @@ public class ConsumptionProcessor
         }
         car.FuelLevel = fuelCh.Value;
     }
+
+    /// <summary>
+    /// Update consumption and range timestamps for the event's cars.
+    /// </summary>
+    public async Task PublishConsumptionRanges()
+    {
+        var pubTasks = cars.Values.Select(async (e) =>
+        {
+            await e.PublishLastChannels();
+        });
+
+        await Task.WhenAll(pubTasks);
+    }
 }

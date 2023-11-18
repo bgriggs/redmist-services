@@ -107,7 +107,14 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
                     await e.CommitFuelRangeStintUpdates();
                 });
 
+                // Publish update to timestamps on fuel range channels to avoid channel expiration between laps
+                var channelPublishTasks = eventSubscriptions.Values.Select(async (e) =>
+                {
+                    await e.PublishDirectFuelConsumptionRanges();
+                });
+
                 await Task.WhenAll(commitTasks);
+                await Task.WhenAll(channelPublishTasks);
             }
             catch (Exception ex)
             {

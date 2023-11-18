@@ -42,6 +42,10 @@ public class CarConsumption
     private readonly IDateTimeHelper dateTime;
     private List<ChannelMapping> channelMappings;
     private ILogger Logger { get; set; }
+    private record ConsRange(double ConsGalLap, double RangeLaps, double RangeTimeSecs, double ConsFiltered, double RangeLapsFiltered, double RangeTimeSecsFiltered);
+
+    private ConsRange lastConsRange;
+
 
     public CarConsumption(int carId, ILoggerFactory loggerFactory, IDataContext dataContext, IDateTimeHelper dateTimeHelper)
     {
@@ -105,10 +109,12 @@ public class CarConsumption
             if (rangeTimeFiltered < 0) rangeTimeFiltered = 0;
         }
 
-        await PublishChannels(cons, rangeLaps, rangeTime, consFiltered, rangeLapsFiltered, rangeTimeFiltered);
+        lastConsRange = new ConsRange(cons, rangeLaps, rangeTime, consFiltered, rangeLapsFiltered, rangeTimeFiltered);
+        await PublishChannels(lastConsRange);
     }
+    
 
-    private async Task PublishChannels(double consGalLap, double rangeLaps, double rangeTimeSecs, double consFiltered, double rangeLapsFiltered, double rangeTimeSecsFiltered)
+    private async Task PublishChannels(ConsRange cr)
     {
         channelMappings ??= await dataContext.GetConsumptionChannels(carId);
 
@@ -125,7 +131,7 @@ public class CarConsumption
                     ChannelId = consCh.Id,
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = consCh.DeviceAppId,
-                    Value = (float)consGalLap
+                    Value = (float)cr.ConsGalLap
                 };
                 channelStatusUpdates.Add(s);
             }
@@ -139,7 +145,7 @@ public class CarConsumption
                     ChannelId = rangeLapsCh.Id,
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = rangeLapsCh.DeviceAppId,
-                    Value = (float)Math.Truncate(rangeLaps)
+                    Value = (float)Math.Truncate(cr.RangeLaps)
                 };
                 channelStatusUpdates.Add(s);
             }
@@ -153,7 +159,7 @@ public class CarConsumption
                     ChannelId = rangeTimeCh.Id,
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = rangeTimeCh.DeviceAppId,
-                    Value = (float)Math.Round(rangeTimeSecs / 60.0, 1)
+                    Value = (float)Math.Round(cr.RangeTimeSecs / 60.0, 1)
                 };
                 channelStatusUpdates.Add(s);
             }
@@ -167,7 +173,7 @@ public class CarConsumption
                     ChannelId = consFilteredCh.Id,
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = consFilteredCh.DeviceAppId,
-                    Value = (float)consFiltered
+                    Value = (float)cr.ConsFiltered
                 };
                 channelStatusUpdates.Add(s);
             }
@@ -181,7 +187,7 @@ public class CarConsumption
                     ChannelId = rangeLapsFilteredCh.Id,
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = rangeLapsFilteredCh.DeviceAppId,
-                    Value = (float)Math.Truncate(rangeLapsFiltered)
+                    Value = (float)Math.Truncate(cr.RangeLapsFiltered)
                 };
                 channelStatusUpdates.Add(s);
             }
@@ -195,7 +201,7 @@ public class CarConsumption
                     ChannelId = rangeTimeSecsFilteredCh.Id,
                     Timestamp = dateTime.UtcNow,
                     DeviceAppId = rangeTimeSecsFilteredCh.DeviceAppId,
-                    Value = (float)Math.Round(rangeTimeSecsFiltered / 60.0, 1)
+                    Value = (float)Math.Round(cr.RangeTimeSecsFiltered / 60.0, 1)
                 };
                 channelStatusUpdates.Add(s);
             }
@@ -207,5 +213,13 @@ public class CarConsumption
         {
             Logger.LogDebug($"No fuel consumption channels configured for car {carId}");
         }
+    }
+
+    /// <summary>
+    /// Update timestamp on consumption and range channels so they do not expire.
+    /// </summary>
+    public async Task PublishLastChannels()
+    {
+        await PublishChannels(lastConsRange);
     }
 }
