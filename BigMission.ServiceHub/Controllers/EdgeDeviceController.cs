@@ -176,7 +176,7 @@ public class EdgeDeviceController : ControllerBase
     public async Task<DeviceAppIds[]> GetTeamDeviceIds(int teamId)
     {
         using var db = await dbFactory.CreateDbContextAsync();
-        var teamDevices = await db.DeviceAppConfigs.Where(t => t.TenantId == teamId).ToArrayAsync();
+        var teamDevices = await db.DeviceAppConfigs.Where(t => t.TenantId == teamId && !t.IsDeleted).ToArrayAsync();
         return teamDevices.Select(t => new DeviceAppIds { AppKey = t.DeviceAppKey, AppId = t.Id, CarId = t.CarId }).ToArray();
     }
 
