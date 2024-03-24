@@ -1,2 +1,14 @@
 ﻿# https://docs.microsoft.com/en-us/ef/core/cli/powershell#scaffold-dbcontext
 Scaffold-DbContext "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -ContextDir . -Context RedMist -Tables ApiKeys,DeviceAppConfig,ChannelMappings,CanAppConfig,FuelCarAppSettings,KeypadCarAppConfig,KeypadCarAppMomentaryButtonRules,KeypadCarAppCanStateRules,ChannelLog,CarAlarms,AlarmConditions,AlarmTriggers,CarAlarmLog,FuelRangeSettings,FuelRangeStints,RaceEventSettings,Cars,CarRaceLaps,ArchivePurgeSettings,TeamRetentionPolicies,EventFlags,TpmsConfig,SimulationSettings,RaceHeroSettings,AbpUsers,EcuFuelCalcConfig,UdpTelemetryConfig -Project BigMission.Database -Force
+
+public partial class RedMist : DbContext
+    {
+        //public RedMist()
+        //{
+        //}
+
+        [ActivatorUtilitiesConstructor]
+        public RedMist(DbContextOptions<RedMist> options)
+            : base(options)
+        {
+        }

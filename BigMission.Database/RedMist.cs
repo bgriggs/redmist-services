@@ -1,17 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using BigMission.Database.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
-using BigMission.Database.Models;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BigMission.Database
 {
     public partial class RedMist : DbContext
     {
-        public RedMist()
-        {
-        }
+        //public RedMist()
+        //{
+        //}
 
+        [ActivatorUtilitiesConstructor]
         public RedMist(DbContextOptions<RedMist> options)
             : base(options)
         {
