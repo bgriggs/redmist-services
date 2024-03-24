@@ -11,7 +11,7 @@
 		<Authors>Brian Griggs</Authors>
 		<Company>Big Mission Motorsports, LLC</Company>
 		<Product>Red Mist</Product>
-		<Copyright>2022-2023</Copyright>
+		<Copyright>2022-2024</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -31,6 +31,10 @@
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="6.0.1" />
 		<PackageReference Include="BigMission.DeviceApp.Shared" Version="2.0.0-CI-20230703-001727" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.1">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
 	</ItemGroup>
 
 	<ItemGroup>

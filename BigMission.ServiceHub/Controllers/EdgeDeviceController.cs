@@ -49,9 +49,11 @@ public class EdgeDeviceController : ControllerBase
                 master.RaceHeroSetting = await db.RaceHeroSettings.FirstOrDefaultAsync();
                 master.RaceEventSetting = await db.RaceEventSettings.FirstOrDefaultAsync();
                 master.EcuFuelCalcConfig = await db.EcuFuelCalcConfigs.FirstOrDefaultAsync(k => k.CarId == deviceAppConfig.CarId);
+                master.UdpTelemetryConfig = await db.UdpTelemetryConfigs.FirstOrDefaultAsync(k => k.CarId == deviceAppConfig.CarId);
             }
             master.TpmsSettings ??= new TpmsConfig { Id = -1 };
             master.EcuFuelCalcConfig ??= new EcuFuelCalcConfig { Id = -1 };
+            master.UdpTelemetryConfig ??= new UdpTelemetryConfig { Id = -1 };
 
             if (master.KeypadSettings != null)
             {

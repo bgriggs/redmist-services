@@ -12,5 +12,6 @@
         public RaceHeroSetting? RaceHeroSetting { get; set; } = new();
         public RaceEventSetting? RaceEventSetting { get; set; } = new();
         public EcuFuelCalcConfig? EcuFuelCalcConfig { get; set; } = new();
+        public UdpTelemetryConfig? UdpTelemetryConfig { get; set; }
     }
 }

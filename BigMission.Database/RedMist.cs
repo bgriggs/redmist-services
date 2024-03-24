@@ -3,17 +3,15 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using BigMission.Database.Models;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace BigMission.Database
 {
     public partial class RedMist : DbContext
     {
-        //public RedMist()
-        //{
-        //}
+        public RedMist()
+        {
+        }
 
-        [ActivatorUtilitiesConstructor]
         public RedMist(DbContextOptions<RedMist> options)
             : base(options)
         {
@@ -45,6 +43,8 @@ namespace BigMission.Database
         public virtual DbSet<SimulationSetting> SimulationSettings { get; set; }
         public virtual DbSet<TeamRetentionPolicy> TeamRetentionPolicies { get; set; }
         public virtual DbSet<TpmsConfig> TpmsConfigs { get; set; }
+        public virtual DbSet<UdpTelemetryConfig> UdpTelemetryConfigs { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -335,6 +335,15 @@ namespace BigMission.Database
                 entity.Property(e => e.Rfsensor).HasColumnName("RFSensor");
 
                 entity.Property(e => e.Rrsensor).HasColumnName("RRSensor");
+            });
+
+            modelBuilder.Entity<UdpTelemetryConfig>(entity =>
+            {
+                entity.ToTable("UdpTelemetryConfig");
+
+                entity.Property(e => e.DestinationIp).IsRequired();
+
+                entity.Property(e => e.LocalNicName).IsRequired();
             });
 
             OnModelCreatingPartial(modelBuilder);
