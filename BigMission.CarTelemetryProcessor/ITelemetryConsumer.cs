@@ -1,7 +1,6 @@
-﻿namespace BigMission.CarTelemetryProcessor
+﻿namespace BigMission.CarTelemetryProcessor;
+
+internal interface ITelemetryConsumer
 {
-    internal interface ITelemetryConsumer
-    {
-        Task ProcessTelemetryMessage(DeviceApp.Shared.ChannelDataSetDto receivedTelem);
-    }
+    Task ProcessTelemetryMessage(DeviceApp.Shared.ChannelDataSetDto receivedTelem);
 }

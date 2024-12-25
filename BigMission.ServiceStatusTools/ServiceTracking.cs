@@ -15,22 +15,26 @@ namespace BigMission.ServiceStatusTools
 {
     public class ServiceTracking : BackgroundService
     {
-        private readonly Guid serviceId;
-        private ServiceStatus cacheStatus;
+        public string ServiceId { get; private set; }
+        private readonly ServiceStatus cacheStatus;
         private readonly IConnectionMultiplexer cacheMuxer;
         private TimeSpan lastCpu;
         private DateTime lastResourceUpdateTimestamp;
         private Microsoft.Extensions.Logging.ILogger Logger { get; }
-        public IDateTimeHelper DateTime { get; }
+        private IDateTimeHelper DateTime { get; }
 
         public ServiceTracking(IConfiguration config, IConnectionMultiplexer cache, ILoggerFactory loggerFactory, IDateTimeHelper dateTime)
         {
-            _ = Guid.TryParse(config["SERVICEID"], out serviceId);
+            ServiceId = config["SERVICEID"];
+            if (config["ASPNETCORE_ENVIRONMENT"] != "Development")
+            {
+                ServiceId = config["HOSTNAME"];
+            }
             Logger = loggerFactory.CreateLogger(GetType().Name);
             cacheMuxer = cache;
             DateTime = dateTime;
 
-            cacheStatus = new ServiceStatus { ServiceId = serviceId, Name = AppDomain.CurrentDomain.FriendlyName, State = ServiceState.OFFLINE, Note = "Initializing" };
+            cacheStatus = new ServiceStatus { ServiceId = ServiceId, Name = AppDomain.CurrentDomain.FriendlyName, State = ServiceState.OFFLINE, Note = "Initializing" };
         }
 
         public async Task Update(string state, string note)
@@ -103,7 +107,7 @@ namespace BigMission.ServiceStatusTools
             }
 
             // Check to see if user is overriding the log level
-            var desiredKey = string.Format(Consts.SERVICE_LOG_DESIRED_LEVEL, serviceId);
+            var desiredKey = string.Format(Consts.SERVICE_LOG_DESIRED_LEVEL, ServiceId);
             var desiredLogLevel = await cache.StringGetAsync(desiredKey);
             if (desiredLogLevel.HasValue && !string.IsNullOrEmpty(desiredLogLevel))
             {

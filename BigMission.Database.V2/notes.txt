@@ -1,0 +1,3 @@
+﻿EntityFrameworkCore\Add-Migration -Context ContextV2 CarTableConfig
+EntityFrameworkCore\Remove-Migration -Context ContextV2
+EntityFrameworkCore\Update-Database -Context ContextV2
