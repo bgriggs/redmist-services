@@ -105,11 +105,11 @@ class Application : BackgroundService
 
         await foreach (var key in GetCacheKeysAsync(string.Format(CarConnectionCacheConst.DEVICE_ASSIGNED_CAR, "*")))
         {
-            await cache.KeyDeleteAsync(key);
+            await hybridCache.RemoveAsync(key);
         }
         await foreach (var key in GetCacheKeysAsync(string.Format(CarConnectionCacheConst.CAR_DEVICES_LOOKUP, "*")))
         {
-            await cache.KeyDeleteAsync(key);
+            await hybridCache.RemoveAsync(key);
         }
     }
 
