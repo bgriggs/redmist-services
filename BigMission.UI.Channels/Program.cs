@@ -105,6 +105,7 @@ public class Program
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
+            Console.Title = "UI.Channels";
             app.UseDeveloperExceptionPage();
             app.UseSwagger();
             app.UseSwaggerUI();

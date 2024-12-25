@@ -22,7 +22,7 @@ public class DeviceConnectionStatus
 
 public static class CarConnectionCacheConst
 {
-    public const string CAR_STATUS_SUBSCRIPTION = "car-status-updated";
+    public const string CAR_CONN_STATUS_SUBSCRIPTION = "car-conn-status-updated";
     public const string GROUP_NAME = "web-status";
     public const string CAR_STATUS = "car-conn-status";
     public const string DEVICE_ASSIGNED_CAR = "device-{0}-car";

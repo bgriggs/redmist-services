@@ -57,6 +57,7 @@ class Program
 
         if (app.Environment.IsDevelopment())
         {
+            Console.Title = "ServiceHub";
             app.UseCors(builder => builder
                .AllowAnyHeader()
                .AllowAnyMethod()

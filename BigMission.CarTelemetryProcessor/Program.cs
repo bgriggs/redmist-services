@@ -43,6 +43,7 @@ internal class Program
 
         if (app.Environment.IsDevelopment())
         {
+            Console.Title = "CarTelemetryProcessor";
             app.UseDeveloperExceptionPage();
         }
 

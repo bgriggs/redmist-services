@@ -51,6 +51,7 @@ class Program
 
         if (app.Environment.IsDevelopment())
         {
+            Console.Title = "DeviceAppServiceStatusProcessor";
             app.UseDeveloperExceptionPage();
         }
 

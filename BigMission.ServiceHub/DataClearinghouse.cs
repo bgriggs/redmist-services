@@ -32,8 +32,8 @@ public class DataClearinghouse
     public async Task PublishHeartbeat(DeviceAppHeartbeat heartbeat)
     {
         var hbjson = JsonConvert.SerializeObject(heartbeat);
-        var pub = cacheMuxer.GetSubscriber();
-        await pub.PublishAsync(RedisChannel.Literal(Consts.HEARTBEAT_CH), hbjson);
+        var db = cacheMuxer.GetDatabase();
+        await db.StreamAddAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, heartbeat.DeviceAppId, hbjson, flags: CommandFlags.FireAndForget);
     }
 
     public async Task PublishConsoleLog(LogMessage message)

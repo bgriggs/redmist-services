@@ -25,14 +25,14 @@ public class CarConnectionStatusAggregator : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var db = cache.GetDatabase();
-        if (!(await db.KeyExistsAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION)) || (await db.StreamGroupInfoAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION)).All(x => x.Name != CarConnectionCacheConst.GROUP_NAME))
+        if (!(await db.KeyExistsAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION)) || (await db.StreamGroupInfoAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION)).All(x => x.Name != CarConnectionCacheConst.GROUP_NAME))
         {
-            await db.StreamCreateConsumerGroupAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, "0-0", true);
+            await db.StreamCreateConsumerGroupAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, "0-0", true);
         }
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var result = await db.StreamReadGroupAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, serviceTracking.ServiceId, ">", 1);
+            var result = await db.StreamReadGroupAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, serviceTracking.ServiceId, ">", 1);
             if (result.Length == 0)
             {
                 await Task.Delay(100, stoppingToken);
@@ -52,8 +52,8 @@ public class CarConnectionStatusAggregator : BackgroundService
                     }
                 }
 
-                _ = db.StreamAcknowledgeAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, r.Id, CommandFlags.FireAndForget)
-                    .ContinueWith((t) => Logger.LogError(t.Exception, $"Error sending stream ack: {CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION}"), TaskContinuationOptions.OnlyOnFaulted);
+                _ = db.StreamAcknowledgeAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, r.Id, CommandFlags.FireAndForget)
+                    .ContinueWith((t) => Logger.LogError(t.Exception, $"Error sending stream ack: {CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION}"), TaskContinuationOptions.OnlyOnFaulted);
             }
 
             var json = JsonConvert.SerializeObject(statusUpdates);

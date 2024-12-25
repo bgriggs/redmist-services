@@ -24,8 +24,10 @@ class Application : BackgroundService
     private readonly StartupHealthCheck startup;
     private readonly IAppCommandsFactory commandsFactory;
     private readonly HybridCache hybridCache;
+    private readonly ServiceTracking serviceTracking;
 
-    public Application(ILoggerFactory loggerFactory, IDateTimeHelper dateTime, IConnectionMultiplexer cache, IDbContextFactory<RedMist> dbFactory, StartupHealthCheck startup, IAppCommandsFactory commandsFactory, HybridCache hybridCache)
+    public Application(ILoggerFactory loggerFactory, IDateTimeHelper dateTime, IConnectionMultiplexer cache, IDbContextFactory<RedMist> dbFactory,
+        StartupHealthCheck startup, IAppCommandsFactory commandsFactory, HybridCache hybridCache, ServiceTracking serviceTracking)
     {
         Logger = loggerFactory.CreateLogger(GetType().Name);
         DateTime = dateTime;
@@ -33,6 +35,7 @@ class Application : BackgroundService
         this.startup = startup;
         this.commandsFactory = commandsFactory;
         this.hybridCache = hybridCache;
+        this.serviceTracking = serviceTracking;
         cacheMuxer = cache;
     }
 
@@ -50,18 +53,20 @@ class Application : BackgroundService
 
         // Ensure the consumer group exists for car status
         var db = cacheMuxer.GetDatabase();
-        if (!(await db.KeyExistsAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION)) || (await db.StreamGroupInfoAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION)).All(x => x.Name != CarConnectionCacheConst.GROUP_NAME))
+        if (!(await db.KeyExistsAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION)) || (await db.StreamGroupInfoAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION)).All(x => x.Name != CarConnectionCacheConst.GROUP_NAME))
         {
-            await db.StreamCreateConsumerGroupAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, "0-0", true);
+            await db.StreamCreateConsumerGroupAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, "0-0", true);
         }
 
-        var sub = cacheMuxer.GetSubscriber();
-        await sub.SubscribeAsync(RedisChannel.Literal(Consts.HEARTBEAT_CH), async (channel, message) =>
+        // Ensure the consumer group exists for device app heartbeat status
+        if (!(await db.KeyExistsAsync(Backend.Shared.Consts.HEARTBEAT_TELEM)) || (await db.StreamGroupInfoAsync(Backend.Shared.Consts.HEARTBEAT_TELEM)).All(x => x.Name != Backend.Shared.Consts.DEV_APP_PROC_GRP))
         {
-            await HandleHeartbeat(message, stoppingToken);
-        });
+            await db.StreamCreateConsumerGroupAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, Backend.Shared.Consts.DEV_APP_PROC_GRP, "0-0", true);
+        }
+
 
         // Watch for changes in device app configuration such as channels
+        var sub = cacheMuxer.GetSubscriber();
         var commands = commandsFactory.CreateAppCommands();
         await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_CONFIG_CHANGED_SUB), async (channel, message) =>
         {
@@ -96,6 +101,30 @@ class Application : BackgroundService
 
         Logger.LogInformation("Started");
         await startup.SetStarted();
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var result = await db.StreamReadGroupAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, Backend.Shared.Consts.DEV_APP_PROC_GRP, serviceTracking.ServiceId, ">", 1);
+            if (result.Length == 0)
+            {
+                await Task.Delay(100, stoppingToken);
+                continue;
+            }
+
+            Logger.LogDebug($"Received {result.Length} heartbeat.");
+            foreach (var r in result)
+            {
+                foreach (var nv in r.Values)
+                {
+                    await HandleHeartbeat(nv.Value, stoppingToken);
+                }
+
+                _ = db.StreamAcknowledgeAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, Backend.Shared.Consts.DEV_APP_PROC_GRP, r.Id, CommandFlags.FireAndForget)
+                    .ContinueWith((t) => Logger.LogError(t.Exception, $"Error sending stream ack: {Backend.Shared.Consts.HEARTBEAT_TELEM}"), TaskContinuationOptions.OnlyOnFaulted);
+            }
+
+            await Task.Delay(10, stoppingToken);
+        }
     }
 
     private async Task ClearCarStatusCacheElements()
@@ -275,7 +304,7 @@ class Application : BackgroundService
         }
 
         var json = JsonConvert.SerializeObject(ccs);
-        await cache.StreamAddAsync(CarConnectionCacheConst.CAR_STATUS_SUBSCRIPTION, [new NameValueEntry(ccs.CarId, json)]);
+        await cache.StreamAddAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION, [new NameValueEntry(ccs.CarId, json)]);
         await cache.HashSetAsync(CarConnectionCacheConst.CAR_STATUS, carId.Value, json);
     }
 
