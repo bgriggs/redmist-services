@@ -1,6 +1,5 @@
 using BigMission.Database;
 using BigMission.Database.V2;
-using BigMission.Database.V2.Models.UI.Channels.CarStatusTable;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
 using BigMission.UI.Channels.Hubs;
@@ -12,7 +11,6 @@ using Keycloak.AuthServices.Common;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json;
 using NLog.Extensions.Logging;
 using StackExchange.Redis;
 

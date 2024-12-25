@@ -63,8 +63,8 @@ public class DataClearinghouse
     public async Task PublishChannelStatus(ChannelDataSetDto dataSet)
     {
         var json = JsonConvert.SerializeObject(dataSet);
-        var pub = cacheMuxer.GetSubscriber();
-        await pub.PublishAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), json);
+        var db = cacheMuxer.GetDatabase();
+        await db.StreamAddAsync(Backend.Shared.Consts.CHANNEL_TELEM, dataSet.DeviceAppId, json, flags: CommandFlags.FireAndForget);
     }
 
     public async Task PublishKeyboardStatus(KeypadStatusDto keypadStatus)

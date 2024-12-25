@@ -30,6 +30,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\BigMission.Backend.Shared\BigMission.Backend.Shared.csproj" />
 		<ProjectReference Include="..\BigMission.Database\BigMission.Database.csproj" />
 		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
 	</ItemGroup>

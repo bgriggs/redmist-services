@@ -51,19 +51,12 @@ class Application : BackgroundService
         }
         await startup.Start();
 
-        // Ensure the consumer group exists for car status
-        var db = cacheMuxer.GetDatabase();
-        if (!(await db.KeyExistsAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION)) || (await db.StreamGroupInfoAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION)).All(x => x.Name != CarConnectionCacheConst.GROUP_NAME))
-        {
-            await db.StreamCreateConsumerGroupAsync(CarConnectionCacheConst.CAR_CONN_STATUS_SUBSCRIPTION, CarConnectionCacheConst.GROUP_NAME, "0-0", true);
-        }
-
         // Ensure the consumer group exists for device app heartbeat status
+        var db = cacheMuxer.GetDatabase();
         if (!(await db.KeyExistsAsync(Backend.Shared.Consts.HEARTBEAT_TELEM)) || (await db.StreamGroupInfoAsync(Backend.Shared.Consts.HEARTBEAT_TELEM)).All(x => x.Name != Backend.Shared.Consts.DEV_APP_PROC_GRP))
         {
             await db.StreamCreateConsumerGroupAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, Backend.Shared.Consts.DEV_APP_PROC_GRP, "0-0", true);
         }
-
 
         // Watch for changes in device app configuration such as channels
         var sub = cacheMuxer.GetSubscriber();
@@ -119,11 +112,8 @@ class Application : BackgroundService
                     await HandleHeartbeat(nv.Value, stoppingToken);
                 }
 
-                _ = db.StreamAcknowledgeAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, Backend.Shared.Consts.DEV_APP_PROC_GRP, r.Id, CommandFlags.FireAndForget)
-                    .ContinueWith((t) => Logger.LogError(t.Exception, $"Error sending stream ack: {Backend.Shared.Consts.HEARTBEAT_TELEM}"), TaskContinuationOptions.OnlyOnFaulted);
+                await db.StreamAcknowledgeAsync(Backend.Shared.Consts.HEARTBEAT_TELEM, Backend.Shared.Consts.DEV_APP_PROC_GRP, r.Id);
             }
-
-            await Task.Delay(10, stoppingToken);
         }
     }
 
