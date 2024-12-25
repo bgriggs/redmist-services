@@ -26,7 +26,7 @@ namespace BigMission.ServiceHub.Hubs
             await base.OnConnectedAsync();
         }
 
-        public async override Task OnDisconnectedAsync(Exception exception)
+        public async override Task OnDisconnectedAsync(Exception? exception)
         {
             var details = GetAuthDetails();
             Logger.LogDebug($"Device {details.appId} disconnected.");

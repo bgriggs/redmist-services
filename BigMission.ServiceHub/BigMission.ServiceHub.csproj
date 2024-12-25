@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 	<Import Project="..\version"></Import>
 	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
-		<Nullable>disable</Nullable>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
@@ -11,7 +11,7 @@
 		<Authors>Brian Griggs</Authors>
 		<Company>Big Mission Motorsports, LLC</Company>
 		<Product>Red Mist</Product>
-		<Copyright>2022-2024</Copyright>
+		<Copyright>2022-2025</Copyright>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -21,20 +21,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AWSSDK.S3" Version="3.7.101.60" />
-		<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="6.0.4" />
-		<PackageReference Include="AspNetCore.HealthChecks.System" Version="6.0.5" />
-		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="6.0.2" />
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.2" />
+		<PackageReference Include="AWSSDK.S3" Version="3.7.410.11" />
+		<PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.System" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
 		<PackageReference Include="NLog.Targets.ServiceHub" Version="2.0.1-CI-20230703-011207" />
-		<PackageReference Include="NLog.Web.AspNetCore" Version="5.3.0" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="6.0.1" />
+		<PackageReference Include="NLog.Web.AspNetCore" Version="5.3.15" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.0" />
 		<PackageReference Include="BigMission.DeviceApp.Shared" Version="2.0.0-CI-20230703-001727" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.1">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
 	</ItemGroup>
 
 	<ItemGroup>
