@@ -6,6 +6,9 @@ public class ContextV2 : DbContext
 {
     public DbSet<Models.UI.Channels.CarStatusTable.Configuration> CarStatusTableConfiguration { get; set; } = null!;
 
+    public ContextV2(DbContextOptions<ContextV2> options)
+            : base(options) { }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         base.OnConfiguring(optionsBuilder);

@@ -68,6 +68,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.UI.Channels", "B
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Database.V2", "BigMission.Database.V2\BigMission.Database.V2.csproj", "{A5F75998-BE42-4760-B439-B71903F01EBD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Backend.Shared", "BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -166,6 +168,10 @@ Global
 		{A5F75998-BE42-4760-B439-B71903F01EBD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A5F75998-BE42-4760-B439-B71903F01EBD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5F75998-BE42-4760-B439-B71903F01EBD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -191,6 +197,7 @@ Global
 		{E63171E4-C4A6-48A6-920C-780FE1F7D52A} = {A0C87FD5-FDFA-448D-BD3F-4303B44750CB}
 		{831F7987-B113-444D-B293-19DF511FB61B} = {A0C87FD5-FDFA-448D-BD3F-4303B44750CB}
 		{8FBBCF36-7180-9C98-3EFE-4C83B14A4F65} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4} = {A0C87FD5-FDFA-448D-BD3F-4303B44750CB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {581F7602-C4FB-46F3-AEF6-061F89ED4104}

@@ -42,6 +42,7 @@ public class ChannelStatusAggregator : BackgroundService
                 continue;
             }
 
+            Logger.LogDebug($"Received {result.Length} channel status updates.");
             var statusUpdates = new List<ChannelStatusDto>();
             foreach (var r in result)
             {
@@ -59,7 +60,7 @@ public class ChannelStatusAggregator : BackgroundService
             }
 
             var json = JsonConvert.SerializeObject(statusUpdates);
-            await statusHub.Clients.All.SendAsync("ReceiveStatusUpdate", json, stoppingToken);
+            await statusHub.Clients.All.SendAsync("ReceiveChannelStatusUpdate", json, stoppingToken);
 
             await Task.Delay(10, stoppingToken);
         }

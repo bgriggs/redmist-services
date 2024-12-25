@@ -98,6 +98,7 @@ public class Program
         builder.Services.AddSingleton<ServiceTracking>();
 
         builder.Services.AddHostedService<ChannelStatusAggregator>();
+        builder.Services.AddHostedService<CarConnectionStatusAggregator>();
 
         var app = builder.Build();
 
