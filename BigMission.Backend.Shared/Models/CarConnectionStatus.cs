@@ -1,22 +1,31 @@
 ﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace BigMission.Backend.Shared.Models;
 
 public class CarConnectionStatus
 {
     [JsonProperty("cid")]
+    [JsonPropertyName("cid")]
     public int CarId { get; set; }
+
     [JsonProperty("dcs")]
+    [JsonPropertyName("dcs")]
     public List<DeviceConnectionStatus> DeviceConnectionStatuses { get; set; } = [];
 }
 
 public class DeviceConnectionStatus
 {
     [JsonProperty("did")]
+    [JsonPropertyName("did")]
     public int DeviceAppId { get; set; }
+
     [JsonProperty("lthbs")]
+    [JsonPropertyName("lthbs")]
     public List<DateTime> LastThreeHeartbeats { get; set; } = [];
+
     [JsonProperty("hbint")]
+    [JsonPropertyName("hbint")]
     public int HeartbeatIntervalMs { get; set; }
 }
 

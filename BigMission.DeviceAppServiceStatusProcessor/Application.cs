@@ -316,7 +316,7 @@ class Application : BackgroundService
         return await db.DeviceAppConfigs.Where(d => d.DeviceAppKey == deviceKey).Select(d => d.Id).FirstOrDefaultAsync(cancellationToken: stoppingToken);
     }
 
-    public async IAsyncEnumerable<string> GetCacheKeysAsync(string pattern)
+    private async IAsyncEnumerable<string> GetCacheKeysAsync(string pattern)
     {
         if (string.IsNullOrWhiteSpace(pattern))
             throw new ArgumentException("Value cannot be null or whitespace.", nameof(pattern));

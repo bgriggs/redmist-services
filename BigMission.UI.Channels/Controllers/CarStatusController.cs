@@ -1,4 +1,5 @@
-﻿using BigMission.Database;
+﻿using BigMission.Backend.Shared.Models;
+using BigMission.Database;
 using BigMission.Database.V2;
 using BigMission.Database.V2.Models.UI.Channels.CarStatusTable;
 using BigMission.TestHelpers;
@@ -6,6 +7,8 @@ using BigMission.UI.Channels.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 
 namespace BigMission.UI.Channels.Controllers;
 
@@ -16,16 +19,18 @@ public class CarStatusController : Controller
 {
     private readonly IDbContextFactory<RedMist> rmFactory;
     private readonly IDbContextFactory<ContextV2> v2Factory;
+    private readonly IConnectionMultiplexer cache;
 
     private ILogger Logger { get; }
     public IDateTimeHelper DateTime { get; }
 
-    public CarStatusController(ILoggerFactory loggerFactory, IDbContextFactory<RedMist> rmFactory, IDbContextFactory<ContextV2> v2Factory, IDateTimeHelper dateTime)
+    public CarStatusController(ILoggerFactory loggerFactory, IDbContextFactory<RedMist> rmFactory, IDbContextFactory<ContextV2> v2Factory, IDateTimeHelper dateTime, IConnectionMultiplexer cache)
     {
         Logger = loggerFactory.CreateLogger(GetType().Name);
         this.rmFactory = rmFactory;
         this.v2Factory = v2Factory;
         DateTime = dateTime;
+        this.cache = cache;
     }
 
     [HttpGet]
@@ -46,8 +51,6 @@ public class CarStatusController : Controller
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult> SaveConfiguration(Configuration config)
     {
-        //if (!(User.IsInRole("administrator") || User.IsInRole("contributor"))) return Unauthorized();
-
         using var context = await v2Factory.CreateDbContextAsync();
         config.LastUpdated = DateTime.UtcNow;
         config.Version++;
@@ -98,5 +101,33 @@ public class CarStatusController : Controller
         }
 
         return Ok(settings);
+    }
+
+    [HttpPost]
+    [ProducesResponseType<CarConnectionStatus[]>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<CarConnectionStatus[]>> GetCarConnectionStatus()
+    {
+        var status = new List<CarConnectionStatus>();
+        var db = cache.GetDatabase();
+        var hashResult = await db.HashGetAllAsync(CarConnectionCacheConst.CAR_STATUS);
+        foreach (var ccsJson in hashResult)
+        {
+            try
+            {
+                if (ccsJson.Value.HasValue)
+                {
+                    var carConnectionStatus = JsonConvert.DeserializeObject<CarConnectionStatus>(ccsJson.Value!);
+                    if (carConnectionStatus != null)
+                    {
+                        status.Add(carConnectionStatus);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, $"Error getting car connection status for carId: {ccsJson.Name}");
+            }
+        }
+        return Ok(status);
     }
 }
