@@ -38,7 +38,7 @@ class ConditionStatus
             AlarmCondition? condStatus = null;
             if (rv.HasValue)
             {
-                condStatus = JsonConvert.DeserializeObject<AlarmCondition>(rv);
+                condStatus = JsonConvert.DeserializeObject<AlarmCondition>(rv!);
             }
 
             var conditionState = EvalCondition(chstatus);
