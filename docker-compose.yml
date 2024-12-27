@@ -67,8 +67,8 @@ services:
       context: .
       dockerfile: BigMission.VirtualChannelAggregator/Dockerfile
 
-  bigmission.webhost:
-    image: bigmission/webhost
-    build:
-      context: .
-      dockerfile: webhost/BigMission.Web.Host/Dockerfile
+  # bigmission.webhost:
+  #   image: bigmission/webhost
+  #   build:
+  #     context: .
+  #     dockerfile: webhost/BigMission.Web.Host/Dockerfile
