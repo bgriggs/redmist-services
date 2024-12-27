@@ -13,6 +13,11 @@
 		<Copyright>2024-2025</Copyright>
 		<UserSecretsId>072a0a6f-0c97-444c-9980-a65c1d88ff8d</UserSecretsId>
 	</PropertyGroup>
+	<ItemGroup>
+	  <None Include="..\.dockerignore" Link=".dockerignore">
+	    <DependentUpon>$(DockerDefaultDockerfile)</DependentUpon>
+	  </None>
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />

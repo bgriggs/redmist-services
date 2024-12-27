@@ -11,8 +11,9 @@ RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/m
 
 WORKDIR /src
 COPY ["nuget.config", "."]
-COPY ["BigMission.ServiceHub/BigMission.ServiceHub.csproj", "BigMission.ServiceHub/"]
+COPY ["BigMission.UI.Channels/BigMission.UI.Channels.csproj", "BigMission.UI.Channels/"]
 COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.Database.V2\BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
 COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
 COPY ["BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
 
@@ -20,15 +21,15 @@ COPY ["BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "BigMission.
 ARG FEED_ACCESSTOKEN
 ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{\"endpointCredentials\": [{\"endpoint\":\"https://pkgs.dev.azure.com/bigmission/_packaging/bmm-artifacts/nuget/v3/index.json\", \"username\":\"docker\", \"password\":\"${FEED_ACCESSTOKEN}\"}]}"
 
-RUN dotnet restore "BigMission.ServiceHub/BigMission.ServiceHub.csproj"
+RUN dotnet restore "BigMission.UI.Channels/BigMission.UI.Channels.csproj"
 COPY . .
-WORKDIR "/src/BigMission.ServiceHub"
-RUN dotnet build "BigMission.ServiceHub.csproj" -c Release -o /app/build
+WORKDIR "/src/BigMission.UI.Channels"
+RUN dotnet build "BigMission.UI.Channels.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "BigMission.ServiceHub.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "BigMission.UI.Channels.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "BigMission.ServiceHub.dll"]
+ENTRYPOINT ["dotnet", "BigMission.UI.Channels.dll"]

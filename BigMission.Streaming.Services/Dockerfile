@@ -11,24 +11,25 @@ RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/m
 
 WORKDIR /src
 COPY ["nuget.config", "."]
-COPY ["BigMission.ServiceHub/BigMission.ServiceHub.csproj", "BigMission.ServiceHub/"]
+COPY ["BigMission.Streaming.Services/BigMission.Streaming.Services.csproj", "BigMission.Streaming.Services/"]
 COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
 COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
-COPY ["BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
+COPY ["BigMission.Database.V2\BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
+COPY ["BigMission.Streaming.Shared\BigMission.Streaming.Shared.csproj", "BigMission.Streaming.Shared/"]
 
 #Use token passed in from the host to access Azure Artifacts
 ARG FEED_ACCESSTOKEN
 ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{\"endpointCredentials\": [{\"endpoint\":\"https://pkgs.dev.azure.com/bigmission/_packaging/bmm-artifacts/nuget/v3/index.json\", \"username\":\"docker\", \"password\":\"${FEED_ACCESSTOKEN}\"}]}"
 
-RUN dotnet restore "BigMission.ServiceHub/BigMission.ServiceHub.csproj"
+RUN dotnet restore "BigMission.Streaming.Services/BigMission.Streaming.Services.csproj"
 COPY . .
-WORKDIR "/src/BigMission.ServiceHub"
-RUN dotnet build "BigMission.ServiceHub.csproj" -c Release -o /app/build
+WORKDIR "/src/BigMission.Streaming.Services"
+RUN dotnet build "BigMission.Streaming.Services.csproj" -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "BigMission.ServiceHub.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "BigMission.Streaming.Services.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "BigMission.ServiceHub.dll"]
+ENTRYPOINT ["dotnet", "BigMission.Streaming.Services.dll"]

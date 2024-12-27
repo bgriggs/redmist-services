@@ -13,6 +13,11 @@
 		<Copyright>2024-2025</Copyright>
 		<UserSecretsId>072a0a6f-0c97-444c-9980-a65c1d88ff8d</UserSecretsId>
 	</PropertyGroup>
+	<ItemGroup>
+	  <None Include="..\.dockerignore" Link=".dockerignore">
+	    <DependentUpon>$(DockerDefaultDockerfile)</DependentUpon>
+	  </None>
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
@@ -32,6 +37,11 @@
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
 		<PackageReference Include="System.Text.Json" Version="9.0.0" />
 		<PackageReference Include="BigMission.DeviceApp.Shared" Version="2.0.0-CI-20230703-001727" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="BigMission.TestHelpers" Version="3.0.6" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -39,11 +49,6 @@
 		<ProjectReference Include="..\BigMission.Database.V2\BigMission.Database.V2.csproj" />
 		<ProjectReference Include="..\BigMission.Database\BigMission.Database.csproj" />
 		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="BigMission.TestHelpers" Version="3.0.6" />
 	</ItemGroup>
 
 </Project>
