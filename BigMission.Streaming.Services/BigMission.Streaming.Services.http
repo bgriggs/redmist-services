@@ -1,0 +1,6 @@
+@BigMission.Streaming.Services_HostAddress = http://localhost:5086
+
+GET {{BigMission.Streaming.Services_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

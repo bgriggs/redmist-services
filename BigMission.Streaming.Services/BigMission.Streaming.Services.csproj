@@ -15,6 +15,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
 		<PackageReference Include="Azure.Identity" Version="1.13.1" />
 		<PackageReference Include="Keycloak.AuthServices.Authorization" Version="2.6.0" />
@@ -30,20 +31,14 @@
 		<PackageReference Include="Keycloak.AuthServices.Authentication" Version="2.6.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
-		<PackageReference Include="System.Text.Json" Version="9.0.0" />
-		<PackageReference Include="BigMission.DeviceApp.Shared" Version="2.0.0-CI-20230703-001727" />
+		<PackageReference Include="BigMission.TestHelpers" Version="3.0.6" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\BigMission.Backend.Shared\BigMission.Backend.Shared.csproj" />
-		<ProjectReference Include="..\BigMission.Database.V2\BigMission.Database.V2.csproj" />
-		<ProjectReference Include="..\BigMission.Database\BigMission.Database.csproj" />
-		<ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="BigMission.TestHelpers" Version="3.0.6" />
+	  <ProjectReference Include="..\BigMission.Database.V2\BigMission.Database.V2.csproj" />
+	  <ProjectReference Include="..\BigMission.Database\BigMission.Database.csproj" />
+	  <ProjectReference Include="..\BigMission.ServiceStatusTools\BigMission.ServiceStatusTools.csproj" />
+	  <ProjectReference Include="..\BigMission.Streaming.Shared\BigMission.Streaming.Shared.csproj" />
 	</ItemGroup>
 
 </Project>

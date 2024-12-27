@@ -70,6 +70,20 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Database.V2", "B
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Backend.Shared", "BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "streaming", "streaming", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Streaming.NginxClient", "BigMission.Streaming.NginxClient\BigMission.Streaming.NginxClient.csproj", "{EB947AE9-924F-419B-8AA2-F5FC47E20FF9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Streaming.ObsClient", "BigMission.Streaming.ObsClient\BigMission.Streaming.ObsClient.csproj", "{9246CF24-3B80-4911-B2E8-072F56DB7D85}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Streaming.Services", "BigMission.Streaming.Services\BigMission.Streaming.Services.csproj", "{649476A4-D243-4F8A-8B3B-24DCDA59BAD7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Shared", "BigMission.ServiceAuth\BigMission.Shared.csproj", "{C0942675-7603-4543-9D7F-DFEAB8846516}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Streaming.Shared", "BigMission.Streaming.Shared\BigMission.Streaming.Shared.csproj", "{2274FD33-0251-413A-8496-8DE4814BF4AF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigMission.Streaming.NginxClient.Tests", "BigMission.Streaming.NginxClient.Tests\BigMission.Streaming.NginxClient.Tests.csproj", "{D96E00E4-DE8D-44D4-9E40-AC89216CD526}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -172,6 +186,30 @@ Global
 		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EB947AE9-924F-419B-8AA2-F5FC47E20FF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB947AE9-924F-419B-8AA2-F5FC47E20FF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB947AE9-924F-419B-8AA2-F5FC47E20FF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB947AE9-924F-419B-8AA2-F5FC47E20FF9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9246CF24-3B80-4911-B2E8-072F56DB7D85}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9246CF24-3B80-4911-B2E8-072F56DB7D85}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9246CF24-3B80-4911-B2E8-072F56DB7D85}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9246CF24-3B80-4911-B2E8-072F56DB7D85}.Release|Any CPU.Build.0 = Release|Any CPU
+		{649476A4-D243-4F8A-8B3B-24DCDA59BAD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{649476A4-D243-4F8A-8B3B-24DCDA59BAD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{649476A4-D243-4F8A-8B3B-24DCDA59BAD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{649476A4-D243-4F8A-8B3B-24DCDA59BAD7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0942675-7603-4543-9D7F-DFEAB8846516}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0942675-7603-4543-9D7F-DFEAB8846516}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0942675-7603-4543-9D7F-DFEAB8846516}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0942675-7603-4543-9D7F-DFEAB8846516}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2274FD33-0251-413A-8496-8DE4814BF4AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2274FD33-0251-413A-8496-8DE4814BF4AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2274FD33-0251-413A-8496-8DE4814BF4AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2274FD33-0251-413A-8496-8DE4814BF4AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D96E00E4-DE8D-44D4-9E40-AC89216CD526}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D96E00E4-DE8D-44D4-9E40-AC89216CD526}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D96E00E4-DE8D-44D4-9E40-AC89216CD526}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D96E00E4-DE8D-44D4-9E40-AC89216CD526}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -198,6 +236,11 @@ Global
 		{831F7987-B113-444D-B293-19DF511FB61B} = {A0C87FD5-FDFA-448D-BD3F-4303B44750CB}
 		{8FBBCF36-7180-9C98-3EFE-4C83B14A4F65} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{CE1C79DC-0D5B-429E-92D2-EC5E17BFFBA4} = {A0C87FD5-FDFA-448D-BD3F-4303B44750CB}
+		{EB947AE9-924F-419B-8AA2-F5FC47E20FF9} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{9246CF24-3B80-4911-B2E8-072F56DB7D85} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{649476A4-D243-4F8A-8B3B-24DCDA59BAD7} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{2274FD33-0251-413A-8496-8DE4814BF4AF} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{D96E00E4-DE8D-44D4-9E40-AC89216CD526} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {581F7602-C4FB-46F3-AEF6-061F89ED4104}
