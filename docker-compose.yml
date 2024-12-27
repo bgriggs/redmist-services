@@ -13,13 +13,11 @@ services:
       context: .
       dockerfile: BigMission.CarTelemetryProcessor/Dockerfile
 
-
   bigmission.deviceappservicestatusprocessor:
     image: bigmission/deviceappservicestatusprocessor
     build:
       context: .
       dockerfile: BigMission.DeviceAppServiceStatusProcessor/Dockerfile
-
 
   bigmission.fuelstatistics:
     image: bigmission/fuelstatistics
@@ -27,13 +25,11 @@ services:
       context: .
       dockerfile: BigMission.FuelStatistics/Dockerfile
 
-
   bigmission.keypadservices:
     image: bigmission/keypadservices
     build:
       context: .
       dockerfile: BigMission.KeypadServices/Dockerfile
-
 
   bigmission.racecontrollog:
     image: bigmission/racecontrollog
@@ -41,13 +37,11 @@ services:
       context: .
       dockerfile: BigMission.RaceControlLog/Dockerfile
 
-
   bigmission.raceheroaggregator:
     image: bigmission/raceheroaggregator
     build:
       context: .
       dockerfile: BigMission.RaceHeroAggregator/Dockerfile
-
 
   bigmission.servicehub:
     image: bigmission/servicehub
@@ -72,7 +66,6 @@ services:
     build:
       context: .
       dockerfile: BigMission.VirtualChannelAggregator/Dockerfile
-
 
   bigmission.webhost:
     image: bigmission/webhost
