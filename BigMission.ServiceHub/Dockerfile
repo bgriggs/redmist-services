@@ -14,7 +14,7 @@ COPY ["nuget.config", "."]
 COPY ["BigMission.ServiceHub/BigMission.ServiceHub.csproj", "BigMission.ServiceHub/"]
 COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
 COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
-COPY ["BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
+COPY ["BigMission.Backend.Shared/BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
 
 #Use token passed in from the host to access Azure Artifacts
 ARG FEED_ACCESSTOKEN

@@ -13,9 +13,9 @@ WORKDIR /src
 COPY ["nuget.config", "."]
 COPY ["BigMission.UI.Channels/BigMission.UI.Channels.csproj", "BigMission.UI.Channels/"]
 COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
-COPY ["BigMission.Database.V2\BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
+COPY ["BigMission.Database.V2/BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
 COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
-COPY ["BigMission.Backend.Shared\BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
+COPY ["BigMission.Backend.Shared/BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
 
 #Use token passed in from the host to access Azure Artifacts
 ARG FEED_ACCESSTOKEN

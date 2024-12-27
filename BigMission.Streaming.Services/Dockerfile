@@ -14,8 +14,8 @@ COPY ["nuget.config", "."]
 COPY ["BigMission.Streaming.Services/BigMission.Streaming.Services.csproj", "BigMission.Streaming.Services/"]
 COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
 COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
-COPY ["BigMission.Database.V2\BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
-COPY ["BigMission.Streaming.Shared\BigMission.Streaming.Shared.csproj", "BigMission.Streaming.Shared/"]
+COPY ["BigMission.Database.V2/BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
+COPY ["BigMission.Streaming.Shared/BigMission.Streaming.Shared.csproj", "BigMission.Streaming.Shared/"]
 
 #Use token passed in from the host to access Azure Artifacts
 ARG FEED_ACCESSTOKEN
