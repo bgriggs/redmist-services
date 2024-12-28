@@ -13,17 +13,13 @@
 		<Copyright>2024-2025</Copyright>
 		<UserSecretsId>072a0a6f-0c97-444c-9980-a65c1d88ff8d</UserSecretsId>
 	</PropertyGroup>
-	<ItemGroup>
-	  <None Include="..\.dockerignore" Link=".dockerignore">
-	    <DependentUpon>$(DockerDefaultDockerfile)</DependentUpon>
-	  </None>
-	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
 		<PackageReference Include="Azure.Identity" Version="1.13.1" />
 		<PackageReference Include="Keycloak.AuthServices.Authorization" Version="2.6.0" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
 		<PackageReference Include="NLog.Extensions.Hosting" Version="5.3.15" />
 		<PackageReference Include="NLog.Extensions.Logging" Version="5.3.15" />
 		<PackageReference Include="StackExchange.Redis" Version="2.8.22" />

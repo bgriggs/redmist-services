@@ -1,16 +1,26 @@
-﻿{
-  "$schema": "https://json.schemastore.org/launchsettings.json",
+{
   "profiles": {
     "http": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "http://0.0.0.0:5178",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "c3b9fb3d-09a7-4d19-bf8a-caa0115fc684"
-      }
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://0.0.0.0:5178"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/swagger",
+      "environmentVariables": {
+        "ASPNETCORE_HTTP_PORTS": "8080"
+      },
+      "publishAllPorts": true,
+      "useSSL": false
     }
-  }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
 }
