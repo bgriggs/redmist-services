@@ -55,11 +55,11 @@ services:
   #     context: .
   #     dockerfile: BigMission.Streaming.Services/Dockerfile
 
-  # bigmission.ui.channels:
-  #   image: bigmission/uichannels
-  #   build:
-  #     context: .
-  #     dockerfile: BigMission.UI.Channels/Dockerfile
+  bigmission.ui.channels:
+    image: bigmission/uichannels
+    build:
+      context: .
+      dockerfile: BigMission.UI.Channels/Dockerfile
       
   bigmission.virtualchannelaggregator:
     image: bigmission/virtualchannelaggregator
