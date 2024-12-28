@@ -49,11 +49,11 @@ services:
       context: .
       dockerfile: BigMission.ServiceHub/Dockerfile
 
-  # bigmission.streaming.services:
-  #   image: bigmission/streamingservices
-  #   build:
-  #     context: .
-  #     dockerfile: BigMission.Streaming.Services/Dockerfile
+  bigmission.streaming.services:
+    image: bigmission/streamingservices
+    build:
+      context: .
+      dockerfile: BigMission.Streaming.Services/Dockerfile
 
   bigmission.ui.channels:
     image: bigmission/uichannels
