@@ -16,7 +16,7 @@ RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/m
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["nuget.config", "."]
-COPY ["BigMission.Streaming.BigMission.Streaming.Services.csproj", "BigMission.Streaming.Services/"]
+COPY ["BigMission.Streaming.Services.csproj", "BigMission.Streaming.Services/"]
 COPY ["BigMission.Database.V2/BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
 COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
 COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
