@@ -15,15 +15,15 @@ RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/m
 
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["services/nuget.config", "services/"]
-COPY ["services/BigMission.UI.Channels/BigMission.UI.Channels.csproj", "services/BigMission.UI.Channels/"]
-COPY ["services/BigMission.Backend.Shared/BigMission.Backend.Shared.csproj", "services/BigMission.Backend.Shared/"]
-COPY ["services/BigMission.Database.V2/BigMission.Database.V2.csproj", "services/BigMission.Database.V2/"]
-COPY ["services/BigMission.Database/BigMission.Database.csproj", "services/BigMission.Database/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-RUN dotnet restore "./services/BigMission.UI.Channels/BigMission.UI.Channels.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.UI.Channels/BigMission.UI.Channels.csproj", "BigMission.UI.Channels/"]
+COPY ["BigMission.Backend.Shared/BigMission.Backend.Shared.csproj", "BigMission.Backend.Shared/"]
+COPY ["BigMission.Database.V2/BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+RUN dotnet restore "./BigMission.UI.Channels/BigMission.UI.Channels.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.UI.Channels"
+WORKDIR "/src/BigMission.UI.Channels"
 RUN dotnet build "./BigMission.UI.Channels.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 #Use token passed in from the host to access Azure Artifacts

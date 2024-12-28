@@ -15,15 +15,15 @@ RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/m
 
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["services/nuget.config", "services/"]
-COPY ["services/BigMission.Streaming.Services/BigMission.Streaming.Services.csproj", "services/BigMission.Streaming.Services/"]
-COPY ["services/BigMission.Database.V2/BigMission.Database.V2.csproj", "services/BigMission.Database.V2/"]
-COPY ["services/BigMission.Database/BigMission.Database.csproj", "services/BigMission.Database/"]
-COPY ["services/BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "services/BigMission.ServiceStatusTools/"]
-COPY ["services/BigMission.Streaming.Shared/BigMission.Streaming.Shared.csproj", "services/BigMission.Streaming.Shared/"]
-RUN dotnet restore "./services/BigMission.Streaming.Services/BigMission.Streaming.Services.csproj"
+COPY ["nuget.config", "."]
+COPY ["BigMission.Streaming.BigMission.Streaming.Services.csproj", "BigMission.Streaming.Services/"]
+COPY ["BigMission.Database.V2/BigMission.Database.V2.csproj", "BigMission.Database.V2/"]
+COPY ["BigMission.Database/BigMission.Database.csproj", "BigMission.Database/"]
+COPY ["BigMission.ServiceStatusTools/BigMission.ServiceStatusTools.csproj", "BigMission.ServiceStatusTools/"]
+COPY ["BigMission.Streaming.Shared/BigMission.Streaming.Shared.csproj", "BigMission.Streaming.Shared/"]
+RUN dotnet restore "./BigMission.Streaming.Services/BigMission.Streaming.Services.csproj"
 COPY . .
-WORKDIR "/src/services/BigMission.Streaming.Services"
+WORKDIR "/src/BigMission.Streaming.Services"
 RUN dotnet build "./BigMission.Streaming.Services.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 #Use token passed in from the host to access Azure Artifacts
