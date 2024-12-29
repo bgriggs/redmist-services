@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BigMission.RaceHeroSdk" Version="2.0.0-CI-20230703-005333" />
+    <PackageReference Include="BigMission.RaceHeroSdk" Version="2.1.0" />
   </ItemGroup>
 
   <ItemGroup>

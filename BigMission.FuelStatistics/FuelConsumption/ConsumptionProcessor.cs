@@ -1,10 +1,6 @@
 ﻿using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics.FuelConsumption;
 
@@ -27,7 +23,7 @@ public class ConsumptionProcessor
 
     public async Task UpdateLaps(List<Lap> laps, int carId)
     {
-        if (!cars.TryGetValue(carId, out CarConsumption car))
+        if (!cars.TryGetValue(carId, out CarConsumption? car))
         {
             car = new CarConsumption(carId, loggerFactory, dataContext, dateTimeHelper);
             cars[carId] = car;
@@ -42,10 +38,10 @@ public class ConsumptionProcessor
     /// </summary>
     public void UpdateTelemetry(ChannelDataSetDto telem, int carId, ChannelMapping fuelMapping)
     {
-        var fuelCh = telem.Data.FirstOrDefault(c => c.ChannelId == fuelMapping.Id);
+        var fuelCh = telem.Data.First(c => c.ChannelId == fuelMapping.Id);
         if (fuelMapping == null) { return; }
 
-        if (!cars.TryGetValue(carId, out CarConsumption car))
+        if (!cars.TryGetValue(carId, out CarConsumption? car))
         {
             car = new CarConsumption(carId, loggerFactory, dataContext, dateTimeHelper);
             cars[carId] = car;

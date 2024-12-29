@@ -1,10 +1,8 @@
 ﻿using BigMission.DeviceApp.Shared;
-using System.Threading.Tasks;
 
-namespace BigMission.FuelStatistics.FuelRange
+namespace BigMission.FuelStatistics.FuelRange;
+
+public interface ICarTelemetryConsumer
 {
-    public interface ICarTelemetryConsumer
-    {
-        Task UpdateTelemetry(ChannelDataSetDto telem);
-    }
+    Task UpdateTelemetry(ChannelDataSetDto telem);
 }

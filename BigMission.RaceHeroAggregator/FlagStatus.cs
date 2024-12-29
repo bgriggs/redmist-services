@@ -3,119 +3,114 @@ using BigMission.Cache.Models.Flags;
 using BigMission.Database;
 using BigMission.TestHelpers;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using StackExchange.Redis;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
-namespace BigMission.RaceHeroAggregator
+namespace BigMission.RaceHeroAggregator;
+
+class FlagStatus
 {
-    class FlagStatus
+    private ILogger Logger { get; }
+    private IDateTimeHelper DateTime { get; }
+
+    private readonly IConnectionMultiplexer cacheMuxer;
+    private readonly IDbContextFactory<RedMist> dbFactory;
+    private readonly List<EventFlag> eventFlags = new();
+    private readonly int eventId;
+
+    public FlagStatus(int eventId, ILoggerFactory loggerFactory, IConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime, IDbContextFactory<RedMist> dbFactory)
     {
-        private ILogger Logger { get; }
-        private IDateTimeHelper DateTime { get; }
+        this.eventId = eventId;
+        Logger = loggerFactory.CreateLogger(GetType().Name);
+        this.cacheMuxer = cacheMuxer;
+        DateTime = dateTime;
+        this.dbFactory = dbFactory;
+    }
 
-        private readonly IConnectionMultiplexer cacheMuxer;
-        private readonly IDbContextFactory<RedMist> dbFactory;
-        private readonly List<EventFlag> eventFlags = new();
-        private readonly int eventId;
-
-        public FlagStatus(int eventId, ILoggerFactory loggerFactory, IConnectionMultiplexer cacheMuxer, IDateTimeHelper dateTime, IDbContextFactory<RedMist> dbFactory)
+    public async Task ProcessFlagStatus(Flag flag, int runId)
+    {
+        using var db = await dbFactory.CreateDbContextAsync();
+        if (eventFlags.Count == 0)
         {
-            this.eventId = eventId;
-            Logger = loggerFactory.CreateLogger(GetType().Name);
-            this.cacheMuxer = cacheMuxer;
-            DateTime = dateTime;
-            this.dbFactory = dbFactory;
+            var ef = AddNewFlag(flag, runId);
+            var flagId = await SaveFlagChange(db, null, ef);
+            ef.Id = flagId;
+            await UpdateCache();                
+            Logger.LogTrace($"Saved event flag update {flag}");
         }
-
-        public async Task ProcessFlagStatus(Flag flag, int runId)
+        else
         {
-            using var db = await dbFactory.CreateDbContextAsync();
-            if (eventFlags.Count == 0)
+            var currentFlag = eventFlags.Last();
+            if (currentFlag.Flag != flag.ToString())
             {
-                var ef = AddNewFlag(flag, runId);
-                var flagId = await SaveFlagChange(db, null, ef);
-                ef.Id = flagId;
-                await UpdateCache();                
-                Logger.LogTrace($"Saved event flag update {flag}");
-            }
-            else
-            {
-                var currentFlag = eventFlags.Last();
-                if (currentFlag.Flag != flag.ToString())
-                {
-                    Logger.LogTrace($"Processing flag change from {currentFlag.Flag} to {flag}");
-                    currentFlag.End = DateTime.UtcNow;
-                    var ef = AddNewFlag(flag, runId);
-
-                    // Save changes
-                    var flagId = await SaveFlagChange(db, currentFlag, ef);
-                    ef.Id = flagId;
-
-                    await UpdateCache();
-                    Logger.LogTrace($"Saved flag change from {currentFlag.Flag} to {flag}");
-                }
-            }
-        }
-
-        public async Task EndEvent()
-        {
-            var currentFlag = eventFlags.LastOrDefault();
-            if (currentFlag != null && currentFlag.End == null)
-            {
+                Logger.LogTrace($"Processing flag change from {currentFlag.Flag} to {flag}");
                 currentFlag.End = DateTime.UtcNow;
+                var ef = AddNewFlag(flag, runId);
 
                 // Save changes
+                var flagId = await SaveFlagChange(db, currentFlag, ef);
+                ef.Id = flagId;
+
                 await UpdateCache();
-                using var db = await dbFactory.CreateDbContextAsync();
-                db.Update(ConvertFlag(currentFlag));
-                await db.SaveChangesAsync();
-                Logger.LogTrace($"Saved event {eventId} end");
+                Logger.LogTrace($"Saved flag change from {currentFlag.Flag} to {flag}");
             }
         }
+    }
 
-        private static async Task<int> SaveFlagChange(RedMist db, EventFlag currentFlag, EventFlag nextFlag)
+    public async Task EndEvent()
+    {
+        var currentFlag = eventFlags.LastOrDefault();
+        if (currentFlag != null && currentFlag.End == null)
         {
-            if (currentFlag != null)
-            {
-                db.Update(ConvertFlag(currentFlag));
-            }
-            var dbFlag = ConvertFlag(nextFlag);
-            db.EventFlags.Add(dbFlag);
+            currentFlag.End = DateTime.UtcNow;
+
+            // Save changes
+            await UpdateCache();
+            using var db = await dbFactory.CreateDbContextAsync();
+            db.Update(ConvertFlag(currentFlag));
             await db.SaveChangesAsync();
-            return dbFlag.Id;
+            Logger.LogTrace($"Saved event {eventId} end");
         }
+    }
 
-        private EventFlag AddNewFlag(Flag flag, int runId)
+    private static async Task<int> SaveFlagChange(RedMist db, EventFlag? currentFlag, EventFlag nextFlag)
+    {
+        if (currentFlag != null)
         {
-            var ef = new EventFlag { EventId = eventId, RunId = runId, Flag = flag.ToString(), Start = DateTime.UtcNow };
-            eventFlags.Add(ef);
-            return ef;
+            db.Update(ConvertFlag(currentFlag));
         }
+        var dbFlag = ConvertFlag(nextFlag);
+        db.EventFlags.Add(dbFlag);
+        await db.SaveChangesAsync();
+        return dbFlag.Id;
+    }
 
-        private async Task UpdateCache()
-        {
-            var key = string.Format(Consts.EVENT_FLAGS, eventId);
-            var json = JsonConvert.SerializeObject(eventFlags);
-            var cache = cacheMuxer.GetDatabase();
-            await cache.StringSetAsync(key, json);
-        }
+    private EventFlag AddNewFlag(Flag flag, int runId)
+    {
+        var ef = new EventFlag { EventId = eventId, RunId = runId, Flag = flag.ToString(), Start = DateTime.UtcNow };
+        eventFlags.Add(ef);
+        return ef;
+    }
 
-        private static Database.Models.EventFlag ConvertFlag(EventFlag cf)
+    private async Task UpdateCache()
+    {
+        var key = string.Format(Consts.EVENT_FLAGS, eventId);
+        var json = JsonConvert.SerializeObject(eventFlags);
+        var cache = cacheMuxer.GetDatabase();
+        await cache.StringSetAsync(key, json);
+    }
+
+    private static Database.Models.EventFlag ConvertFlag(EventFlag cf)
+    {
+        return new Database.Models.EventFlag
         {
-            return new Database.Models.EventFlag
-            {
-                Id = cf.Id,
-                EventId = cf.EventId,
-                RunId = cf.RunId,
-                Start = cf.Start,
-                End = cf.End,
-                Flag = cf.Flag,
-            };
-        }
+            Id = cf.Id,
+            EventId = cf.EventId,
+            RunId = cf.RunId,
+            Start = cf.Start,
+            End = cf.End,
+            Flag = cf.Flag,
+        };
     }
 }

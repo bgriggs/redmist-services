@@ -1,11 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿namespace BigMission.FuelStatistics;
 
-namespace BigMission.FuelStatistics
+public interface ILapConsumer
 {
-    public interface ILapConsumer
-    {
-        int[] EventIds { get; }
-        Task UpdateLaps(int eventId, List<Lap> laps);
-    }
+    int[] EventIds { get; }
+    Task UpdateLaps(int eventId, List<Lap> laps);
 }

@@ -5,14 +5,6 @@ using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.ServiceStatusTools;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics;
 
@@ -23,7 +15,7 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
 
     public int[] EventIds
     {
-        get { return eventSubscriptions.Keys.ToArray(); }
+        get { return [.. eventSubscriptions.Keys]; }
     }
 
     private readonly TimeSpan subCheckInterval;
@@ -46,8 +38,8 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
         this.flagContext = flagContext;
         DateTime = dateTime;
         this.startup = startup;
-        subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTSUBSCRIPTIONCHECKMS"]));
-        commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTCOMMITMS"]));
+        subCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTSUBSCRIPTIONCHECKMS"] ?? throw new InvalidOperationException("EVENTSUBSCRIPTIONCHECKMS is required")));
+        commitInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["EVENTCOMMITMS"] ?? throw new InvalidOperationException("EVENTSUBSCRIPTIONCHECKMS is required")));
     }
 
 
@@ -78,7 +70,7 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
                     foreach (var settings in eventSettings)
                     {
                         var eventId = int.Parse(settings.RaceHeroEventId);
-                        if (!eventSubscriptions.TryGetValue(eventId, out Event e))
+                        if (!eventSubscriptions.TryGetValue(eventId, out Event? e))
                         {
                             e = new Event(settings, loggerFactory, DateTime, dataContext, fuelRangeContext, flagContext);
                             await e.Initialize();
@@ -136,7 +128,7 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
             foreach (var evt in events)
             {
                 // Get the local time zone info if available
-                TimeZoneInfo tz = null;
+                TimeZoneInfo? tz = null;
                 if (!string.IsNullOrWhiteSpace(evt.EventTimeZoneId))
                 {
                     try
@@ -161,7 +153,7 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
                 }
             }
 
-            return activeSubscriptions.ToArray();
+            return [.. activeSubscriptions];
         }
         catch (Exception ex)
         {
@@ -172,7 +164,7 @@ public class EventService : BackgroundService, ILapConsumer, ICarTelemetryConsum
 
     public async Task UpdateLaps(int eventId, List<Lap> laps)
     {
-        if (eventSubscriptions.TryGetValue(eventId, out Event evt))
+        if (eventSubscriptions.TryGetValue(eventId, out Event? evt))
         {
             await evt.UpdateLap(laps);
         }

@@ -6,10 +6,6 @@ using BigMission.FuelStatistics.FuelConsumption;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics;
 
@@ -17,7 +13,7 @@ class DataContext : IDataContext
 {
     private readonly IConnectionMultiplexer cacheMuxer;
     private readonly IDbContextFactory<RedMist> dbFactory;
-    private RedMist batchDbContext;
+    private RedMist? batchDbContext;
 
 
     public DataContext(IConnectionMultiplexer cacheMuxer, IDbContextFactory<RedMist> dbFactory)
@@ -70,7 +66,7 @@ class DataContext : IDataContext
         {
             int latestRunId = 0;
             var runIds = await db.CarRaceLaps.Where(l => l.EventId == eventId).Select(p => p.RunId).ToListAsync();
-            if (runIds.Any())
+            if (runIds.Count != 0)
             {
                 latestRunId = runIds.Max();
             }
@@ -230,7 +226,7 @@ class DataContext : IDataContext
         var dtstr = await cache.StringGetAsync(key);
         if (!string.IsNullOrEmpty(dtstr))
         {
-            return DateTime.Parse(dtstr).ToUniversalTime();
+            return DateTime.Parse(dtstr!).ToUniversalTime();
         }
         return null;
     }
@@ -240,14 +236,18 @@ class DataContext : IDataContext
         var cache = cacheMuxer.GetDatabase();
         var laps = new List<Lap>();
         var key = string.Format(Consts.LAPS_FUEL_STAT, rhEventId);
-        Lap lap;
+        Lap? lap;
         do
         {
             lap = null;
             var lapJson = await cache.ListRightPopAsync(key);
             if (!string.IsNullOrEmpty(lapJson))
             {
-                var racer = JsonConvert.DeserializeObject<CarRaceLap>(lapJson);
+                var racer = JsonConvert.DeserializeObject<CarRaceLap>(lapJson!);
+                if (racer == null)
+                {
+                    continue;
+                }
                 lap = new Lap
                 {
                     EventId = rhEventId,
@@ -285,7 +285,7 @@ class DataContext : IDataContext
     {
         var json = JsonConvert.SerializeObject(channelDataSetDto);
         var pub = cacheMuxer.GetSubscriber();
-        await pub.PublishAsync(Consts.CAR_TELEM_SUB, json);
+        await pub.PublishAsync(new RedisChannel(Consts.CAR_TELEM_SUB, RedisChannel.PatternMode.Literal), json);
     }
 
     #endregion

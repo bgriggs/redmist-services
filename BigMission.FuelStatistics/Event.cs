@@ -5,12 +5,7 @@ using BigMission.DeviceApp.Shared;
 using BigMission.FuelStatistics.FuelConsumption;
 using BigMission.FuelStatistics.FuelRange;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics;
 
@@ -87,7 +82,10 @@ public class Event
             Logger.LogInformation($"Loaded {deviceApps.Count} device apps");
             foreach (var da in deviceApps)
             {
-                deviceAppCarMappings[da.Id] = da.CarId.Value;
+                if (da.CarId.HasValue)
+                {
+                    deviceAppCarMappings[da.Id] = da.CarId.Value;
+                }
             }
 
             // Load Cars to be able to go from RH car number to a car ID
@@ -107,7 +105,7 @@ public class Event
             {
                 if (deviceAppCarMappings.TryGetValue(chMap.DeviceAppId, out int carId))
                 {
-                    if (carRanges.TryGetValue(carId, out CarRange cr))
+                    if (carRanges.TryGetValue(carId, out CarRange? cr))
                     {
                         if (chMap.ReservedName == SPEED)
                         {
@@ -167,7 +165,7 @@ public class Event
             // Update Fuel Range stats
             if (carNumberToIdMappings.TryGetValue(cl.Key.ToUpper(), out int carId))
             {
-                if (carRanges.TryGetValue(carId, out CarRange cr))
+                if (carRanges.TryGetValue(carId, out CarRange? cr))
                 {
                     var changed = await cr.ProcessLaps(cl.ToArray());
                     if (changed)
@@ -177,7 +175,7 @@ public class Event
                 }
 
                 // Update directly measured fuel consumption
-                await consumptionProcessor.UpdateLaps(cl.ToList(), carId);
+                await consumptionProcessor.UpdateLaps([.. cl], carId);
             }
         }
     }
@@ -190,7 +188,7 @@ public class Event
     {
         if (deviceAppCarMappings.TryGetValue(telem.DeviceAppId, out int carId))
         {
-            if (carRanges.TryGetValue(carId, out CarRange cr))
+            if (carRanges.TryGetValue(carId, out CarRange? cr))
             {
                 var changed = await cr.ProcessTelemetry(telem);
                 if (changed)
@@ -272,7 +270,7 @@ public class Event
 
     public Car[] GetCars()
     {
-        return Cars.Values.ToArray();
+        return [.. Cars.Values];
     }
 
     /// <summary>

@@ -1,10 +1,8 @@
 ﻿using BigMission.Cache.Models.FuelRange;
-using System.Threading.Tasks;
 
-namespace BigMission.FuelStatistics
+namespace BigMission.FuelStatistics;
+
+public interface IStintOverrideConsumer
 {
-    public interface IStintOverrideConsumer
-    {
-        Task ProcessStintOverride(RangeUpdate stint);
-    }
+    Task ProcessStintOverride(RangeUpdate stint);
 }

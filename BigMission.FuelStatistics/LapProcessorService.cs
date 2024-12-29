@@ -1,13 +1,5 @@
 ﻿using BigMission.ServiceStatusTools;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BigMission.FuelStatistics;
 
@@ -28,7 +20,7 @@ public class LapProcessorService : BackgroundService
         this.dataContext = dataContext;
         this.lapConsumers = lapConsumers;
         this.startup = startup;
-        lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LAPCHECKMS"]));
+        lapCheckInterval = TimeSpan.FromMilliseconds(int.Parse(configuration["LAPCHECKMS"] ?? throw new InvalidOperationException("LAPCHECKMS is required")));
     }
 
 
@@ -48,9 +40,9 @@ public class LapProcessorService : BackgroundService
             {
                 var sw = Stopwatch.StartNew();
                 var eventIds = lapConsumers.SelectMany(e => e.EventIds).Distinct();
-                var lapResults = eventIds.Select(l => dataContext.PopEventLaps(l));
+                var lapResults = eventIds.Select(dataContext.PopEventLaps);
                 var laps = await Task.WhenAll(lapResults);
-                if (laps.Any())
+                if (laps.Length != 0)
                 {
                     var flat = laps.SelectMany(l => l);
                     var lg = flat.GroupBy(l => l.EventId).ToDictionary(g => g.Key, g => g.ToList());
@@ -58,7 +50,7 @@ public class LapProcessorService : BackgroundService
                     {
                         foreach (var eid in consumer.EventIds)
                         {
-                            if (lg.TryGetValue(eid, out List<Lap> evtLaps))
+                            if (lg.TryGetValue(eid, out List<Lap>? evtLaps))
                             {
                                 try
                                 {

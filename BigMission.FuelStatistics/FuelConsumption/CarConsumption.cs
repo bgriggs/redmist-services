@@ -1,11 +1,6 @@
 ﻿using BigMission.Database.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.TestHelpers;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using static BigMission.RaceHeroSdk.RaceHeroClient;
 
 namespace BigMission.FuelStatistics.FuelConsumption;
@@ -17,7 +12,7 @@ public class CarConsumption
 {
     public float FuelLevel { get; set; }
     private float lastLapFuelLevel;
-    private readonly List<(double lapSecs, double cons)> lapConsHistory = new();
+    private readonly List<(double lapSecs, double cons)> lapConsHistory = [];
     private const int MAX_CONS_HISTORY = 3;
 
     public const string SVR_CONS_GAL_LAP = "SrvConsGalLap";
@@ -27,24 +22,24 @@ public class CarConsumption
     public const string SVR_FL_RANGE_LAPS = "SrvFlRangeLaps";
     public const string SVR_FL_RANGE_TIME = "SrvFlRangeTime";
 
-    public static readonly string[] ConsumptionChannelNames = new[]
-    {
+    public static readonly string[] ConsumptionChannelNames =
+    [
         SVR_CONS_GAL_LAP,
         SVR_RANGE_LAPS,
         SVR_RANGE_TIME,
         SVR_FL_CONS_GAL_LAP,
         SVR_FL_RANGE_LAPS,
         SVR_FL_RANGE_TIME,
-    };
+    ];
 
     private readonly int carId;
     private readonly IDataContext dataContext;
     private readonly IDateTimeHelper dateTime;
-    private List<ChannelMapping> channelMappings;
+    private List<ChannelMapping> channelMappings = [];
     private ILogger Logger { get; set; }
     private record ConsRange(double ConsGalLap, double RangeLaps, double RangeTimeSecs, double ConsFiltered, double RangeLapsFiltered, double RangeTimeSecsFiltered);
 
-    private ConsRange lastConsRange;
+    private ConsRange? lastConsRange;
 
 
     public CarConsumption(int carId, ILoggerFactory loggerFactory, IDataContext dataContext, IDateTimeHelper dateTimeHelper)

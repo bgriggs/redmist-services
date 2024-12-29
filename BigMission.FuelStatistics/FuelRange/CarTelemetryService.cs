@@ -1,69 +1,71 @@
 ﻿using BigMission.Cache.Models;
 using BigMission.DeviceApp.Shared;
 using BigMission.ServiceStatusTools;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using StackExchange.Redis;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace BigMission.FuelStatistics.FuelRange
+namespace BigMission.FuelStatistics.FuelRange;
+
+/// <summary>
+/// Receives car telemetry and propagates it to consumers.
+/// </summary>
+public class CarTelemetryService : BackgroundService
 {
-    /// <summary>
-    /// Receives car telemetry and propagates it to consumers.
-    /// </summary>
-    public class CarTelemetryService : BackgroundService
+    private ILogger Logger { get; set; }
+    private readonly IEnumerable<ICarTelemetryConsumer> telemetryConsumers;
+    private readonly IStartupHealthCheck startup;
+    private readonly IConnectionMultiplexer cacheMuxer;
+
+    public CarTelemetryService(IConnectionMultiplexer cacheMuxer, IEnumerable<ICarTelemetryConsumer> telemetryConsumers, ILoggerFactory loggerFactory, IStartupHealthCheck startup)
     {
-        private ILogger Logger { get; set; }
-        private readonly IEnumerable<ICarTelemetryConsumer> telemetryConsumers;
-        private readonly IStartupHealthCheck startup;
-        private readonly IConnectionMultiplexer cacheMuxer;
+        this.telemetryConsumers = telemetryConsumers;
+        this.startup = startup;
+        this.cacheMuxer = cacheMuxer;
+        Logger = loggerFactory.CreateLogger(GetType().Name);
+    }
 
-        public CarTelemetryService(IConnectionMultiplexer cacheMuxer, IEnumerable<ICarTelemetryConsumer> telemetryConsumers, ILoggerFactory loggerFactory, IStartupHealthCheck startup)
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        Logger.LogInformation("Waiting for dependencies...");
+        while (!stoppingToken.IsCancellationRequested)
         {
-            this.telemetryConsumers = telemetryConsumers;
-            this.startup = startup;
-            this.cacheMuxer = cacheMuxer;
-            Logger = loggerFactory.CreateLogger(GetType().Name);
+            if (await startup.CheckDependencies())
+                break;
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
         }
 
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        var sub = cacheMuxer.GetSubscriber();
+        await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), async (channel, message) =>
         {
-            Logger.LogInformation("Waiting for dependencies...");
-            while (!stoppingToken.IsCancellationRequested)
-            {
-                if (await startup.CheckDependencies())
-                    break;
-                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-            }
+            await HandleTelemetry(message);
+        });
+    }
 
-            var sub = cacheMuxer.GetSubscriber();
-            await sub.SubscribeAsync(RedisChannel.Literal(Consts.CAR_TELEM_SUB), async (channel, message) =>
-            {
-                await HandleTelemetry(message);
-            });
+    private async Task HandleTelemetry(RedisValue value)
+    {
+        if (!value.HasValue)
+        {
+            Logger.LogWarning("Received empty telemetry message.");
+            return;
         }
 
-        private async Task HandleTelemetry(RedisValue value)
+        var telemetryData = JsonConvert.DeserializeObject<ChannelDataSetDto>(value!);
+        if (telemetryData == null)
         {
-            var telemetryData = JsonConvert.DeserializeObject<ChannelDataSetDto>(value);
-
-            if (telemetryData.Data == null)
-            {
-                telemetryData.Data = System.Array.Empty<ChannelStatusDto>();
-            }
-
-            var consumerTasks = telemetryConsumers.Select(async (consumer) =>
-            {
-                await consumer.UpdateTelemetry(telemetryData);
-            });
-
-            await Task.WhenAll(consumerTasks);
+            Logger.LogWarning("Received telemetry message with null data.");
+            return;
         }
+        if (telemetryData.Data == null)
+        {
+            telemetryData.Data = [];
+        }
+
+        var consumerTasks = telemetryConsumers.Select(async (consumer) =>
+        {
+            await consumer.UpdateTelemetry(telemetryData);
+        });
+
+        await Task.WhenAll(consumerTasks);
     }
 }

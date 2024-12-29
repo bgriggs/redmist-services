@@ -22,10 +22,6 @@
         "ASPNETCORE_URLS": "http://+:80"
       },
       "publishAllPorts": true
-    },
-    "Bridge to Kubernetes": {
-      "commandName": "AzureDevSpacesLocal",
-      "launchBrowser": true
     }
   },
   "$schema": "https://json.schemastore.org/launchsettings.json"
