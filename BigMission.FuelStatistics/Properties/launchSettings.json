@@ -5,9 +5,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "b1ad0ae1-1a00-42c3-9dd5-a8a2ce3061f5",
-        "ConnectionStrings__Default": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
         "REDIS_SVC": "localhost:6379",
-        "REDIS_PW": "***REMOVED***",
         "EVENTSUBSCRIPTIONCHECKMS": "10000",
         "EVENTCOMMITMS": "500",
         "LAPCHECKMS": "500"

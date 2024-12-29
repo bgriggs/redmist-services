@@ -5,11 +5,8 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "d4907a41-488d-4ed5-97f4-5278612d1502",
-        "ConnectionStrings__Default": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
         "REDIS_SVC": "localhost:6379",
-        "REDIS_PW": "***REMOVED***",
         "RACEHEROURL": "https://api.racehero.io/v1/",
-        "RACEHEROAPIKEY": "3c233e2af814aa2f8ff1",
         "EVENTSUBSCRIPTIONCHECKMS": "10000",
         "WAITFORSTARTTIMER": "3000",
         "EVENTPOLLTIMER": "1000"

@@ -7,13 +7,9 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "b459738a-d31a-4056-b1d5-08aafe3892ea",
-        "ConnectionStrings__Default": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
         "REDIS_SVC": "localhost:6379",
-        "REDIS_PW": "***REMOVED***",
         "DIGITALOCEAN_ENDPOINTURL": "https://nyc3.digitaloceanspaces.com",
-        "DIGITALOCEAN_RELEASEBUCKET": "redmist-releases",
-        "DIGITALOCEAN_KEYID": "***REMOVED***",
-        "DIGITALOCEAN_KEYSECRET": "***REMOVED***"
+        "DIGITALOCEAN_RELEASEBUCKET": "redmist-releases"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://0.0.0.0:5199"
