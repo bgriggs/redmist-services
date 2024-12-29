@@ -1,62 +1,61 @@
 ﻿using BigMission.Database.Models;
 
-namespace BigMission.RaceControlLog.Configuration
+namespace BigMission.RaceControlLog.Configuration;
+
+internal class ConfigurationEventData
 {
-    internal class ConfigurationEventData
+    public RaceEventSetting[] Events { get; set; } = [];
+    public Dictionary<int, Car> Cars { get; set; } = [];
+    public Dictionary<long, AbpUser> Users { get; set; } = [];
+
+    public static long[] GetIds(string idStr)
     {
-        public RaceEventSetting[] Events { get; set; } = Array.Empty<RaceEventSetting>();
-        public Dictionary<int, Car> Cars { get; set; } = new Dictionary<int, Car>();
-        public Dictionary<long, AbpUser> Users { get; set; } = new Dictionary<long, AbpUser>();
-
-        public static long[] GetIds(string idStr)
+        var ids = new List<long>();
+        var items = idStr.Split(";");
+        foreach (var i in items)
         {
-            var ids = new List<long>();
-            var items = idStr.Split(";");
-            foreach (var i in items)
+            if (!string.IsNullOrWhiteSpace(i))
             {
-                if (!string.IsNullOrWhiteSpace(i))
+                if (long.TryParse(i, out long id))
                 {
-                    if (long.TryParse(i, out long id))
-                    {
-                        ids.Add(id);
-                    }
+                    ids.Add(id);
                 }
             }
-            return ids.ToArray();
         }
+        return [.. ids];
+    }
 
-        public Dictionary<(int sysEvent, string car), AbpUser[]> GetCarSmsSubscriptions()
+    public Dictionary<(int sysEvent, string car), AbpUser[]> GetCarSmsSubscriptions()
+    {
+        var subs = new Dictionary<(int sysEvent, string car), AbpUser[]>();
+
+        foreach (var evt in Events)
         {
-            var subs = new Dictionary<(int sysEvent, string car), AbpUser[]>();
-
-            foreach (var evt in Events)
+            var carIds = GetIds(evt.CarIds ?? string.Empty);
+            var userIds = GetIds(evt.ControlLogSmsUserSubscriptions ?? string.Empty);
+            var users = GetUsers(userIds);
+            foreach (int cid in carIds)
             {
-                var carIds = GetIds(evt.CarIds ?? string.Empty);
-                var userIds = GetIds(evt.ControlLogSmsUserSubscriptions ?? string.Empty);
-                var users = GetUsers(userIds);
-                foreach (int cid in carIds)
+                if (Cars.TryGetValue(cid, out var car))
                 {
-                    if (Cars.TryGetValue(cid, out var car))
-                    {
-                        var key = (evt.Id, car.Number.ToUpper());
-                        subs[key] = users;
-                    }
+                    var key = (evt.Id, car.Number.ToUpper());
+                    subs[key] = users;
                 }
             }
-            return subs;
         }
+        return subs;
+    }
 
-        private AbpUser[] GetUsers(long[] ids)
+    private AbpUser[] GetUsers(long[] ids)
+    {
+        var users = new List<AbpUser>();
+        foreach (var id in ids)
         {
-            var users = new List<AbpUser>();
-            foreach (var id in ids)
+            if (Users.TryGetValue(id, out var user))
             {
-                if (Users.TryGetValue(id, out var user))
-                {
-                    users.Add(user);
-                }
+                users.Add(user);
             }
-            return users.ToArray();
         }
+        return [.. users];
     }
 }

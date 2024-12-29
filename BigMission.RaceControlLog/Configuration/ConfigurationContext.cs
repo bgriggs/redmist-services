@@ -1,34 +1,33 @@
-﻿namespace BigMission.RaceControlLog.Configuration
+﻿namespace BigMission.RaceControlLog.Configuration;
+
+internal class ConfigurationContext
 {
-    internal class ConfigurationContext
+    private ConfigurationEventData data = new();
+    private readonly SemaphoreSlim dataLock = new(1);
+
+    public async Task UpdateConfiguration(ConfigurationEventData data, CancellationToken cancellationToken)
     {
-        private ConfigurationEventData data = new();
-        private readonly SemaphoreSlim dataLock = new(1);
-
-        public async Task UpdateConfiguration(ConfigurationEventData data, CancellationToken cancellationToken)
+        await dataLock.WaitAsync(cancellationToken);
+        try
         {
-            await dataLock.WaitAsync(cancellationToken);
-            try
-            {
-                this.data = data;
-            }
-            finally
-            {
-                dataLock.Release();
-            }
+            this.data = data;
         }
-
-        public async Task<ConfigurationEventData> GetConfiguration(CancellationToken cancellationToken)
+        finally
         {
-            await dataLock.WaitAsync(cancellationToken);
-            try
-            {
-                return data;
-            }
-            finally
-            {
-                dataLock.Release();
-            }
+            dataLock.Release();
+        }
+    }
+
+    public async Task<ConfigurationEventData> GetConfiguration(CancellationToken cancellationToken)
+    {
+        await dataLock.WaitAsync(cancellationToken);
+        try
+        {
+            return data;
+        }
+        finally
+        {
+            dataLock.Release();
         }
     }
 }
