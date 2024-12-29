@@ -5,10 +5,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "SERVICEID": "0d6e4bf2-e23f-4734-b059-744fa917a651",
-        "ConnectionStrings__Default": "Server=localhost;Database=redmistdb-prod;User Id=sa;Password=***REMOVED***;",
         "REDIS_SVC": "localhost:6379",
-        "REDIS_PW": "***REMOVED***",
-        "APIKEY": "tjGG0avCXlloGlGQ4arcetr2S0HlyBY6A",
         "APIURL": "https://localhost:7199/edgedevhub/",
         "FULLUPDATEFREQUENCYMS": "2500"
       },
