@@ -131,18 +131,18 @@ public class Event
     /// <param name="laps"></param>
     public async Task UpdateLap(List<Lap> laps)
     {
-        var carLaps = laps.GroupBy(l => l.CarNumber);
+        var carLaps = laps.Where(l => l.CarNumber != null && l.ClassName != null).GroupBy(l => l.CarNumber!);
         foreach (var cl in carLaps)
         {
             if (!Cars.TryGetValue(cl.Key, out var car))
             {
-                car = new Car(cl.Key, cl.First().ClassName);
+                car = new Car(cl.Key, cl.First().ClassName!);
                 Cars[cl.Key] = car;
             }
 
             // Check for an event/lap reset when new laps are less than what's tracked for the car.
             // This is typically when you have a multi-race event.
-            if (laps.Any() && car.Laps.Any())
+            if (laps.Any() && car.Laps.Count != 0)
             {
                 var latestLap = laps.Max(l => l.CurrentLap);
                 var carsLatest = car.Laps.Keys.Max();
@@ -152,7 +152,7 @@ public class Event
                 }
             }
 
-            car.AddLap(cl.ToArray());
+            car.AddLap([.. cl]);
 
             // Save car status
             await dataContext.UpdateCarStatus(car, RhEventId);
@@ -167,7 +167,7 @@ public class Event
             {
                 if (carRanges.TryGetValue(carId, out CarRange? cr))
                 {
-                    var changed = await cr.ProcessLaps(cl.ToArray());
+                    var changed = await cr.ProcessLaps([.. cl]);
                     if (changed)
                     {
                         SetDirty(carId);
@@ -197,7 +197,14 @@ public class Event
                 }
 
                 // Update directly measured fuel consumption
-                consumptionProcessor.UpdateTelemetry(telem, cr.CarId, cr.FuelLevelChannel);
+                if (cr.FuelLevelChannel != null)
+                {
+                    consumptionProcessor.UpdateTelemetry(telem, cr.CarId, cr.FuelLevelChannel);
+                }
+                else
+                {
+                    Logger.LogDebug($"No fuel level channel for car {cr.CarId}");
+                }
             }
         }
     }

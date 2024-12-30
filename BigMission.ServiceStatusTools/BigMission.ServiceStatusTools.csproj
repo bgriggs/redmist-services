@@ -1,24 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<Import Project="..\version"></Import>
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+		<Authors>Brian Griggs</Authors>
+		<Company>Big Mission Motorsports, LLC</Company>
+		<Product>Red Mist</Product>
+		<Copyright>2022-2025</Copyright>
+	</PropertyGroup>
 	
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 	
 	<ItemGroup>
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="6.0.5" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
 		<PackageReference Include="BigMission.Cache.Models" Version="2.0.1-CI-20241118-003744" />
-		<PackageReference Include="BigMission.TestHelpers" Version="2.0.0-CI-20230702-223939" />
-		<PackageReference Include="NLog.Targets.Redis" Version="2.0.0-CI-20230703-202818" />
+		<PackageReference Include="BigMission.TestHelpers" Version="3.0.6" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="NLog.Targets.Redis" Version="3.1.0" />
 	</ItemGroup>
 
-	<PropertyGroup>
-		<TargetFramework>net7.0</TargetFramework>
-		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
-		<Authors>Brian Griggs</Authors>
-		<Company>Big Mission Motorsports, LLC</Company>
-		<Product>Red Mist</Product>
-		<Copyright>2022-2023</Copyright>
-	</PropertyGroup>
+	
 
 </Project>

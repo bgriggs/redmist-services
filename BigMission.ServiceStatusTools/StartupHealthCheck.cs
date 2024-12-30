@@ -1,23 +1,15 @@
 ﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StackExchange.Redis;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BigMission.ServiceStatusTools;
 
-public class StartupHealthCheck : IStartupHealthCheck
+public class StartupHealthCheck(IConnectionMultiplexer cache, ServiceTracking serviceTracking) : IStartupHealthCheck
 {
-    private readonly IConnectionMultiplexer cache;
-    private readonly ServiceTracking serviceTracking;
+    private readonly IConnectionMultiplexer cache = cache;
+    private readonly ServiceTracking serviceTracking = serviceTracking;
 
     public string ServiceState { get; set; } = Cache.Models.ServiceState.STARTING;
-    public ServiceTracking ServiceTracking { get; private set; }
-
-    public StartupHealthCheck(IConnectionMultiplexer cache,ServiceTracking serviceTracking)
-    {
-        this.cache = cache;
-        this.serviceTracking = serviceTracking;
-    }
+    public ServiceTracking ServiceTracking { get; private set; } = serviceTracking;
 
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {

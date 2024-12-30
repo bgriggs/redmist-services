@@ -16,12 +16,12 @@ public class CarRange
     private int RunId { get; set; }
     private readonly FuelRangeSetting settings;
 
-    public ChannelMapping SpeedChannel
+    public ChannelMapping? SpeedChannel
     {
         get { return telemetryTriggers.SpeedChannel; }
         set { telemetryTriggers.SpeedChannel = value; }
     }
-    public ChannelMapping FuelLevelChannel
+    public ChannelMapping? FuelLevelChannel
     {
         get { return telemetryTriggers.FuelLevelChannel; }
         set { telemetryTriggers.FuelLevelChannel = value; }

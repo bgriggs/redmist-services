@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
-using System.Threading.Tasks;
 
 namespace BigMission.ServiceStatusTools;
 

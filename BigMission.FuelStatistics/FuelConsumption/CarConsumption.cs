@@ -215,6 +215,11 @@ public class CarConsumption
     /// </summary>
     public async Task PublishLastChannels()
     {
+        if (lastConsRange == null)
+        {
+            Logger.LogDebug($"No last consumption range data for car {carId}");
+            return;
+        }
         await PublishChannels(lastConsRange);
     }
 }
