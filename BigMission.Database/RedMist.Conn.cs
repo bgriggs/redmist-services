@@ -12,7 +12,7 @@ namespace BigMission.Database
             ConnectionString = connectionString;
         }
 
-        private string ConnectionString { get; }
+        private string? ConnectionString { get; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
