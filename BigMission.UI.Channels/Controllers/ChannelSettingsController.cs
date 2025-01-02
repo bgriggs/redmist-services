@@ -23,6 +23,7 @@ public class ChannelSettingsController : Controller
     }
 
     [HttpGet]
+    [ProducesResponseType<List<ChannelDefinition>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ChannelDefinition>>> LoadChannelDefinitions()
     {
         using var db = await rmFactory.CreateDbContextAsync();
@@ -43,6 +44,7 @@ public class ChannelSettingsController : Controller
     }
 
     [HttpGet]
+    [ProducesResponseType<List<Car>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<Car>>> LoadCars()
     {
         using var db = await rmFactory.CreateDbContextAsync();

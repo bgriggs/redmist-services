@@ -1,6 +1,7 @@
 using BigMission.Database;
 using BigMission.Database.V2;
 using BigMission.ServiceStatusTools;
+using BigMission.Streaming.Services.Clients;
 using BigMission.Streaming.Services.Hubs;
 using BigMission.TestHelpers;
 using HealthChecks.UI.Client;
@@ -25,7 +26,8 @@ public class Program
 
         builder.Services.AddCors(options =>
         {
-            options.AddDefaultPolicy(policy => {
+            options.AddDefaultPolicy(policy =>
+            {
                 policy.AllowAnyOrigin();
                 policy.AllowAnyHeader();
             });
@@ -83,15 +85,16 @@ public class Program
             .AddRedis(redisConn, tags: ["cache", "redis"])
             .AddProcessAllocatedMemoryHealthCheck(maximumMegabytesAllocated: 1024, name: "Process Allocated Memory", tags: ["memory"]);
 
-        builder.Services.AddSignalR().AddStackExchangeRedis(redisConn, options =>
-        {
-            options.Configuration.ChannelPrefix = RedisChannel.Literal("channel-status-sr");
-        });
+        builder.Services.AddSignalR(o => o.MaximumParallelInvocationsPerClient = 3)
+            .AddStackExchangeRedis(redisConn, options =>
+            {
+                options.Configuration.ChannelPrefix = RedisChannel.Literal("video-streaming");
+            });
 
         builder.Services.AddTransient<IDateTimeHelper, DateTimeHelper>();
         builder.Services.AddSingleton<StartupHealthCheck>();
         builder.Services.AddSingleton<ServiceTracking>();
-
+        builder.Services.AddSingleton<NginxClient>();
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.

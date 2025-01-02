@@ -1,31 +1,58 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using System.Security.Claims;
+﻿using BigMission.Streaming.Shared.Models;
+using BigMission.TestHelpers;
+using Microsoft.AspNetCore.SignalR;
+using StackExchange.Redis;
 
 namespace BigMission.Streaming.Services.Hubs;
 
 public class NginxHub : Hub
 {
-    private ILogger Logger { get; }
+    private readonly IConnectionMultiplexer cache;
 
-    public NginxHub(ILoggerFactory loggerFactory)
+    private ILogger Logger { get; }
+    public IDateTimeHelper DateTime { get; }
+
+    public NginxHub(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDateTimeHelper dateTime)
     {
         Logger = loggerFactory.CreateLogger(GetType().Name);
+        this.cache = cache;
+        DateTime = dateTime;
     }
 
     public async override Task OnConnectedAsync()
     {
-        //var details = Context.User?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email);
-        //Logger.LogInformation($"Connection from user {details}");
-        //await Groups.AddToGroupAsync(Context.ConnectionId, details.appId.ToString().ToUpper());
         await base.OnConnectedAsync();
-        await Clients.All.SendAsync("ReceiveMessage", $"Connected {DateTime.Now}");
+        var info = await Clients.Caller.InvokeAsync<NginxInfo?>("GetInfo", default);
+        if (info == null)
+        {
+            Logger.LogError("Failed to get Nginx info.");
+        }
+        else
+        {
+            await SaveConnection(Context.ConnectionId);
+            Logger.LogInformation($"Connected to Nginx {info.HostName}");
+        }
+        Context.Items.Add($"info", info);
     }
 
     public async override Task OnDisconnectedAsync(Exception? exception)
     {
-        var details = Context.User?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email);
-        Logger.LogInformation($"User {details} disconnected.");
-        //await Groups.RemoveFromGroupAsync(Context.ConnectionId, details.appId.ToString().ToUpper());
         await base.OnDisconnectedAsync(exception);
+        await RemoveConnection(Context.ConnectionId);
+    }
+
+    
+
+    private async Task SaveConnection(string connectionId)
+    {
+        var db = cache.GetDatabase();
+        var hashEntries = new HashEntry[] { new(connectionId, DateTime.UtcNow.ToString()) };
+        await db.HashSetAsync("NginxConnections", hashEntries);
+    }
+
+    private async Task RemoveConnection(string connectionId)
+    {
+        var db = cache.GetDatabase();
+        await db.HashDeleteAsync("NginxConnections", connectionId);
     }
 }

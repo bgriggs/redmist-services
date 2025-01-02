@@ -13,7 +13,7 @@ namespace BigMission.Streaming.NginxClient;
 internal class HubClient : HubClientBase
 {
     private ILogger Logger { get; }
-    private string nginxConfPath;
+    private readonly string nginxConfPath;
 
     public HubClient(ILoggerFactory loggerFactory, IConfiguration configuration) : base(loggerFactory, configuration)
     {
@@ -42,15 +42,9 @@ internal class HubClient : HubClientBase
 
         var hub = StartConnection(stoppingToken);
 
-        hub.On<string>("ReceiveMessage", message =>
+        hub.On<NginxStreamPush[], bool>("SetStreams", async (streams) =>
         {
-            Logger.LogInformation($"Received message: {message}");
-        });
-
-        hub.On<NginxStreamPush[]>("SetStreams", async streams =>
-        {
-            var response = new RequestResponse { RequestId = streams.First().RequestId };
-            Logger.LogInformation($"Received SetStreams ID: {response.RequestId}");
+            Logger.LogInformation($"Received SetStreams");
             try
             {
                 var conf = await File.ReadAllTextAsync(nginxConfPath, stoppingToken);
@@ -60,37 +54,31 @@ internal class HubClient : HubClientBase
                 if (exitCode != 0)
                 {
                     Logger.LogError($"Failed to restart Nginx. Exit code: {exitCode}");
-                    response.Message = "Failed to restart Nginx.";
                 }
                 else
                 {
-                    response.Success = true;
+                    return true;
                 }
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to set streams.");
-                response.Message = "Failed to set streams.";
             }
-            await hub.SendAsync("ReceiveResponse", response);
+            return false;
         });
 
-        hub.On<string>("GetInfo", async id =>
+        hub.On<string, NginxInfo?>("GetInfo", async id =>
         {
-            var response = new RequestResponse { RequestId = id };
             Logger.LogInformation($"Received GetInfo request: {id}");
             try
             {
-                var info = await GetNginxInfo(stoppingToken);
-                response.Data = info;
-                response.Success = true;
+                return await GetNginxInfo(stoppingToken);
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to get Nginx info.");
-                response.Message = "Failed to get Nginx info.";
             }
-            await hub.SendAsync("ReceiveResponse", response);
+            return null;
         });
     }
 
