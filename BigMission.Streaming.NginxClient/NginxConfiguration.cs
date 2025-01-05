@@ -1,4 +1,5 @@
 ﻿using BigMission.Streaming.Shared.Models;
+using NLog;
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -68,7 +69,6 @@ public partial class NginxConfiguration
     public static ImmutableArray<NginxStreamPush> GetStreams(string config)
     {
         var streams = new List<NginxStreamPush>();
-
         var start = config.IndexOf(CONFIG_STREAM_START) + CONFIG_STREAM_START.Length + 1;
         var end = config.IndexOf(CONFIG_STREAM_END);
         if (start == -1 || end == -1)
@@ -76,7 +76,7 @@ public partial class NginxConfiguration
             throw new Exception("Stream destinations not found in config.");
         }
 
-        var contents = config.Substring(start, end - start);
+        var contents = config[start..end];
         var lines = contents.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         foreach (var line in lines)
         {

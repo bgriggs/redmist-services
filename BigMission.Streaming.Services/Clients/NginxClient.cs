@@ -1,4 +1,5 @@
 ﻿using BigMission.Streaming.Services.Hubs;
+using BigMission.Streaming.Services.Models;
 using BigMission.Streaming.Shared.Models;
 using BigMission.TestHelpers;
 using Microsoft.AspNetCore.SignalR;
@@ -7,6 +8,9 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace BigMission.Streaming.Services.Clients;
 
+/// <summary>
+/// Provides methods to interact with Nginx servers.
+/// </summary>
 public class NginxClient
 {
     private readonly IConnectionMultiplexer cache;
@@ -38,6 +42,12 @@ public class NginxClient
                     info.Add((connectionId, nginxInfo));
                 }
             }
+            catch (IOException)
+            {
+                Logger.LogDebug($"Connection {connectionId} is no longer available. Removing...");
+                var db = cache.GetDatabase();
+                await RemoveConnection(db, connectionId);
+            }
             catch (Exception ex)
             {
                 Logger.LogError(ex, $"Failed to get Nginx info for connection {connectionId}");
@@ -57,21 +67,93 @@ public class NginxClient
     {
         // Get nginx info to resolve the host name
         var info = await GetAllServerInfo();
-        var nginxInfo = info.FirstOrDefault(i => string.Equals(i.info.HostName, hostName, StringComparison.OrdinalIgnoreCase));
-
-        if (nginxInfo == default)
+        var connections = info.Where(i => string.Equals(i.info.HostName, hostName, StringComparison.OrdinalIgnoreCase));
+        if (!connections.Any())
         {
             Logger.LogError($"Failed to find Nginx info for host {hostName}");
             return null;
         }
 
-        var client = nginxHub.Clients.Client(nginxInfo.connectionId);
-        var result = await client.InvokeAsync<bool>("SetStreams", streams.ToArray(), default);
-
-        if (result)
+        foreach (var conn in connections)
         {
-            return await client.InvokeAsync<NginxInfo?>("GetInfo", default);
+            var client = nginxHub.Clients.Client(conn.connectionId);
+            try
+            {
+                var result = await client.InvokeAsync<bool>("SetStreams", streams.ToArray(), default);
+
+                if (result)
+                {
+                    return await client.InvokeAsync<NginxInfo?>("GetInfo", default);
+                }
+            }
+            catch (IOException)
+            {
+                Logger.LogDebug($"Connection {conn.connectionId} is no longer available. Removing...");
+                var db = cache.GetDatabase();
+                await RemoveConnection(db, conn.connectionId);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, $"Failed to update streams for connection {conn.connectionId}");
+            }
         }
         return null;
+    }
+
+    public static async Task RemoveConnection(IDatabase db, string connectionId)
+    {
+        await db.HashDeleteAsync("NginxConnections", connectionId);
+    }
+
+    /// <summary>
+    /// Update the status of all Nginx servers in the cache.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<List<NginxStatus>> UpdateNginxServiceStatus()
+    {
+        var info = await GetAllServerInfo();
+        var result = new List<NginxStatus>();
+        var db = cache.GetDatabase();
+        foreach (var conn in info)
+        {
+            var client = nginxHub.Clients.Client(conn.connectionId);
+            try
+            {
+                var isActive = await client.InvokeAsync<bool>("GetIsActive", default);
+                result.Add(new NginxStatus { ServerHostName = conn.info.HostName, IsActive = isActive });
+            }
+            catch (IOException)
+            {
+                Logger.LogDebug($"Connection {conn.connectionId} is no longer available. Removing...");
+                await RemoveConnection(db, conn.connectionId);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, $"Failed to get Nginx status for connection {conn.connectionId}");
+            }
+        }
+
+        // Save results to hash in cache
+        var hashEntries = result.Select(r => new HashEntry(r.ServerHostName, r.IsActive)).ToArray();
+        // Save the status to Redis
+        await db.HashSetAsync("NginxStatus", hashEntries);
+        await db.KeyExpireAsync("NginxStatus", TimeSpan.FromMinutes(1));
+
+        return result;
+    }
+
+    /// <summary>
+    /// Get the status of all Nginx servers.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<List<NginxStatus>> GetNginxStatus()
+    {
+        var db = cache.GetDatabase();
+        var status = await db.HashGetAllAsync("NginxStatus");
+        return status.Select(s => new NginxStatus 
+        { 
+            ServerHostName = s.Name.ToString(), 
+            IsActive = s.Value.ToString() == "1" 
+        }).ToList();
     }
 }

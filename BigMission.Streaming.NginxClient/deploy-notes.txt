@@ -1,0 +1,22 @@
+scp -r C:\code\redmist-services\BigMission.Streaming.NginxClient\bin\Release\net9.0\publish\linux-x64\*  bgriggs@192.168.13.21:/home/bgriggs/redmist-agent/
+chmod +x /home/bgriggs/redmist-agent/BigMission.Streaming.NginxClient
+sudo ./BigMission.Streaming.NginxClient
+
+sudo cp /home/bgriggs/redmist-agent/RedMistNginxClient.service /etc/systemd/system
+sudo systemctl enable RedMistNginxClient.service
+sudo systemctl daemon-reload
+
+<Project>
+  <PropertyGroup>
+    <Configuration>Release</Configuration>
+    <Platform>Any CPU</Platform>
+    <PublishDir>bin\Release\net9.0\publish\linux-x64\</PublishDir>
+    <PublishProtocol>FileSystem</PublishProtocol>
+    <_TargetId>Folder</_TargetId>
+    <TargetFramework>net9.0</TargetFramework>
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+</Project>

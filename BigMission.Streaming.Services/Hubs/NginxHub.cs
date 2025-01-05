@@ -1,10 +1,13 @@
-﻿using BigMission.Streaming.Shared.Models;
+﻿using BigMission.Streaming.Services.Clients;
 using BigMission.TestHelpers;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 
 namespace BigMission.Streaming.Services.Hubs;
 
+/// <summary>
+/// SignalR hub for Nginx connections from Nginx Client agents running on Nginx server instances.
+/// </summary>
 public class NginxHub : Hub
 {
     private readonly IConnectionMultiplexer cache;
@@ -22,37 +25,20 @@ public class NginxHub : Hub
     public async override Task OnConnectedAsync()
     {
         await base.OnConnectedAsync();
-        var info = await Clients.Caller.InvokeAsync<NginxInfo?>("GetInfo", default);
-        if (info == null)
-        {
-            Logger.LogError("Failed to get Nginx info.");
-        }
-        else
-        {
-            await SaveConnection(Context.ConnectionId);
-            Logger.LogInformation($"Connected to Nginx {info.HostName}");
-        }
-        Context.Items.Add($"info", info);
+        await SaveConnection(Context.ConnectionId);
     }
 
     public async override Task OnDisconnectedAsync(Exception? exception)
     {
         await base.OnDisconnectedAsync(exception);
-        await RemoveConnection(Context.ConnectionId);
+        var db = cache.GetDatabase();
+        await NginxClient.RemoveConnection(db, Context.ConnectionId);
     }
-
-    
 
     private async Task SaveConnection(string connectionId)
     {
         var db = cache.GetDatabase();
         var hashEntries = new HashEntry[] { new(connectionId, DateTime.UtcNow.ToString()) };
         await db.HashSetAsync("NginxConnections", hashEntries);
-    }
-
-    private async Task RemoveConnection(string connectionId)
-    {
-        var db = cache.GetDatabase();
-        await db.HashDeleteAsync("NginxConnections", connectionId);
     }
 }

@@ -3,6 +3,7 @@ using BigMission.Database.V2;
 using BigMission.ServiceStatusTools;
 using BigMission.Streaming.Services.Clients;
 using BigMission.Streaming.Services.Hubs;
+using BigMission.Streaming.Services.Services;
 using BigMission.TestHelpers;
 using HealthChecks.UI.Client;
 using Keycloak.AuthServices.Authentication;
@@ -95,6 +96,8 @@ public class Program
         builder.Services.AddSingleton<StartupHealthCheck>();
         builder.Services.AddSingleton<ServiceTracking>();
         builder.Services.AddSingleton<NginxClient>();
+        builder.Services.AddHostedService<NginxStatusService>();
+
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
@@ -127,8 +130,10 @@ public class Program
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
+
         app.MapHub<NginxHub>("/nginx-hub");
         app.MapHub<ObsHub>("/obs-hub");
+        app.MapHub<UIStatusHub>("/streaming-status-hub");
 
         await app.RunAsync();
     }

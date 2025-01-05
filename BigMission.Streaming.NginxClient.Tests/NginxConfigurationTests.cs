@@ -5,6 +5,8 @@ namespace BigMission.Streaming.NginxClient.Tests;
 [TestClass]
 public sealed class NginxConfigurationTests
 {
+    // ****** Make sure to set the nginx.conf file to LF line endings (bottom right of the VS editor page in the file). ******
+
     [TestMethod]
     public void NoDestination_Test()
     {

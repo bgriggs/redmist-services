@@ -48,8 +48,10 @@ internal class HubClient : HubClientBase
             try
             {
                 var conf = await File.ReadAllTextAsync(nginxConfPath, stoppingToken);
-                var updatedConf = NginxConfiguration.SetStreamDestinations(nginxConfPath, [.. streams]);
+                var updatedConf = NginxConfiguration.SetStreamDestinations(conf, [.. streams]);
+                Logger.LogDebug("Writing new Nginx conf...");
                 await File.WriteAllTextAsync(nginxConfPath, updatedConf, stoppingToken);
+                Logger.LogDebug("Restarting Nginx...");
                 var exitCode = await RestartNginx(stoppingToken);
                 if (exitCode != 0)
                 {
@@ -57,6 +59,7 @@ internal class HubClient : HubClientBase
                 }
                 else
                 {
+                    Logger.LogInformation("Nginx restarted successfully.");
                     return true;
                 }
             }
@@ -67,9 +70,9 @@ internal class HubClient : HubClientBase
             return false;
         });
 
-        hub.On<string, NginxInfo?>("GetInfo", async id =>
+        hub.On("GetInfo", async () =>
         {
-            Logger.LogInformation($"Received GetInfo request: {id}");
+            Logger.LogInformation($"Received GetInfo request");
             try
             {
                 return await GetNginxInfo(stoppingToken);
@@ -79,6 +82,20 @@ internal class HubClient : HubClientBase
                 Logger.LogError(ex, "Failed to get Nginx info.");
             }
             return null;
+        });
+
+        hub.On("GetIsActive", async () =>
+        {
+            Logger.LogInformation($"Received GetIsActive request");
+            try
+            {
+                return await IsNginxActive(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to get Nginx status.");
+            }
+            return false;
         });
     }
 
@@ -96,13 +113,16 @@ internal class HubClient : HubClientBase
 
         info.HostName = Dns.GetHostName();
         var ips = await Dns.GetHostAddressesAsync(info.HostName, stoppingToken);
-
-        info.IP = ips.FirstOrDefault(ips => ips.AddressFamily == AddressFamily.InterNetwork)?.ToString() ?? "?";
+        foreach(var ip in ips)
+        {
+            Logger.LogTrace($"IP: {ip}");
+        }
+        info.IP = ips.FirstOrDefault(ips => ips.AddressFamily == AddressFamily.InterNetwork && !ips.ToString().StartsWith("127."))?.ToString() ?? "?";
 
         return info;
     }
 
-    private async static Task<int> RestartNginx(CancellationToken stoppingToken)
+    private async Task<int> RestartNginx(CancellationToken stoppingToken)
     {
         var procInfo = new ProcessStartInfo
         {
@@ -112,12 +132,38 @@ internal class HubClient : HubClientBase
             CreateNoWindow = true
         };
 
+        Logger.LogDebug($"Restarting Nginx: {procInfo.FileName} {procInfo.Arguments}");
         var p = Process.Start(procInfo);
         if (p == null)
         {
+            Logger.LogError("Nginx process handle is null");
             return -1;
         }
+        Logger.LogDebug($"Waiting for Nginx process to restart...");
         await p.WaitForExitAsync(stoppingToken);
+        Logger.LogDebug($"Nginx process restart exited with code {p.ExitCode}");
         return p.ExitCode;
+    }
+
+    public async Task<bool> IsNginxActive(CancellationToken stoppingToken)
+    {
+        var procInfo = new ProcessStartInfo
+        {
+            FileName = "/usr/bin/sudo",
+            Arguments = "/bin/systemctl is-active nginx",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true
+        };
+        Logger.LogDebug($"Checking Nginx status: {procInfo.FileName} {procInfo.Arguments}");
+        var p = Process.Start(procInfo);
+        if (p == null)
+        {
+            Logger.LogError("Nginx process handle is null");
+            return false;
+        }
+        var output = await p.StandardOutput.ReadToEndAsync();
+        Logger.LogDebug($"Nginx status: {output}");
+        return string.Equals(output.Trim(), "active", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -39,7 +39,7 @@ public abstract class HubClientBase : BackgroundService
 
         var builder = new HubConnectionBuilder()
             .WithUrl(url, options => options.AccessTokenProvider = async () => await KeycloakServiceToken.RequestClientToken(authUrl, realm, clientId, clientSecret))
-            .WithAutomaticReconnect();
+            .WithAutomaticReconnect(new InfiniteRetryPolicy());
 
         var connection = builder.Build();
         InitializeStateLogging(connection);
