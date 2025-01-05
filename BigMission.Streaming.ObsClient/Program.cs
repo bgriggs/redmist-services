@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NLog.Extensions.Logging;
 
@@ -9,11 +10,13 @@ internal class Program
     static async Task Main(string[] args)
     {
         Console.Title = "OBS Client";
-        Console.WriteLine("Hello, World!");
         var builder = Host.CreateApplicationBuilder(args);
         builder.Logging.ClearProviders();
         builder.Logging.AddNLog("NLog");
-        //builder.Services.AddHostedService<Worker>();
+
+        builder.Services.AddSingleton<ObsClient>();
+        builder.Services.AddSingleton<HubClient>();
+        builder.Services.AddHostedService<ObsService>();
 
         var host = builder.Build();
         await host.RunAsync();

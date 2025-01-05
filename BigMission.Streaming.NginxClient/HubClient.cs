@@ -117,7 +117,7 @@ internal class HubClient : HubClientBase
         {
             Logger.LogTrace($"IP: {ip}");
         }
-        info.IP = ips.FirstOrDefault(ips => ips.AddressFamily == AddressFamily.InterNetwork && !ips.ToString().StartsWith("127."))?.ToString() ?? "?";
+        info.IP = ips.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork && !ip.ToString().StartsWith("127."))?.ToString() ?? "?";
 
         return info;
     }
