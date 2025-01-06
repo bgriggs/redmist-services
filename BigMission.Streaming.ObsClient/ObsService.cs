@@ -48,27 +48,28 @@ internal class ObsService : BackgroundService
             {
                 Logger.LogDebug($"OBS status loop took {sw.ElapsedMilliseconds}ms");
 
-                // Check if OBS is running and start it if not
-                if (!result.status.IsObsRunning)
-                {
-                    Logger.LogWarning("OBS is not running. Attempting to start OBS...");
-                    bool obsResult = TryStartObsProcess();
-                    if (!obsResult)
-                    {
-                        Logger.LogError("Failed to start OBS.");
-                    }
-                }
+                // Disable for now as this doesn't launch the GUI of the applications correctly
+                //// Check if OBS is running and start it if not
+                //if (!result.status.IsObsRunning)
+                //{
+                //    Logger.LogWarning("OBS is not running. Attempting to start OBS...");
+                //    bool obsResult = TryStartObsProcess();
+                //    if (!obsResult)
+                //    {
+                //        Logger.LogError("Failed to start OBS.");
+                //    }
+                //}
 
-                // Check if Loopy SRT Monitor is running and start it if not
-                if (!result.status.IsSrtMonitorRunning && result.status.IsObsRunning)
-                {
-                    Logger.LogWarning("Loopy SRT Monitor is not running. Attempting to start Loopy SRT Monitor...");
-                    bool loopyMonitorResult = TryStartLoopyMonitorProcess();
-                    if (!loopyMonitorResult)
-                    {
-                        Logger.LogError("Failed to start Loopy SRT Monitor.");
-                    }
-                }
+                //// Check if Loopy SRT Monitor is running and start it if not
+                //if (!result.status.IsSrtMonitorRunning && result.status.IsObsRunning)
+                //{
+                //    Logger.LogWarning("Loopy SRT Monitor is not running. Attempting to start Loopy SRT Monitor...");
+                //    bool loopyMonitorResult = TryStartLoopyMonitorProcess();
+                //    if (!loopyMonitorResult)
+                //    {
+                //        Logger.LogError("Failed to start Loopy SRT Monitor.");
+                //    }
+                //}
             }
             var delay = 1000 - sw.ElapsedMilliseconds;
             if (delay > 0)
@@ -144,7 +145,16 @@ internal class ObsService : BackgroundService
     {
         try
         {
-            Process.Start(path);
+            if (!File.Exists(path))
+            {
+                Logger.LogDebug($"File not found: {path}");
+                return false;
+            }
+            var p = new ProcessStartInfo(path)
+            {
+                WorkingDirectory = Path.GetDirectoryName(path)
+            };
+            Process.Start(p);
             return true;
         }
         catch (Exception ex)

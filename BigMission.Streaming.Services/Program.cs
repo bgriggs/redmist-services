@@ -96,6 +96,8 @@ public class Program
         builder.Services.AddSingleton<StartupHealthCheck>();
         builder.Services.AddSingleton<ServiceTracking>();
         builder.Services.AddSingleton<NginxClient>();
+        builder.Services.AddSingleton<ObsClient>();
+        builder.Services.AddSingleton<HubConnectionContext>();
         builder.Services.AddHostedService<NginxStatusService>();
 
         var app = builder.Build();

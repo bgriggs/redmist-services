@@ -1,0 +1,4 @@
+sc.exe create "Red Mist OBS Client" binpath= "\"C:\Program Files\RedMistObsClient\BigMission.Streaming.ObsClient.exe\" --contentRoot \"C:\Program Files\RedMistObsClient\"" obj= .\administrator password= ZAQ!2wsxCDE#
+sc.exe delete "Red Mist OBS Client"
+sc.exe start "Red Mist OBS Client"
+sc.exe stop "Red Mist OBS Client"

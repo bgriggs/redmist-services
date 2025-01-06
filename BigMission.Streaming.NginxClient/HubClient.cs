@@ -41,6 +41,7 @@ internal class HubClient : HubClientBase
         }
 
         var hub = StartConnection(stoppingToken);
+        hub.On("GetHostName", Dns.GetHostName);
 
         hub.On<NginxStreamPush[], bool>("SetStreams", async (streams) =>
         {

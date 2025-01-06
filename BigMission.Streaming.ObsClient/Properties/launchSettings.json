@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BigMission.Streaming.ObsClient": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

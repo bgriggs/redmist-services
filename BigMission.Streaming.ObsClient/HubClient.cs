@@ -3,6 +3,7 @@ using BigMission.Streaming.Shared.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace BigMission.Streaming.ObsClient;
 
@@ -33,6 +34,7 @@ internal class HubClient : HubClientBase
         // Streaming
         hubConnection.On("StartStreaming", async () => await OnStartStreamingAsync(stoppingToken));
         hubConnection.On("StopStreaming", async () => await OnStopStreamingAsync(stoppingToken));
+        hubConnection.On("GetHostName", Dns.GetHostName);
 
         return Task.CompletedTask;
     }
