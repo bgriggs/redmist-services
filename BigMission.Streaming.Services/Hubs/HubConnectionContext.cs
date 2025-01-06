@@ -1,4 +1,5 @@
-﻿using StackExchange.Redis;
+﻿using Microsoft.AspNetCore.SignalR;
+using StackExchange.Redis;
 
 namespace BigMission.Streaming.Services.Hubs;
 
@@ -7,45 +8,55 @@ namespace BigMission.Streaming.Services.Hubs;
 /// </summary>
 public class HubConnectionContext
 {
-    private readonly Dictionary<string, BaseHub> _hubs = [];
+    private readonly Dictionary<string, IHubContext> _hubs = [];
+    private readonly Dictionary<string, string> _connectionKeys = [];
+    private readonly Dictionary<string, string> _connectionNameRequest = [];
     private readonly IConnectionMultiplexer cache;
     private ILogger Logger { get; }
 
-    public HubConnectionContext(IConnectionMultiplexer cache, ILoggerFactory loggerFactory)
+    public HubConnectionContext(IConnectionMultiplexer cache, ILoggerFactory loggerFactory, 
+        IHubContext<NginxHub> nginxContext, IHubContext<ObsHub> obsContext)
     {
         Logger = loggerFactory.CreateLogger(GetType().Name);
         this.cache = cache;
+
+        _hubs[nameof(NginxHub)] = (IHubContext)nginxContext;
+        _hubs[nameof(ObsHub)] = (IHubContext)obsContext;
+
+        _connectionKeys[nameof(NginxHub)] = NginxHub.CONNECTION_CACHE_KEY;
+        _connectionKeys[nameof(ObsHub)] = ObsHub.CONNECTION_CACHE_KEY;
+
+        _connectionNameRequest[nameof(NginxHub)] = NginxHub.CONNECTION_NAME_REQUEST;
+        _connectionNameRequest[nameof(ObsHub)] = ObsHub.CONNECTION_NAME_REQUEST;
     }
 
-    public void RegisterHub(BaseHub hub)
-    {
-        _hubs[hub.GetType().Name] = hub;
-    }
-
-    public T? GetHub<T>() where T : BaseHub
+    public IHubContext? GetHub<T>() where T : BaseHub
     {
         if (_hubs.TryGetValue(typeof(T).Name, out var hub))
         {
-            return hub as T;
+            return hub;
         }
         return null;
     }
 
     public async Task RemoveConnectionAsync<T>(string connectionId) where T : BaseHub
     {
-        var hub = GetHub<T>();
-        if (hub != null)
+        if (_connectionKeys.TryGetValue(typeof(T).Name, out var key))
         {
-            await hub.RemoveConnection(connectionId);
+            var db = cache.GetDatabase();
+            await db.HashDeleteAsync(key, connectionId);
+        }
+        else
+        {
+            Logger.LogWarning($"No connection key found for {typeof(T).Name}");
         }
     }
 
     public async Task<List<string>> GetConnectionsAsync<T>(IDatabase cache) where T : BaseHub
     {
-        var hub = GetHub<T>();
-        if (hub != null)
+        if (_connectionKeys.TryGetValue(typeof(T).Name, out var key))
         {
-            var connections = await cache.HashGetAllAsync(hub.ConnectionCacheKey);
+            var connections = await cache.HashGetAllAsync(key);
             return [.. connections.Select(c => c.Name.ToString())];
         }
         return [];
@@ -73,18 +84,13 @@ public class HubConnectionContext
             try
             {
                 var client = hub.Clients.Client(connectionId);
-                var result = await client.InvokeCoreAsync<V?>(method, [], default);
+                var result = await client.InvokeAsync<V?>(method, default);
                 if (result != null)
                 {
                     results.Add((connectionId, result));
                 }
             }
             catch (IOException)
-            {
-                Logger.LogDebug($"Connection {connectionId} is no longer available. Removing...");
-                await RemoveConnectionAsync<NginxHub>(connectionId);
-            }
-            catch (ObjectDisposedException)
             {
                 Logger.LogDebug($"Connection {connectionId} is no longer available. Removing...");
                 await RemoveConnectionAsync<NginxHub>(connectionId);
@@ -106,12 +112,11 @@ public class HubConnectionContext
     public async Task<string> RequestConnectionIdByNameAsync<T>(string connectionName) where T : BaseHub
     {
         var hub = GetHub<T>();
-        if (hub == null)
+        if (_connectionNameRequest.TryGetValue(typeof(T).Name, out var methodName))
         {
-            return string.Empty;
+            var connectionNames = await InvokeAllConnections<T, string>(methodName);
+            return connectionNames.FirstOrDefault(c => string.Equals(c.result, connectionName, StringComparison.OrdinalIgnoreCase)).connectionId;
         }
-
-        var connectionNames = await InvokeAllConnections<T, string>(hub.ConnectionNameRequest);
-        return connectionNames.FirstOrDefault(c => string.Equals(c.result, connectionName, StringComparison.OrdinalIgnoreCase)).connectionId;
+        return string.Empty;
     }
 }

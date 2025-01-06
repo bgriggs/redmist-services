@@ -41,4 +41,10 @@
 	  <ProjectReference Include="..\BigMission.Streaming.Shared\BigMission.Streaming.Shared.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Content Update="appsettings.Development.json">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+
 </Project>

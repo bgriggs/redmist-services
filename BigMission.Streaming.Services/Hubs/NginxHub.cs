@@ -8,11 +8,13 @@ namespace BigMission.Streaming.Services.Hubs;
 /// </summary>
 public class NginxHub : BaseHub
 {
-    public override string ConnectionCacheKey => "NginxConnections";
+    public const string CONNECTION_CACHE_KEY = "NginxConnections";
+    public override string ConnectionCacheKey => CONNECTION_CACHE_KEY;
 
-    public override string ConnectionNameRequest => "GetHostName";
+    public const string CONNECTION_NAME_REQUEST = "GetHostName";
+    public override string ConnectionNameRequest => CONNECTION_NAME_REQUEST;
 
-    public NginxHub(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDateTimeHelper dateTime, HubConnectionContext connectionContext) :
-        base(loggerFactory, cache, dateTime, connectionContext)
+    public NginxHub(IConnectionMultiplexer cache, IDateTimeHelper dateTime) :
+        base(cache, dateTime)
     { }
 }

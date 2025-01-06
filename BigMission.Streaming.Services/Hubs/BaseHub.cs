@@ -7,18 +7,14 @@ namespace BigMission.Streaming.Services.Hubs;
 public abstract class BaseHub : Hub
 {
     private readonly IConnectionMultiplexer cache;
-
-    private ILogger Logger { get; }
     public IDateTimeHelper DateTime { get; }
     public abstract string ConnectionCacheKey { get; }
     public abstract string ConnectionNameRequest { get; }
 
-    public BaseHub(ILoggerFactory loggerFactory, IConnectionMultiplexer cache, IDateTimeHelper dateTime, HubConnectionContext connectionContext)
+    public BaseHub(IConnectionMultiplexer cache, IDateTimeHelper dateTime)
     {
-        Logger = loggerFactory.CreateLogger(GetType().Name);
         this.cache = cache;
         DateTime = dateTime;
-        connectionContext.RegisterHub(this);
     }
 
     public async override Task OnConnectedAsync()
@@ -45,6 +41,4 @@ public abstract class BaseHub : Hub
         var db = cache.GetDatabase();
         await db.HashDeleteAsync(ConnectionCacheKey, connectionId);
     }
-
-    
 }

@@ -134,11 +134,6 @@ public class NginxClient
                 Logger.LogDebug($"Connection {conn.connectionId} is no longer available. Removing...");
                 await connectionContext.RemoveConnectionAsync<NginxHub>(conn.connectionId);
             }
-            catch (ObjectDisposedException)
-            {
-                Logger.LogDebug($"Connection {conn.connectionId} is no longer available. Removing...");
-                await connectionContext.RemoveConnectionAsync<NginxHub>(conn.connectionId);
-            }
             catch (Exception ex)
             {
                 Logger.LogError(ex, $"Failed to get Nginx status for connection {conn.connectionId}");
